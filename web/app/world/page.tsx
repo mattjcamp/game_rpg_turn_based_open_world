@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 const GameCanvas = dynamic(() => import("@/components/GameCanvas"), {
   ssr: false,
@@ -13,6 +14,19 @@ const GameCanvas = dynamic(() => import("@/components/GameCanvas"), {
 });
 
 export default function WorldPage() {
+  // Hydrate the rolling save before the canvas mounts. The canvas
+  // boots Phaser which boots OverworldScene, which reads
+  // `gameState.lastScene` and routes the player back into the
+  // dungeon / town they were last in. Done in an effect so it only
+  // fires once per mount and never on the server.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    void import("@/game/save").then(({ load }) => {
+      load();  // false on first run / after "Start New Game" — fine
+      setReady(true);
+    });
+  }, []);
+
   // h-screen + overflow-hidden prevents the page from scrolling when the
   // viewport is shorter than 720px + chrome. The canvas wrapper is
   // `flex-1` + `min-h-0` so it auto-shrinks to fill remaining space, and
@@ -27,7 +41,9 @@ export default function WorldPage() {
         <span className="w-16" /> {/* spacer */}
       </div>
       <div className="flex min-h-0 w-full flex-1 items-center justify-center">
-        <GameCanvas startScene="OverworldScene" />
+        {ready ? <GameCanvas startScene="OverworldScene" /> : (
+          <div className="text-parchment/60">Loading the world&hellip;</div>
+        )}
       </div>
       <p className="mt-1 max-w-[960px] shrink-0 text-center text-xs text-parchment/40">
         Walk around with WASD / arrow keys, or tap a tile next to you. Stepping

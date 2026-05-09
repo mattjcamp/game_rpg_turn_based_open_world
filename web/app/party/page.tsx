@@ -12,6 +12,7 @@
  */
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   loadParty,
@@ -34,6 +35,7 @@ function fmtMod(n: number): string {
 }
 
 export default function FormPartyPage() {
+  const router = useRouter();
   const [party, setParty] = useState<Party | null>(null);
   const [active, setActive] = useState<Set<number>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
@@ -78,6 +80,20 @@ export default function FormPartyPage() {
     party.activeParty = Array.from(active).sort((a, b) => a - b);
     saveStoredRoster(party);
     setMessage("Party saved!");
+  }
+
+  /** Save the roster + start the adventure. Called by the "Begin
+   *  Adventure" button at the bottom of the page; routes the player
+   *  to /world where the OverworldScene takes over. */
+  function beginAdventure(): void {
+    if (!party) return;
+    if (active.size === 0) {
+      setMessage("Select at least one character before beginning.");
+      return;
+    }
+    party.activeParty = Array.from(active).sort((a, b) => a - b);
+    saveStoredRoster(party);
+    router.push("/world");
   }
 
   function deleteMember(idx: number): void {
@@ -210,9 +226,15 @@ export default function FormPartyPage() {
           </Link>
           <button
             onClick={save}
-            className="rounded border border-ember bg-ember/40 px-4 py-2 text-sm text-parchment hover:bg-ember/60"
+            className="rounded border border-parchment/30 px-4 py-2 text-sm text-parchment/80 hover:bg-parchment/10"
           >
             Save Party
+          </button>
+          <button
+            onClick={beginAdventure}
+            className="rounded border border-ember bg-ember/40 px-5 py-2 text-sm text-parchment hover:bg-ember/60"
+          >
+            Begin Adventure &rarr;
           </button>
         </div>
       </div>

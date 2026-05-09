@@ -21,6 +21,7 @@ import { makeClock, type GameClock } from "./world/GameTime";
 import type { ExamineLayout } from "./world/Examine";
 import type { DungeonLevel } from "./world/Dungeon";
 import type { QuestState } from "./world/Quests";
+import type { LastSceneSnapshot } from "./save";
 
 export interface GameState {
   /** Combat-layer party — slim Combatant[] used by CombatScene only.
@@ -138,6 +139,13 @@ export interface GameState {
    * `quest_interior_monsters` dict.
    */
   interiorMonsters: Map<string, InteriorMonster[]>;
+  /**
+   * The active scene + its init payload — written by each scene's
+   * create() and read by the resume path on "Return to Game" so the
+   * player lands back in whichever map they were on. Null until any
+   * scene boots for the first time (which it does within ~1s of the
+   * world page loading). */
+  lastScene: LastSceneSnapshot | null;
 }
 
 export interface InteriorMonster {
@@ -181,10 +189,18 @@ function makeFreshState(): GameState {
     combatLocation: "",
     pendingKilledMonsters: [],
     interiorMonsters: new Map(),
+    lastScene: null,
   };
 }
 
 export const gameState: GameState = makeFreshState();
+
+// Live-debug hook — exposes the singleton on window so the browser
+// console / Claude-in-Chrome MCP can inspect quest progress, party
+// data, dungeon cache, etc. without going through a scene.
+if (typeof window !== "undefined") {
+  (window as unknown as { __gameState?: GameState }).__gameState = gameState;
+}
 
 export function resetGameState(): void {
   const fresh = makeFreshState();
@@ -206,6 +222,7 @@ export function resetGameState(): void {
   gameState.combatLocation = fresh.combatLocation;
   gameState.pendingKilledMonsters = fresh.pendingKilledMonsters;
   gameState.interiorMonsters = fresh.interiorMonsters;
+  gameState.lastScene = fresh.lastScene;
 }
 
 export function triggerKey(col: number, row: number): string {

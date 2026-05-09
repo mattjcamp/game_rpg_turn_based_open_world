@@ -348,12 +348,29 @@ export class CombatScene extends Phaser.Scene {
     this.turnUndeadUsed = false;
     this.classTemplates.clear();
     this.actionCursor = 0;
+    // Defensive cleanup — `init()` runs whenever the scene boots,
+    // including re-entries after combat → overworld → combat.
+    // Phaser's shutdown is supposed to destroy all GameObjects, but
+    // a "phantom HP bars" report (HP bars from a previous combat
+    // showing up in the next one) points to a path where stale
+    // GameObjects survived. Walking the maps and calling destroy()
+    // belt-and-braces means a no-op when Phaser already cleaned
+    // them, and a real cleanup when it didn't.
+    for (const body of this.bodies.values()) body?.destroy();
     this.bodies.clear();
+    for (const ring of this.selRings.values()) ring?.destroy();
     this.selRings.clear();
+    for (const r of this.moveHintRects) r?.destroy();
     this.moveHintRects.length = 0;
     this.partyCards.clear();
+    for (const b of this.monsterHpBars.values()) {
+      b.bg?.destroy();
+      b.bar?.destroy();
+    }
     this.monsterHpBars.clear();
+    for (const t of this.actionTexts) t?.destroy();
     this.actionTexts.length = 0;
+    for (const h of this.actionRowHandles) h?.destroy();
     this.actionRowHandles.length = 0;
     this.mode = "default";
     this.pendingAction = null;
@@ -398,6 +415,12 @@ export class CombatScene extends Phaser.Scene {
   }
 
   async create(): Promise<void> {
+    // Live-debug hook — `window.__combat` is the running CombatScene
+    // so the dev console / Claude-in-Chrome can introspect the
+    // engine state when something looks off.
+    if (typeof window !== "undefined") {
+      (window as unknown as { __combat?: CombatScene }).__combat = this;
+    }
     // Items + spells back the action sub-menus and the
     // party-bridge's stat derivation, so load them up-front before
     // we build Combat.
@@ -1387,6 +1410,52 @@ export class CombatScene extends Phaser.Scene {
     this.mode = "pick-target";
     this.clearPicker();
     this.drawTargetBadges(side);
+    // If no valid targets were drawn (e.g. ranged weapon with all
+    // enemies out of range, throw with no live foes, cast on
+    // allies that are all already at full HP), the picker would be
+    // silently empty — pressing 1..9 / clicking does nothing and the
+    // player can't tell why. Bail out with an explanation in the
+    // combat log so the move stays usable on a future turn.
+    if (this.targetBadges.length === 0) {
+      const reason = this.noTargetReason(action, side);
+      this.combat.log.push(reason);
+      this.refreshLog();
+      this.pendingAction = null;
+      this.mode = "default";
+      this.refreshActionMenu();
+    }
+  }
+
+  /**
+   * Build a "why no targets" message for a picker that landed on an
+   * empty list. The text is action-specific so the player knows
+   * exactly what gate failed (out of range, no allies hurt, no foes
+   * alive, etc.) — vague banners would just shift the confusion.
+   */
+  private noTargetReason(action: PendingAction, side: "party" | "enemies"): string {
+    const sideHasAnyone = this.combat.combatants.some(
+      (c) => c.side === side && c.hp > 0,
+    );
+    if (action.kind === "range") {
+      const max = maxRangeFor(action.weapon);
+      if (!sideHasAnyone) {
+        return `${this.combat.current.name}: no enemies left to fire at.`;
+      }
+      return `${this.combat.current.name}: no enemies within ${max} tiles — ${action.weapon.name} can't reach. Move closer first.`;
+    }
+    if (action.kind === "throw") {
+      if (!sideHasAnyone) {
+        return `${this.combat.current.name}: no enemies left to throw at.`;
+      }
+      return `${this.combat.current.name}: no enemies in range to throw ${action.item.name} at.`;
+    }
+    if (action.kind === "cast") {
+      if (side === "party") {
+        return `${this.combat.current.name}: no valid ally targets for ${action.spell.name}.`;
+      }
+      return `${this.combat.current.name}: no valid enemy targets for ${action.spell.name}.`;
+    }
+    return `${this.combat.current.name}: no targets available.`;
   }
 
   private currentTargetList(): Combatant[] {
@@ -2638,8 +2707,15 @@ export class CombatScene extends Phaser.Scene {
       const handle = this.actionRowHandles[i];
       const enabled = isEnabled(a.id);
       const cursor = playerTurn && i === this.actionCursor;
-      const color = !enabled ? C.faint : cursor ? C.body : C.dim;
-      text.setStyle(FONT_BODY(color));
+      // Enabled rows (whether or not the cursor is on them) share the
+      // same bright body colour — the leading `> ` arrow on the
+      // cursor row is the only differentiator. This sidesteps the
+      // "Attack looks dimmer than End Turn so I assume it's disabled"
+      // confusion that the previous `dim`-vs-`body` split caused.
+      // `setColor` rather than `setStyle` so Phaser flushes the
+      // colour change reliably even when the text body hasn't changed.
+      const color = enabled ? C.body : C.faint;
+      text.setColor(hex(color));
       const prefix = cursor ? "> " : "  ";
       const suffix = enabled ? "" : "  —";
       text.setText(`${prefix}${a.label}${suffix}`);

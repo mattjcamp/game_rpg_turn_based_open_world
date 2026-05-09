@@ -41,5 +41,13 @@ export function startGame(parent: HTMLElement, startScene: StartScene = "Overwor
     },
     scene: sceneOrder,
   };
-  return new Phaser.Game(config);
+  const game = new Phaser.Game(config);
+  // Live-debug hook — exposes the running Phaser.Game on window so
+  // the dev console / Claude-in-Chrome MCP can poke at scenes,
+  // state, and start arbitrary scenes for testing without having
+  // to drive the avatar through the world.
+  if (typeof window !== "undefined") {
+    (window as unknown as { __phaserGame?: Phaser.Game }).__phaserGame = game;
+  }
+  return game;
 }

@@ -26,6 +26,7 @@
 
 import Phaser from "phaser";
 import { gameState } from "../state";
+import { rememberScene } from "../save";
 import {
   tileDef,
   loadTileDefs,
@@ -383,6 +384,18 @@ export class DungeonScene extends Phaser.Scene {
       for (const m of result.messages) console.log("[quest]", m);
     }
     gameState.pendingKilledMonsters = [];
+
+    // Save snapshot — closing the tab inside the dungeon resumes
+    // back into this same dungeon on next launch. The payload
+    // is the same init shape the scene started with.
+    rememberScene({
+      key: "DungeonScene",
+      payload: {
+        dungeonName: this.dungeonName,
+        overworldCol: this.overworldCol,
+        overworldRow: this.overworldRow,
+      },
+    });
   }
 
   /**

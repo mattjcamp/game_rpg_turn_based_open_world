@@ -132,6 +132,7 @@ import {
 import { paintMoonPhase, MOON_HUD_SIZE } from "../world/MoonIcon";
 import { withBase, dataPath } from "../world/Module";
 import { gameState } from "../state";
+import { rememberScene } from "../save";
 
 const TILE = 32;
 const HUD_HEIGHT = 56;
@@ -501,6 +502,21 @@ export class TownScene extends Phaser.Scene {
       for (const m of result.messages) console.log("[quest]", m);
     }
     gameState.pendingKilledMonsters = [];
+
+    // Save snapshot — the player can close the tab here and pick
+    // up exactly where they left off. The payload mirrors the init
+    // data the scene takes so a fresh boot routes back into this
+    // same town / interior at the same entry tile.
+    rememberScene({
+      key: "TownScene",
+      payload: {
+        townName: this.townName,
+        entryCol: this.playerCol,
+        entryRow: this.playerRow,
+        returnCol: this.returnCol,
+        returnRow: this.returnRow,
+      },
+    });
   }
 
   // ── Coordinate helpers ───────────────────────────────────────────

@@ -40,6 +40,7 @@ import {
 import { paintMoonPhase, MOON_HUD_SIZE } from "../world/MoonIcon";
 import { partyLightRadius } from "../world/PartyActions";
 import { gameState, triggerKey } from "../state";
+import { rememberScene } from "../save";
 import type { Combatant } from "../types";
 import {
   loadSpawnPoints,
@@ -84,6 +85,17 @@ import { normalizeSpritePath } from "../world/Towns";
 
 const TILE = 32; // matches the source PNGs' native size
 const HUD_HEIGHT = 56;
+
+/**
+ * One-shot gate for the save-resume routing. Set after the first
+ * OverworldScene boot of the page session so subsequent legitimate
+ * transitions (Town → Overworld via an exit tile, Dungeon →
+ * Overworld) don't bounce the player back into whatever scene
+ * `gameState.lastScene` happens to remember from its most recent
+ * `rememberScene` call. Module-level so it resets on hard reload —
+ * which is exactly when we DO want resume to fire again.
+ */
+let _resumeChecked = false;
 
 export class OverworldScene extends Phaser.Scene {
   private tileMap!: TileMap;
@@ -315,6 +327,21 @@ export class OverworldScene extends Phaser.Scene {
     }
 
     if (gameState.defeated) this.showDefeat();
+
+    // Resume routing — only on the FIRST OverworldScene boot of the
+    // page session. After that, every legitimate Town/Dungeon → exit
+    // tile transition starts OverworldScene fresh, and we must NOT
+    // bounce the player back into the scene `lastScene` happens to
+    // hold (which is whatever Town/Dungeon they last visited).
+    if (!_resumeChecked) {
+      _resumeChecked = true;
+      const snap = gameState.lastScene;
+      if (snap && snap.key !== "OverworldScene") {
+        this.scene.start(snap.key, snap.payload);
+        return;
+      }
+    }
+    rememberScene({ key: "OverworldScene", payload: {} });
   }
 
   // ── Static rendering ─────────────────────────────────────────────
