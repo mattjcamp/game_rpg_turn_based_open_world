@@ -8,7 +8,14 @@ import {
   memberFromRaw,
   spriteForMember,
   activeMembers,
+  mergeStackableInventory,
+  mergePartyStackables,
+  findAmmoInStash,
+  consumeAmmoFromStash,
+  partyHasAmmo,
+  swapToMeleeIfOutOfAmmo,
 } from "./Party";
+import type { Item } from "./Items";
 
 describe("spriteForMember", () => {
   it("keeps a normalised /assets/characters/<known>.png path as-is", () => {
@@ -122,5 +129,197 @@ describe("partyFromRaw", () => {
     expect(p.activeParty).toEqual([0, 1, 2, 3]);
     expect(p.partyEffects.effect_1).toBeNull();
     expect(p.inventory).toEqual([]);
+  });
+});
+
+/** Items map for the stacking helpers' tests. */
+function stackingItems(): Map<string, Item> {
+  const items = new Map<string, Item>();
+  items.set("Arrows", { name: "Arrows", category: "general", stackable: true, charges: 20 } as Item);
+  items.set("Bolts",  { name: "Bolts",  category: "general", stackable: true, charges: 20 } as Item);
+  items.set("Healing Herb", { name: "Healing Herb", category: "general", stackable: true, charges: 1 } as Item);
+  items.set("Sword",        { name: "Sword",        category: "weapons" } as Item);
+  items.set("Long Bow", {
+    name: "Long Bow", category: "weapons", ranged: true, ammo: "Arrows", power: 7,
+  } as Item);
+  items.set("Crossbow", {
+    name: "Crossbow", category: "weapons", ranged: true, ammo: "Bolts", power: 9,
+  } as Item);
+  items.set("Round Shield", {
+    name: "Round Shield", category: "armors",
+  } as Item);
+  return items;
+}
+
+describe("mergeStackableInventory", () => {
+  it("collapses duplicate stackable entries summing charges", () => {
+    const merged = mergeStackableInventory(
+      [
+        { item: "Arrows", charges: 20 },
+        { item: "Arrows", charges: 20 },
+        { item: "Sword" },
+      ],
+      stackingItems(),
+    );
+    expect(merged).toEqual([
+      { item: "Arrows", charges: 40 },
+      { item: "Sword" },
+    ]);
+  });
+
+  it("treats a missing charges field as 1", () => {
+    const merged = mergeStackableInventory(
+      [{ item: "Healing Herb" }, { item: "Healing Herb" }, { item: "Healing Herb" }],
+      stackingItems(),
+    );
+    expect(merged).toEqual([{ item: "Healing Herb", charges: 3 }]);
+  });
+
+  it("leaves non-stackable items alone (one row per copy)", () => {
+    const merged = mergeStackableInventory(
+      [{ item: "Sword" }, { item: "Sword" }],
+      stackingItems(),
+    );
+    expect(merged).toEqual([{ item: "Sword" }, { item: "Sword" }]);
+  });
+
+  it("is idempotent — running on already-merged inventory is a no-op", () => {
+    const items = stackingItems();
+    const once = mergeStackableInventory(
+      [{ item: "Arrows", charges: 20 }, { item: "Arrows", charges: 40 }],
+      items,
+    );
+    const twice = mergeStackableInventory(once, items);
+    expect(twice).toEqual([{ item: "Arrows", charges: 60 }]);
+  });
+
+  it("ignores items the catalog doesn't know", () => {
+    const merged = mergeStackableInventory(
+      [{ item: "Phantom Glaive" }, { item: "Phantom Glaive" }],
+      stackingItems(),
+    );
+    expect(merged).toEqual([{ item: "Phantom Glaive" }, { item: "Phantom Glaive" }]);
+  });
+});
+
+describe("mergePartyStackables", () => {
+  it("merges shared stash AND every roster member's bag", () => {
+    const p = partyFromRaw({
+      roster: [
+        {
+          name: "Gimli", class: "Fighter", hp: 20,
+          inventory: [{ item: "Healing Herb" }, { item: "Healing Herb" }],
+        },
+      ],
+      inventory: [
+        { item: "Arrows", charges: 20 },
+        { item: "Arrows", charges: 20 },
+        { item: "Sword" },
+      ],
+    });
+    mergePartyStackables(p, stackingItems());
+    expect(p.inventory).toEqual([
+      { item: "Arrows", charges: 40 },
+      { item: "Sword" },
+    ]);
+    expect(p.roster[0].inventory).toEqual([{ item: "Healing Herb", charges: 2 }]);
+  });
+});
+
+describe("findAmmoInStash / partyHasAmmo / consumeAmmoFromStash", () => {
+  it("findAmmoInStash returns the index + entry, null when absent", () => {
+    const p = partyFromRaw({ inventory: [{ item: "Arrows", charges: 5 }] });
+    expect(findAmmoInStash(p, "Arrows")).toEqual({
+      index: 0, entry: { item: "Arrows", charges: 5 },
+    });
+    expect(findAmmoInStash(p, "Bolts")).toBeNull();
+  });
+
+  it("partyHasAmmo flips false when the only stack hits zero", () => {
+    const p = partyFromRaw({ inventory: [{ item: "Arrows", charges: 1 }] });
+    expect(partyHasAmmo(p, "Arrows")).toBe(true);
+    expect(consumeAmmoFromStash(p, "Arrows")).toBe(true);
+    expect(partyHasAmmo(p, "Arrows")).toBe(false);
+    // Spent stacks are removed entirely so the inventory doesn't
+    // grow zero-charge tombstones.
+    expect(p.inventory).toEqual([]);
+  });
+
+  it("consumeAmmoFromStash decrements without removing while charges remain", () => {
+    const p = partyFromRaw({ inventory: [{ item: "Arrows", charges: 3 }] });
+    expect(consumeAmmoFromStash(p, "Arrows")).toBe(true);
+    expect(p.inventory).toEqual([{ item: "Arrows", charges: 2 }]);
+  });
+
+  it("consumeAmmoFromStash returns false when no matching stack exists", () => {
+    const p = partyFromRaw({ inventory: [] });
+    expect(consumeAmmoFromStash(p, "Arrows")).toBe(false);
+  });
+});
+
+describe("swapToMeleeIfOutOfAmmo", () => {
+  it("swaps the offhand into the main hand when out of ammo", () => {
+    const p = partyFromRaw({
+      roster: [{
+        name: "Legolas", class: "Thief", hp: 18,
+        equipped: { right_hand: "Long Bow", left_hand: "Sword", body: null, head: null },
+      }],
+      inventory: [], // no Arrows
+    });
+    const m = p.roster[0];
+    const r = swapToMeleeIfOutOfAmmo(m, p, stackingItems());
+    expect(r).toEqual({ from: "Long Bow", to: "Sword" });
+    expect(m.equipped.rightHand).toBe("Sword");
+    expect(m.equipped.leftHand).toBeNull();
+  });
+
+  it("no-op when the party still has matching ammo", () => {
+    const p = partyFromRaw({
+      roster: [{
+        name: "Legolas", class: "Thief", hp: 18,
+        equipped: { right_hand: "Long Bow", left_hand: "Sword", body: null, head: null },
+      }],
+      inventory: [{ item: "Arrows", charges: 20 }],
+    });
+    const m = p.roster[0];
+    expect(swapToMeleeIfOutOfAmmo(m, p, stackingItems())).toBeNull();
+    expect(m.equipped.rightHand).toBe("Long Bow");
+  });
+
+  it("no-op when the offhand isn't a weapon (e.g. shield)", () => {
+    const p = partyFromRaw({
+      roster: [{
+        name: "Legolas", class: "Thief", hp: 18,
+        equipped: { right_hand: "Long Bow", left_hand: "Round Shield", body: null, head: null },
+      }],
+      inventory: [],
+    });
+    const m = p.roster[0];
+    expect(swapToMeleeIfOutOfAmmo(m, p, stackingItems())).toBeNull();
+    expect(m.equipped.rightHand).toBe("Long Bow");
+  });
+
+  it("no-op when there's nothing in the offhand at all", () => {
+    const p = partyFromRaw({
+      roster: [{
+        name: "Legolas", class: "Thief", hp: 18,
+        equipped: { right_hand: "Long Bow", left_hand: null, body: null, head: null },
+      }],
+      inventory: [],
+    });
+    const m = p.roster[0];
+    expect(swapToMeleeIfOutOfAmmo(m, p, stackingItems())).toBeNull();
+    expect(m.equipped.rightHand).toBe("Long Bow");
+  });
+
+  it("no-op for a melee right-hand weapon", () => {
+    const p = partyFromRaw({
+      roster: [{
+        name: "Gimli", class: "Fighter", hp: 20,
+        equipped: { right_hand: "Sword", left_hand: "Sword", body: null, head: null },
+      }],
+      inventory: [],
+    });
+    expect(swapToMeleeIfOutOfAmmo(p.roster[0], p, stackingItems())).toBeNull();
   });
 });

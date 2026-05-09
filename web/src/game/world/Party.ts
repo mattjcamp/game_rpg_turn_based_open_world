@@ -9,6 +9,8 @@
 
 import { BASE_PATH, dataPath, withBase } from "./Module";
 import { normalizeSpritePath } from "./Towns";
+import type { Item } from "./Items";
+import { isStackable, loadItems } from "./Items";
 
 export interface EquipmentSlots {
   rightHand: string | null;
@@ -331,12 +333,24 @@ export async function loadParty(url = dataPath("party.json")): Promise<Party> {
   const stored = loadStoredRoster();
   if (stored) {
     _partyCache = stored;
-    return _partyCache;
+  } else {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to load ${url}: ${res.status}`);
+    const raw = (await res.json()) as RawParty;
+    _partyCache = partyFromRaw(raw);
   }
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to load ${url}: ${res.status}`);
-  const raw = (await res.json()) as RawParty;
-  _partyCache = partyFromRaw(raw);
+  // First-load tidy-up: pull items.json (best-effort — a failure here
+  // shouldn't crash the party load) and consolidate any duplicate
+  // stackable entries the save / starter file might have. Saves that
+  // predate the stacking work see "Healing Herb / Healing Herb /
+  // Healing Herb" collapse to "Healing Herb (3)" the next time they
+  // load.
+  try {
+    const items = await loadItems();
+    mergePartyStackables(_partyCache, items);
+  } catch {
+    /* items unavailable — skip merge, leave inventory as-is */
+  }
   return _partyCache;
 }
 
@@ -345,6 +359,159 @@ export function activeMembers(p: Party): PartyMember[] {
   return p.activeParty
     .map((i) => p.roster[i])
     .filter((m): m is PartyMember => Boolean(m));
+}
+
+/**
+ * Collapse duplicate stackable inventory entries — anywhere in the
+ * party (the shared stash AND every roster member's personal bag) —
+ * into a single entry whose `charges` count sums across the
+ * duplicates. Idempotent: running it on an already-merged inventory
+ * is a no-op.
+ *
+ * Runs once on first load (the first `loadParty()` call this session)
+ * so saves predating the stacking work see their inventories tidied
+ * up automatically. Items the catalog doesn't flag as stackable are
+ * left alone so non-stackable gear with multiple copies still shows
+ * one row per copy.
+ *
+ * Entries that are already missing a `charges` count are treated as
+ * having `1` so two pre-existing Healing Potion entries (no charges
+ * field) collapse into a single charges-2 row rather than charges-0.
+ */
+export function mergeStackableInventory(
+  inventory: InventoryItem[],
+  items: Map<string, Item>,
+): InventoryItem[] {
+  const out: InventoryItem[] = [];
+  const idxByName = new Map<string, number>();
+  for (const entry of inventory) {
+    const def = items.get(entry.item);
+    if (!def || !isStackable(def)) {
+      out.push(entry);
+      continue;
+    }
+    const charges = entry.charges ?? 1;
+    const existingIdx = idxByName.get(entry.item);
+    if (existingIdx == null) {
+      idxByName.set(entry.item, out.length);
+      out.push({ ...entry, charges });
+      continue;
+    }
+    const existing = out[existingIdx];
+    existing.charges = (existing.charges ?? 0) + charges;
+  }
+  return out;
+}
+
+/**
+ * Walk every inventory the party touches (shared stash + each
+ * member's personal bag) and replace it with the merged version.
+ * Mutates `party` in place so downstream code sees the consolidated
+ * entries immediately.
+ */
+export function mergePartyStackables(
+  party: Party,
+  items: Map<string, Item>,
+): void {
+  party.inventory = mergeStackableInventory(party.inventory, items);
+  for (const m of party.roster) {
+    m.inventory = mergeStackableInventory(m.inventory, items);
+  }
+}
+
+/**
+ * Find the first stack of `itemName` in the party's shared inventory
+ * with at least one charge remaining. Returns the index (for splice/
+ * mutation) and the entry, or null when none exist. Used by the
+ * combat scene to gate ranged attacks on ammo availability and by
+ * the consume helper to pick which stack to decrement.
+ */
+export function findAmmoInStash(
+  party: Party,
+  itemName: string,
+): { index: number; entry: InventoryItem } | null {
+  for (let i = 0; i < party.inventory.length; i++) {
+    const it = party.inventory[i];
+    if (it.item !== itemName) continue;
+    if ((it.charges ?? 1) <= 0) continue;
+    return { index: i, entry: it };
+  }
+  return null;
+}
+
+/**
+ * Drain one charge of `itemName` from the shared stash. When the
+ * stack hits zero, the entry is removed entirely so the inventory
+ * doesn't grow tombstones. Returns true on success, false when no
+ * stack with charges was available.
+ *
+ * Always pulls from the SHARED stash — the user's design choice for
+ * ammo, since "the party's quiver" is one pool not four. (A future
+ * iteration could let the caller pick a source if we add per-member
+ * ammo bags.)
+ */
+export function consumeAmmoFromStash(
+  party: Party,
+  itemName: string,
+): boolean {
+  const found = findAmmoInStash(party, itemName);
+  if (!found) return false;
+  const { index, entry } = found;
+  const remaining = (entry.charges ?? 1) - 1;
+  if (remaining <= 0) {
+    party.inventory.splice(index, 1);
+  } else {
+    entry.charges = remaining;
+  }
+  return true;
+}
+
+/**
+ * True when the shared stash holds at least one charge of
+ * `itemName`. Pure-read variant of `findAmmoInStash` for callers that
+ * only need a yes/no (UI gating).
+ */
+export function partyHasAmmo(party: Party, itemName: string): boolean {
+  return findAmmoInStash(party, itemName) !== null;
+}
+
+/**
+ * If `member` is wielding a ranged weapon in their right hand and the
+ * shared stash has no matching ammo, swap their left-hand weapon (if
+ * any) into the right hand so the player can fall back to melee.
+ * Returns the swap details for the scene to log, or null when no
+ * swap was needed (or possible).
+ *
+ * Honours the user's combat-flow request: "If they have an offhand
+ * weapon equipped move it to the weapon slot and update the log. At
+ * that point they will be able to fight melee. If no ammunition is
+ * available then the 'range' option should not appear."
+ */
+export function swapToMeleeIfOutOfAmmo(
+  member: PartyMember,
+  party: Party,
+  items: Map<string, Item>,
+): { from: string; to: string } | null {
+  const right = member.equipped.rightHand;
+  if (!right) return null;
+  const def = items.get(right);
+  if (!def || !def.ranged) return null;
+  // Built-in-ammo ranged weapons (Rock — both throwable and ranged)
+  // don't have a separate ammo string. Don't swap them.
+  if (!def.ammo) return null;
+  if (partyHasAmmo(party, def.ammo)) return null;
+  const left = member.equipped.leftHand;
+  if (!left) return null;
+  const leftDef = items.get(left);
+  // Only swap if the left-hand item is actually a weapon — swapping a
+  // shield into the main hand would leave the member unable to attack.
+  if (!leftDef || leftDef.category !== "weapons") return null;
+  member.equipped.rightHand = left;
+  member.equipped.leftHand = null;
+  // Move durability tracker too so wear keeps tracking the right item.
+  member.equippedDurability.right_hand = member.equippedDurability.left_hand;
+  member.equippedDurability.left_hand = null;
+  return { from: right, to: left };
 }
 
 /** Test-only cache reset. */

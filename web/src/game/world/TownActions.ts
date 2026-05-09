@@ -12,6 +12,7 @@ import type { Party } from "./Party";
 import { activeMembers } from "./Party";
 import type { CounterService } from "./Counters";
 import type { Item } from "./Items";
+import { isStackable, stackSizeOf } from "./Items";
 
 export interface ActionResult {
   ok: boolean;
@@ -61,8 +62,46 @@ export function sellPriceOf(
 }
 
 /**
+ * Add `count` charges of `itemName` to the party's shared stash,
+ * stacking onto an existing entry when the item is flagged stackable
+ * in items.json. Pushes a fresh entry otherwise. Returns the entry
+ * that was mutated/created so callers can show "(N total)".
+ *
+ * `count` is the per-purchase / per-drop stack size from the catalog
+ * (arrows = 20, lockpick = 5, most potions = 1).
+ */
+export function addToStash(
+  party: Party,
+  itemName: string,
+  items: Map<string, Item>,
+): { entry: { item: string; charges?: number }; merged: boolean } {
+  const def = items.get(itemName);
+  const size = def ? stackSizeOf(def) : 1;
+  if (def && isStackable(def)) {
+    const existing = party.inventory.find((it) => it.item === itemName);
+    if (existing) {
+      existing.charges = (existing.charges ?? 0) + size;
+      return { entry: existing, merged: true };
+    }
+    const fresh = { item: itemName, charges: size };
+    party.inventory.push(fresh);
+    return { entry: fresh, merged: false };
+  }
+  // Non-stackable items: keep the legacy "one entry per copy"
+  // behaviour. We still attach `charges` if the catalog provides one
+  // (e.g. a torch carries its own per-copy 150-step counter even
+  // when the inventory doesn't pool them).
+  const fresh: { item: string; charges?: number } =
+    def && typeof def.charges === "number" ? { item: itemName, charges: def.charges } : { item: itemName };
+  party.inventory.push(fresh);
+  return { entry: fresh, merged: false };
+}
+
+/**
  * Buy the item at `stockIndex` from the shop's stock list. Debits gold,
- * pushes a fresh entry onto the party stash, and removes the item from
+ * adds the item to the party stash (stacking onto an existing entry
+ * for stackable items so e.g. a third bundle of arrows turns 40 →
+ * 60 rather than creating a new row), and removes the item from
  * the shop's stock so it can't be bought again until somebody sells one
  * back. Refuses when the index is out of range, the counter doesn't
  * price the item, or the party can't afford it.
@@ -85,7 +124,7 @@ export function buyItem(
     return { ok: false, message: "Not enough gold." };
   }
   party.gold -= price;
-  party.inventory.push({ item: itemName });
+  addToStash(party, itemName, items);
   stock.splice(stockIndex, 1);
   return { ok: true, message: `Bought ${itemName} for ${price}g.` };
 }

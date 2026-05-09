@@ -47,6 +47,28 @@ export interface Item {
   buy?: number;
   /** Sell price (gold) at shops. 0 / missing = nobody will buy it. */
   sell?: number;
+  /**
+   * Whether multiple copies of this item collapse into a single
+   * inventory entry whose `charges` count sums across copies. Mirrors
+   * the items.json `stackable` flag — true for ammo, herbs, potions,
+   * lockpicks, torches, camping supplies, reagents.
+   */
+  stackable?: boolean;
+  /**
+   * Per-purchase / per-drop "stack size". Adding one copy of this
+   * item to the stash bumps the inventory entry's `charges` by this
+   * amount. e.g. arrows are sold in stacks of 20 (charges: 20), each
+   * lockpick set has 5 attempts (charges: 5), most potions are 1.
+   * Undefined falls back to 1 in code.
+   */
+  charges?: number;
+  /**
+   * Name of the matching ammo item this weapon consumes per shot.
+   * Bows reference "Arrows", crossbows "Bolts", slings "Stones".
+   * Missing for melee weapons and for ranged weapons with built-in
+   * ammo (e.g. Rock — the weapon IS the projectile).
+   */
+  ammo?: string;
 }
 
 interface RawItem {
@@ -66,6 +88,9 @@ interface RawItem {
   item_type?: string;
   buy?: number;
   sell?: number;
+  stackable?: boolean;
+  charges?: number;
+  ammo?: string;
 }
 
 interface RawItems {
@@ -101,7 +126,34 @@ function itemFromRaw(name: string, category: Item["category"], r: RawItem): Item
     itemType: r.item_type,
     buy: r.buy,
     sell: r.sell,
+    stackable: r.stackable,
+    charges: r.charges,
+    ammo: r.ammo,
   };
+}
+
+/**
+ * "Stack size" for a stackable item — how many uses one purchase /
+ * drop / loot pickup adds to the inventory entry's `charges` count.
+ * Defaults to 1 so non-ammo consumables (potions, herbs, scrolls)
+ * stack one-per-copy without each needing an explicit value.
+ *
+ * For non-stackable items returns 1 too — callers that care about
+ * the distinction should check `item.stackable` directly.
+ */
+export function stackSizeOf(item: Item): number {
+  if (typeof item.charges === "number" && item.charges > 0) return item.charges;
+  return 1;
+}
+
+/**
+ * True for items the inventory should consolidate. Defers to the
+ * `stackable` flag in items.json so authors stay in control; nothing
+ * stacks implicitly. Non-equippable items that lack the flag remain
+ * one-entry-per-copy.
+ */
+export function isStackable(item: Item): boolean {
+  return !!item.stackable;
 }
 
 export async function loadItems(url = dataPath("items.json")): Promise<Map<string, Item>> {

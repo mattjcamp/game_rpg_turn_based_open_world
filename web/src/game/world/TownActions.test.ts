@@ -4,6 +4,7 @@ import {
   sellItem,
   shopStockKey,
   getOrSeedShopStock,
+  addToStash,
 } from "./TownActions";
 import type { Party } from "./Party";
 import type { Item } from "./Items";
@@ -23,6 +24,29 @@ function makeItems(): Map<string, Item> {
   const items = new Map<string, Item>();
   items.set("Healing Potion", { name: "Healing Potion", category: "general", buy: 20, sell: 10 } as Item);
   items.set("Junk Stone",     { name: "Junk Stone",     category: "general", buy: 0,  sell: 0  } as Item);
+  return items;
+}
+
+/** Items map used by the stacking-aware tests. Sets up arrows (stack
+ *  of 20), lockpicks (stack of 5), a basic stackable potion, plus a
+ *  non-stackable sword for the negative case. */
+function stackingItems(): Map<string, Item> {
+  const items = new Map<string, Item>();
+  items.set("Arrows", {
+    name: "Arrows", category: "general", buy: 5, sell: 2,
+    stackable: true, charges: 20,
+  } as Item);
+  items.set("Lockpick", {
+    name: "Lockpick", category: "general", buy: 8, sell: 3,
+    stackable: true, charges: 5,
+  } as Item);
+  items.set("Healing Potion", {
+    name: "Healing Potion", category: "general", buy: 40, sell: 20,
+    stackable: true, charges: 1,
+  } as Item);
+  items.set("Sword", {
+    name: "Sword", category: "weapons", buy: 40, sell: 20,
+  } as Item);
   return items;
 }
 
@@ -127,6 +151,39 @@ describe("sellItem (finite stock)", () => {
     expect(party.inventory).toEqual([{ item: "Junk Stone" }]);
   });
 
+  it("re-buying a stackable item bumps the existing entry's charges", () => {
+    const party = makeParty({ gold: 100 });
+    const stock = ["Arrows", "Arrows", "Arrows"];
+    const items = stackingItems();
+    expect(buyItem(party, stock, 0, items).ok).toBe(true);
+    expect(party.inventory).toEqual([{ item: "Arrows", charges: 20 }]);
+    expect(buyItem(party, stock, 0, items).ok).toBe(true);
+    expect(buyItem(party, stock, 0, items).ok).toBe(true);
+    // Three stacks → 60 arrows in a single inventory row.
+    expect(party.inventory).toEqual([{ item: "Arrows", charges: 60 }]);
+    expect(party.gold).toBe(85); // 100 − 5*3
+    expect(stock).toEqual([]);
+  });
+
+  it("buying a non-stackable item still pushes a fresh entry per copy", () => {
+    const party = makeParty({ gold: 100 });
+    const stock = ["Sword", "Sword"];
+    const items = stackingItems();
+    expect(buyItem(party, stock, 0, items).ok).toBe(true);
+    expect(buyItem(party, stock, 0, items).ok).toBe(true);
+    expect(party.inventory).toEqual([{ item: "Sword" }, { item: "Sword" }]);
+  });
+
+  it("buys a lockpick (stack of 5) and stacks a second purchase to 10", () => {
+    const party = makeParty({ gold: 100 });
+    const stock = ["Lockpick", "Lockpick"];
+    const items = stackingItems();
+    expect(buyItem(party, stock, 0, items).ok).toBe(true);
+    expect(party.inventory).toEqual([{ item: "Lockpick", charges: 5 }]);
+    expect(buyItem(party, stock, 0, items).ok).toBe(true);
+    expect(party.inventory).toEqual([{ item: "Lockpick", charges: 10 }]);
+  });
+
   it("re-buying a sold item works (the same array round-trips)", () => {
     const party = makeParty({
       gold: 30,
@@ -141,5 +198,54 @@ describe("sellItem (finite stock)", () => {
     expect(stock).toEqual([]);
     expect(party.gold).toBe(20);
     expect(party.inventory).toEqual([{ item: "Healing Potion" }]);
+  });
+});
+
+describe("addToStash", () => {
+  it("creates a fresh stack with the item's per-stack charges", () => {
+    const party = makeParty();
+    const items = stackingItems();
+    const r = addToStash(party, "Arrows", items);
+    expect(r.merged).toBe(false);
+    expect(party.inventory).toEqual([{ item: "Arrows", charges: 20 }]);
+  });
+
+  it("adds to an existing stack instead of pushing a new entry", () => {
+    const party = makeParty({ inventory: [{ item: "Arrows", charges: 20 }] });
+    const items = stackingItems();
+    const r = addToStash(party, "Arrows", items);
+    expect(r.merged).toBe(true);
+    expect(party.inventory).toEqual([{ item: "Arrows", charges: 40 }]);
+  });
+
+  it("treats a missing existing-charges field as zero", () => {
+    // Save data predating the stacking work might hold an entry
+    // without a `charges` field. Adding to it should still work.
+    const party = makeParty({ inventory: [{ item: "Arrows" }] });
+    addToStash(party, "Arrows", stackingItems());
+    expect(party.inventory).toEqual([{ item: "Arrows", charges: 20 }]);
+  });
+
+  it("non-stackable items push a fresh entry every time", () => {
+    const party = makeParty();
+    const items = stackingItems();
+    addToStash(party, "Sword", items);
+    addToStash(party, "Sword", items);
+    expect(party.inventory).toEqual([{ item: "Sword" }, { item: "Sword" }]);
+  });
+
+  it("falls back to a 1-entry push for unknown items", () => {
+    const party = makeParty();
+    addToStash(party, "Phantom Glaive", stackingItems());
+    expect(party.inventory).toEqual([{ item: "Phantom Glaive" }]);
+  });
+
+  it("a +1 stack-size potion stacks one charge per pickup", () => {
+    const party = makeParty();
+    const items = stackingItems();
+    addToStash(party, "Healing Potion", items);
+    addToStash(party, "Healing Potion", items);
+    addToStash(party, "Healing Potion", items);
+    expect(party.inventory).toEqual([{ item: "Healing Potion", charges: 3 }]);
   });
 });

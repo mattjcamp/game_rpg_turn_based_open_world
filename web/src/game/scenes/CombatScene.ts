@@ -51,8 +51,14 @@ import { assetUrl, dataPath } from "../world/Module";
 import { loadItems, type Item } from "../world/Items";
 import { loadCounters } from "../world/Counters";
 import { rollLootDrop } from "../world/Loot";
+import { addToStash } from "../world/TownActions";
 import { loadSpells, minLevelFor, type Spell } from "../world/Spells";
-import { loadParty } from "../world/Party";
+import {
+  loadParty,
+  consumeAmmoFromStash,
+  partyHasAmmo,
+  swapToMeleeIfOutOfAmmo,
+} from "../world/Party";
 import { loadClass, loadRaces, type ClassTemplate } from "../world/Classes";
 import { awardXp, type LevelUpEvent } from "../world/Leveling";
 import { defaultRng } from "../rng";
@@ -532,6 +538,68 @@ export class CombatScene extends Phaser.Scene {
     if (isAiControlled(this.combat.current)) {
       this.busy = true;
       this.time.delayedCall(450, () => void this.runMonsterTurn());
+      return;
+    }
+    // Player turn opening — if the active member is wielding a
+    // ranged weapon and the stash is out of matching ammo, swap
+    // their offhand weapon into the main hand so they can melee
+    // their way out of the encounter. Fires once at turn start (not
+    // on every refresh) so the log doesn't get spammed.
+    this.maybeSwapOutOfAmmo();
+  }
+
+  /**
+   * Auto-swap a ranged-but-out-of-ammo wielder over to their offhand
+   * weapon. No-op when the active member isn't a real PartyMember
+   * (summons), when they're not holding a ranged weapon, when ammo
+   * IS available, or when there's no usable offhand to swap with.
+   * Logs the swap so the player understands their loadout changed.
+   */
+  private maybeSwapOutOfAmmo(): void {
+    const member = this.memberForCurrent();
+    const partyData = gameState.partyData;
+    if (!member || !partyData) return;
+    const swap = swapToMeleeIfOutOfAmmo(member, partyData, this.items);
+    if (!swap) return;
+    this.combat.log.push(
+      `${member.name} is out of ${this.items.get(swap.from)?.ammo ?? "ammo"} — switches to ${swap.to}!`
+    );
+    // Update the live Combatant's damage profile so the new weapon
+    // is what melee bumps actually use this turn. Without this, the
+    // member would visibly hold the swapped weapon but still attack
+    // with the bow's stats.
+    this.refreshCombatantWeapon(member);
+    this.refreshLog();
+  }
+
+  /**
+   * Refresh the active Combatant's attack/damage stats from the live
+   * PartyMember after an equipment change mid-fight. Mirrors the
+   * derivation in CombatBridge but applied in place — we can't drop
+   * and re-add the combatant because that'd lose buffs and position.
+   */
+  private refreshCombatantWeapon(member: PartyMember): void {
+    const c = this.combat.combatants.find(
+      (x) => x.side === "party" && x.name === member.name,
+    );
+    if (!c) return;
+    const weapon = member.equipped.rightHand
+      ? this.items.get(member.equipped.rightHand) ?? null
+      : null;
+    const isRangedWeapon = !!(weapon && weapon.ranged);
+    const dexMod = abilityMod(member.dexterity);
+    const strMod = abilityMod(member.strength);
+    c.attackBonus = isRangedWeapon ? dexMod : strMod;
+    if (!weapon || typeof weapon.power !== "number" || weapon.power <= 0) {
+      c.damage = { dice: 0, sides: 0, bonus: 1 };
+    } else {
+      const statMod = isRangedWeapon ? dexMod : strMod;
+      const wp = weapon.power;
+      if (wp === 1)      c.damage = { dice: 1, sides: 4,  bonus: statMod - 1 };
+      else if (wp <= 3)  c.damage = { dice: 1, sides: 4,  bonus: statMod };
+      else if (wp <= 5)  c.damage = { dice: 1, sides: 6,  bonus: statMod };
+      else if (wp <= 8)  c.damage = { dice: 1, sides: 8,  bonus: statMod };
+      else               c.damage = { dice: 1, sides: 10, bonus: statMod };
     }
   }
 
@@ -1509,6 +1577,22 @@ export class CombatScene extends Phaser.Scene {
       } else if (action.kind === "range") {
         // Same dice resolution as Throw — fire-and-forget projectile.
         // The weapon stays equipped (no consume) since it's reusable.
+        // Ammo, however, IS consumed: one arrow per shot for bows,
+        // one bolt for crossbows, one stone for slings. Ammo is
+        // pooled in the shared party stash so any character with the
+        // matching weapon can draw from it. The Range option is gated
+        // upstream (refreshActions checks partyHasAmmo before
+        // enabling the row), so reaching this branch with no ammo
+        // shouldn't happen — but defend against it anyway with a
+        // clean fizzle rather than a silent free shot.
+        const ammoName = action.weapon.ammo;
+        const partyData = gameState.partyData;
+        if (ammoName && partyData && !consumeAmmoFromStash(partyData, ammoName)) {
+          this.combat.log.push(`${me.name} is out of ${ammoName}!`);
+          this.refreshLog();
+          this.refreshActionMenu();
+          return;
+        }
         const result = resolveThrow(me, target, action.weapon, defaultRng);
         this.combat.log.push(
           result.hit
@@ -2693,12 +2777,25 @@ export class CombatScene extends Phaser.Scene {
           member.level >= minLevelFor(s, member.class) &&
           (member.mp ?? 0) >= s.mp_cost
       );
-    // Range is enabled when the equipped weapon has ranged: true.
+    // Range is enabled when the equipped weapon has ranged: true AND
+    // the party still has matching ammo to fire. A bow with no
+    // arrows hides the Range row (per the user's design) so the
+    // player isn't tricked into picking an option that'd just fizzle
+    // — they fall back to melee with the offhand weapon, which the
+    // turn-start hook auto-swapped into the right hand.
     const equippedWeapon =
       member && member.equipped.rightHand
         ? this.items.get(member.equipped.rightHand) ?? null
         : null;
-    const canRange = !!equippedWeapon && isRanged(equippedWeapon);
+    const ammoOk = (() => {
+      if (!equippedWeapon || !isRanged(equippedWeapon)) return false;
+      // Built-in-ammo ranged weapons (e.g. Rock — no `ammo` field)
+      // never need a quiver: the weapon IS the projectile.
+      if (!equippedWeapon.ammo) return true;
+      const partyData = gameState.partyData;
+      return !!partyData && partyHasAmmo(partyData, equippedWeapon.ammo);
+    })();
+    const canRange = !!equippedWeapon && isRanged(equippedWeapon) && ammoOk;
     const isEnabled = (id: ActionId): boolean => {
       if (!playerTurn) return false;
       if (id === "range") return canRange;
@@ -2998,7 +3095,9 @@ export class CombatScene extends Phaser.Scene {
       // Roll for a post-combat item drop from the shop pool. Loaders
       // are cached so the first encounter pays the fetch cost and
       // subsequent ones are instant; either failure just skips the
-      // drop without breaking the exit flow.
+      // drop without breaking the exit flow. Stackable items (arrows,
+      // potions, herbs, …) merge into an existing stash entry rather
+      // than spawning a new row.
       try {
         const [items, counters] = await Promise.all([
           loadItems(),
@@ -3006,7 +3105,7 @@ export class CombatScene extends Phaser.Scene {
         ]);
         lootDrop = rollLootDrop(items, counters);
         if (lootDrop) {
-          party.inventory.push({ item: lootDrop });
+          addToStash(party, lootDrop, items);
         }
       } catch {
         /* counters/items unavailable — skip drop */
