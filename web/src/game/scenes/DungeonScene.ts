@@ -52,6 +52,8 @@ import {
   creditKills,
   creditCollect,
   activeCollectStepFor,
+  activeKillStepsForLocation,
+  rosterFor,
   type QuestDef,
 } from "../world/Quests";
 import {
@@ -62,12 +64,14 @@ import {
 import {
   attachPulsingGlow,
   QUEST_ITEM_COLOR,
+  QUEST_MONSTER_COLOR,
   type PulsingGlowHandle,
 } from "../world/GlowEffect";
 import {
   generateDungeon,
   dungeonSeed,
   styleFloorTile,
+  placeQuestKillMonsters,
   TILE_STAIRS,
   TILE_STAIRS_DOWN,
   TILE_CHEST,
@@ -145,6 +149,10 @@ export class DungeonScene extends Phaser.Scene {
    *  "col,row" so we can dispose the glow when the player picks up
    *  the artifact (which restores the floor underneath). */
   private artifactGlows: Map<string, PulsingGlowHandle> = new Map();
+  /** Pulsing gold halos per quest-spawned monster on the active
+   *  floor. Keyed by monster id so each one can be torn down when
+   *  the monster is engaged or the floor changes. */
+  private questMonsterGlows: Map<string, PulsingGlowHandle> = new Map();
 
   // Phaser objects
   private tileSprites: Phaser.GameObjects.GameObject[][] = [];
@@ -185,6 +193,8 @@ export class DungeonScene extends Phaser.Scene {
     this.messageTimer = undefined;
     for (const h of this.artifactGlows.values()) h.destroy();
     this.artifactGlows = new Map();
+    for (const h of this.questMonsterGlows.values()) h.destroy();
+    this.questMonsterGlows = new Map();
     this.questLogClose = undefined;
   }
 
@@ -327,6 +337,10 @@ export class DungeonScene extends Phaser.Scene {
     // re-entries skip placement when an artifact for the same step
     // is already recorded on the level.
     this.placeQuestArtifactsIfNeeded();
+    // Place quest-required kill encounters (goblin warbands, the
+    // ambush boss, etc.) into the appropriate floors. Top-up only:
+    // re-entries don't respawn already-killed monsters.
+    this.spawnQuestKillMonstersIfNeeded();
 
     // Resolve player position. If gameState.dungeonPos belongs to this
     // entrance, replay it (return-from-combat / re-enter). Otherwise
@@ -441,6 +455,10 @@ export class DungeonScene extends Phaser.Scene {
     this.decorSprites.clear();
     for (const obj of this.monsterSprites.values()) obj.destroy();
     this.monsterSprites.clear();
+    // Tear down quest-monster glows from the previous floor — the
+    // sprites are gone, the halos shouldn't outlive them.
+    for (const g of this.questMonsterGlows.values()) g.destroy();
+    this.questMonsterGlows.clear();
     for (const r of this.darknessRects.values()) r.destroy();
     this.darknessRects.clear();
     for (const r of this.tintRects.values()) r.destroy();
@@ -533,6 +551,19 @@ export class DungeonScene extends Phaser.Scene {
         .setDepth(7);
     }
     this.monsterSprites.set(m.id, obj);
+    // Quest-spawned monsters get a soft gold halo so the player can
+    // see at a glance which sprites credit a quest. Same colour /
+    // intensity TownScene uses for interior quest targets.
+    if (m.questName) {
+      const sprite = obj as Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
+      const glow = attachPulsingGlow(
+        this,
+        () => sprite.x,
+        () => sprite.y,
+        { color: QUEST_MONSTER_COLOR, intensity: 0.5, depth: 6 },
+      );
+      this.questMonsterGlows.set(m.id, glow);
+    }
   }
 
   private drawPlayer(): void {
@@ -842,6 +873,11 @@ export class DungeonScene extends Phaser.Scene {
   private redrawMonsters(): void {
     for (const obj of this.monsterSprites.values()) obj.destroy();
     this.monsterSprites.clear();
+    // Glows are recreated by drawMonster — tear down the old ones
+    // first so we don't stack two halos on the same sprite (or
+    // leave one behind for a monster that wandered off-floor).
+    for (const g of this.questMonsterGlows.values()) g.destroy();
+    this.questMonsterGlows.clear();
     for (const m of this.level.monsters) this.drawMonster(m);
   }
 
@@ -1002,6 +1038,67 @@ export class DungeonScene extends Phaser.Scene {
       stepIdx: placement.stepIdx,
       itemName: placement.step.collectItem,
     };
+  }
+
+  /**
+   * Top up dungeon-floor monster lists with the encounters every
+   * active kill step demands. Mirrors the artifact placement above:
+   * idempotent, only adds the missing copies on re-entry, no-op
+   * when the encounter table didn't load.
+   *
+   * Without this pass, quests like "Goblins in the Hill" couldn't
+   * complete — the procedural generator only places random
+   * encounters from the level's encounter band, so the specific
+   * "Wolves and Goblins" warbands the quest demands never appeared
+   * unless the random roll happened to pick them.
+   */
+  private spawnQuestKillMonstersIfNeeded(): void {
+    if (this.questDefs.length === 0) return;
+    if (!this.encounterTable) return;
+    const target = `dungeon:${this.dungeonName}`;
+    const steps = activeKillStepsForLocation(
+      this.questDefs,
+      gameState.moduleQuestStates,
+      target,
+    );
+    if (steps.length === 0) return;
+    // Convert the quest-side rows into the placement helper's input
+    // shape, looking up the encounter template for each step.
+    const rows: import("../world/Dungeon").QuestKillSpawnRow[] = [];
+    for (const s of steps) {
+      const tmpl = rosterFor(this.encounterTable, s.step.encounter);
+      if (!tmpl || tmpl.monsters.length === 0) continue;
+      rows.push({
+        questName: s.questName,
+        stepIdx: s.stepIdx,
+        remaining: s.remaining,
+        template: {
+          name: tmpl.name,
+          monsters: tmpl.monsters,
+          monsterPartyTile: tmpl.monsterPartyTile,
+        },
+      });
+    }
+    if (rows.length === 0) return;
+    placeQuestKillMonsters(
+      this.levels,
+      rows,
+      (col, row, levelIdx) => this.isWalkableOnLevel(col, row, levelIdx),
+    );
+  }
+
+  /** Walkability check for an arbitrary floor (not just the current
+   *  one) — the quest spawn pass needs to evaluate floors the player
+   *  hasn't entered yet. Mirrors `isWalkable` but scoped to a
+   *  passed-in level. */
+  private isWalkableOnLevel(col: number, row: number, levelIdx: number): boolean {
+    const lvl = this.levels[levelIdx];
+    if (!lvl) return false;
+    if (col < 0 || row < 0 || col >= lvl.width || row >= lvl.height) return false;
+    const props = lvl.tileProperties[`${col},${row}`];
+    if (props && typeof props.walkable === "boolean") return props.walkable;
+    const id = lvl.tiles[row][col];
+    return tileDef(id).walkable;
   }
 
   /** Attach a cyan pulsing halo over every artifact tile on the

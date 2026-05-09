@@ -373,6 +373,17 @@ export class CombatScene extends Phaser.Scene {
     this.selRings.clear();
     for (const r of this.moveHintRects) r?.destroy();
     this.moveHintRects.length = 0;
+    // Party cards previously got `.clear()`'d but their child
+    // GameObjects (hp bar, hp text, mp bar, mp text) were left to
+    // Phaser's shutdown — same race the monster bars hit. Walk and
+    // destroy explicitly so a fast scene swap can't leave bars
+    // floating over the right-hand HUD when the next combat opens.
+    for (const card of this.partyCards.values()) {
+      card?.hpBar?.destroy();
+      card?.hpText?.destroy();
+      card?.mpBar?.destroy();
+      card?.mpText?.destroy();
+    }
     this.partyCards.clear();
     for (const b of this.monsterHpBars.values()) {
       b.bg?.destroy();
@@ -388,10 +399,17 @@ export class CombatScene extends Phaser.Scene {
     this.throwOptions = [];
     this.spellOptions = [];
     this.pickerCursor = 0;
+    // Picker / targeting / tile-cursor overlays are also
+    // GameObjects — destroy them before resetting the arrays so a
+    // swap that interrupted a picker mid-render doesn't leave
+    // dangling badges over the next encounter.
+    for (const obj of this.targetBadges) obj?.destroy();
     this.targetBadges = [];
+    for (const obj of this.pickerObjects) obj?.destroy();
     this.pickerObjects = [];
-    this.tileCursorPos = { col: 0, row: 0 };
+    for (const obj of this.tileCursorObjects) obj?.destroy();
     this.tileCursorObjects = [];
+    this.tileCursorPos = { col: 0, row: 0 };
   }
 
   preload(): void {

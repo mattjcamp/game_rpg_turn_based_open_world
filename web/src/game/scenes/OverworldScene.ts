@@ -110,7 +110,14 @@ export class OverworldScene extends Phaser.Scene {
   private clockText!: Phaser.GameObjects.Text;
   private moonIcon!: Phaser.GameObjects.Graphics;
   private busy = false;
+  /** Backwards-compat handle — kept around so old code paths that
+   *  test `if (this.defeatOverlay)` still work. The new modal lives
+   *  in `defeatModalObjects`; this points at the title Text inside
+   *  it (or null when the modal isn't up). */
   private defeatOverlay?: Phaser.GameObjects.Text;
+  /** Every GameObject that makes up the game-over modal. Populated
+   *  by `showDefeat`, destroyed by `dismissDefeatModal`. */
+  private defeatModalObjects: Phaser.GameObjects.GameObject[] = [];
   private darkness = new Map<string, Phaser.GameObjects.Rectangle>();
   /** Renamed from `lights` to avoid colliding with Phaser.Scene.lights. */
   private mapLights: LightSource[] = [];
@@ -170,6 +177,7 @@ export class OverworldScene extends Phaser.Scene {
     this.boatSprites = new Map();
     this.boatBobTween = undefined;
     this.defeatOverlay = undefined;
+    this.defeatModalObjects = [];
     this.questGiverSprites = new Map();
     this.questDialog = undefined;
     this.questLogClose = undefined;
@@ -1230,19 +1238,202 @@ export class OverworldScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Game-over modal — shown when CombatScene returns with the
+   * party fully wiped (`gameState.defeated`). Replaces the older
+   * "Defeated. Reload the page to start over." static text with two
+   * actionable buttons:
+   *
+   *   - **Return to Game** — soft revive. The party stands back up
+   *     at full HP on the same overworld tile, the defeated flag
+   *     clears, and the modal goes away. Treats the wipe as a
+   *     "you blacked out and woke up here" moment rather than a
+   *     hard end-game. Cheaper than a full save reload, and the
+   *     rolling save's been overwritten with `defeated=true`
+   *     anyway so loading it would just restore the same dead
+   *     state — soft revive is the only useful "continue" path.
+   *
+   *   - **Start New Game** — wipes the rolling save + stored
+   *     roster (via `startFreshSession`) and routes the page to
+   *     `/new-game`, the same intro the title-screen "Start New
+   *     Game" button uses. The user re-creates their party from
+   *     scratch.
+   *
+   * Idempotent — calling twice is a no-op while the modal is up.
+   */
   private showDefeat(): void {
     if (this.defeatOverlay) return;
-    this.defeatOverlay = this.add
-      .text(480, 360, "Defeated.\nReload the page to start over.", {
+
+    const W = 480;
+    const H = 240;
+    const X = (960 - W) / 2;
+    const Y = (720 - H) / 2;
+    const track = (obj: Phaser.GameObjects.GameObject): void => {
+      this.defeatModalObjects.push(obj);
+    };
+    // Dim veil over the whole screen so the modal reads as modal.
+    track(
+      this.add
+        .rectangle(0, 0, 960, 720, 0x000000, 0.78)
+        .setOrigin(0)
+        .setScrollFactor(0)
+        .setDepth(95),
+    );
+    // Frame.
+    track(
+      this.add
+        .rectangle(X, Y, W, H, 0x161629, 0.97)
+        .setOrigin(0)
+        .setStrokeStyle(3, 0xc8553d)
+        .setScrollFactor(0)
+        .setDepth(96),
+    );
+    // Title — also tracked as `defeatOverlay` for backwards-compat
+    // with the "is the modal up?" idempotency guard.
+    const title = this.add
+      .text(480, Y + 36, "YOUR PARTY HAS FALLEN", {
         fontFamily: "Georgia, serif",
-        fontSize: "32px",
+        fontSize: "26px",
         color: "#ff6b6b",
         align: "center",
         stroke: "#1a1a2e",
-        strokeThickness: 6,
+        strokeThickness: 5,
       })
       .setOrigin(0.5)
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setDepth(97);
+    track(title);
+    this.defeatOverlay = title;
+    track(
+      this.add
+        .text(480, Y + 78, "Pick up where you fell, or begin again.", {
+          fontFamily: "Georgia, serif",
+          fontSize: "14px",
+          color: "#dcc69a",
+          align: "center",
+        })
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(97),
+    );
+    // Buttons — clickable rounded rectangles with centred labels.
+    this.makeDefeatButton(
+      X + 24, Y + 120, W - 48, 44,
+      "Return to Game",
+      "[Enter]",
+      () => this.continueAfterDefeat(),
+    );
+    this.makeDefeatButton(
+      X + 24, Y + 174, W - 48, 44,
+      "Start New Game",
+      "[Esc]",
+      () => this.restartAfterDefeat(),
+    );
+    // Keyboard shortcuts — match what the buttons advertise.
+    const k = this.input.keyboard;
+    if (k) {
+      const onEnter = (): void => {
+        if (this.defeatOverlay) this.continueAfterDefeat();
+      };
+      const onEsc = (): void => {
+        if (this.defeatOverlay) this.restartAfterDefeat();
+      };
+      k.once("keydown-ENTER", onEnter);
+      k.once("keydown-SPACE", onEnter);
+      k.once("keydown-ESC", onEsc);
+    }
+  }
+
+  /** Build one game-over button at (x, y, w, h) with `label` + a
+   *  small grey hotkey hint on the right edge. Tracks every
+   *  GameObject it creates on `defeatModalObjects` so dismissal
+   *  cleans up cleanly. */
+  private makeDefeatButton(
+    x: number, y: number, w: number, h: number,
+    label: string, hotkey: string,
+    onClick: () => void,
+  ): void {
+    const track = (obj: Phaser.GameObjects.GameObject): void => {
+      this.defeatModalObjects.push(obj);
+    };
+    const bg = this.add
+      .rectangle(x, y, w, h, 0x2a1f24, 1)
+      .setOrigin(0)
+      .setStrokeStyle(2, 0xc8553d)
+      .setScrollFactor(0)
+      .setDepth(97)
+      .setInteractive({ useHandCursor: true });
+    bg.on("pointerover", () => bg.setFillStyle(0x3a2b30, 1));
+    bg.on("pointerout",  () => bg.setFillStyle(0x2a1f24, 1));
+    bg.on("pointerdown", () => onClick());
+    track(bg);
+    track(
+      this.add
+        .text(x + w / 2, y + h / 2, label, {
+          fontFamily: "Georgia, serif",
+          fontSize: "18px",
+          color: "#f6efd6",
+        })
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(98),
+    );
+    track(
+      this.add
+        .text(x + w - 12, y + h / 2, hotkey, {
+          fontFamily: "monospace",
+          fontSize: "11px",
+          color: "#bdb38a",
+        })
+        .setOrigin(1, 0.5)
+        .setScrollFactor(0)
+        .setDepth(98),
+    );
+  }
+
+  /** "Return to Game" handler — soft revive at the current tile. */
+  private continueAfterDefeat(): void {
+    if (!this.defeatOverlay) return;
+    const party = gameState.partyData;
+    if (party) {
+      // Stand the active four back up at full HP / MP. We don't
+      // touch the wider roster — players who'd benched a member
+      // before the fight won't see them magically revived.
+      for (const idx of party.activeParty) {
+        const m = party.roster[idx];
+        if (!m) continue;
+        m.hp = m.maxHp;
+        if (typeof m.maxMp === "number") m.mp = m.maxMp;
+      }
+    }
+    gameState.defeated = false;
+    // Persist the revived state so a refresh now resumes here, not
+    // back to the wiped party.
+    void import("../save").then(({ save }) => save());
+    this.dismissDefeatModal();
+  }
+
+  /** "Start New Game" handler — full reset + route to /new-game. */
+  private restartAfterDefeat(): void {
+    if (!this.defeatOverlay) return;
+    void import("../save").then(({ startFreshSession }) => {
+      startFreshSession();
+      // We're inside a Phaser scene, not a React component, so
+      // useRouter isn't available. window.location.href is the
+      // simplest reliable way to navigate; Next handles the route
+      // change and re-mounts the title flow.
+      if (typeof window !== "undefined") {
+        window.location.href = "/new-game";
+      }
+    });
+  }
+
+  /** Tear down every GameObject the modal created and clear the
+   *  idempotency guard so a future defeat can re-show. */
+  private dismissDefeatModal(): void {
+    for (const obj of this.defeatModalObjects) obj?.destroy();
+    this.defeatModalObjects = [];
+    this.defeatOverlay = undefined;
   }
 
   // ── Module quest givers (overworld) ─────────────────────────────

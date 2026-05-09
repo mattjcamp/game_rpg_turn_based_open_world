@@ -130,6 +130,62 @@ describe("partyFromRaw", () => {
     expect(p.partyEffects.effect_1).toBeNull();
     expect(p.inventory).toEqual([]);
   });
+
+  it("auto-promotes bare-string inventory entries to InventoryItem objects", () => {
+    // A hand-edit (or linter) sometimes flattens `{ "item": "Arrows" }`
+    // to a bare `"Arrows"`. Without normalization the runtime sees a
+    // string where it expects an object and `partyHasAmmo` /
+    // stackable-merge silently fail. The loader should heal the data
+    // on the way in.
+    const p = partyFromRaw({
+      // Cast through unknown — the JSON is valid but the typed shape
+      // would otherwise refuse the bare-string entry.
+      inventory: ["Arrows" as unknown as { item: string }],
+    });
+    expect(p.inventory).toEqual([{ item: "Arrows" }]);
+  });
+
+  it("auto-promotes bare-string entries on per-member inventories too", () => {
+    const p = partyFromRaw({
+      roster: [{
+        name: "Pippin", class: "Thief", race: "Halfling", hp: 9,
+        inventory: ["Lockpick" as unknown as { item: string }],
+      }],
+    });
+    expect(p.roster[0].inventory).toEqual([{ item: "Lockpick" }]);
+  });
+
+  it("preserves well-formed inventory entries unchanged", () => {
+    const p = partyFromRaw({
+      inventory: [
+        { item: "Arrows", charges: 20 },
+        { item: "Healing Herb" },
+      ],
+    });
+    expect(p.inventory).toEqual([
+      { item: "Arrows", charges: 20 },
+      { item: "Healing Herb" },
+    ]);
+  });
+
+  it("drops malformed entries (number, null, missing item field) silently", () => {
+    const p = partyFromRaw({
+      inventory: [
+        "Arrows" as unknown as { item: string },
+        42 as unknown as { item: string },
+        null as unknown as { item: string },
+        { /* no `item` field */ } as unknown as { item: string },
+        { item: "Torch" },
+      ],
+    });
+    // Strings get promoted; objects with an `item` string survive;
+    // numbers / nulls / missing-item objects are dropped — better
+    // than poisoning the whole load.
+    expect(p.inventory).toEqual([
+      { item: "Arrows" },
+      { item: "Torch" },
+    ]);
+  });
 });
 
 /** Items map for the stacking helpers' tests. */

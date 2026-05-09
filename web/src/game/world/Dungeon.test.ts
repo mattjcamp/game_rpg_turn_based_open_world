@@ -5,12 +5,14 @@ import {
   getDifficultyProfile,
   dungeonSeed,
   styleFloorTile,
+  placeQuestKillMonsters,
   TILE_DWALL,
   TILE_STAIRS,
   TILE_STAIRS_DOWN,
   TILE_CHEST,
   TILE_TRAP,
   type DungeonLevel,
+  type QuestKillSpawnRow,
 } from "./Dungeon";
 import { TILE_DFLOOR, TILE_PATH, TILE_GRASS, TILE_FOREST_ARCHWAY_UP } from "./Tiles";
 
@@ -307,5 +309,140 @@ describe("Dungeon — connectivity (entry must reach the descent stairs)", () =>
       expect(reachable.has(`${stair[0]},${stair[1]}`)).toBe(true);
     }
     expect(triedAtLeastOne).toBe(true);
+  });
+});
+
+describe("placeQuestKillMonsters", () => {
+  /** Build a tiny 2-floor "dungeon" of all-walkable cells with no
+   *  random monsters. Each floor is a 4x4 grid; entry is (0,0). */
+  function blankDungeon(numLevels = 2): DungeonLevel[] {
+    const levels: DungeonLevel[] = [];
+    for (let i = 0; i < numLevels; i++) {
+      levels.push({
+        name: `Floor ${i}`,
+        width: 4,
+        height: 4,
+        tiles: [
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+        ],
+        decorations: {},
+        tileProperties: {},
+        entryCol: 0,
+        entryRow: 0,
+        style: "default",
+        monsters: [],
+        openedChests: new Set(),
+        triggeredTraps: new Set(),
+        exploredTiles: new Set(),
+        overworldExits: new Set(),
+        questArtifacts: {},
+      });
+    }
+    return levels;
+  }
+
+  function row(
+    questName: string,
+    stepIdx: number,
+    remaining: number,
+    name = "Wolves and Goblins",
+    monsters = ["Goblin", "Wolf"],
+  ): QuestKillSpawnRow {
+    return {
+      questName,
+      stepIdx,
+      remaining,
+      template: { name, monsters, monsterPartyTile: monsters[0] },
+    };
+  }
+
+  it("places `remaining` monsters on the matching floor for each step", () => {
+    const levels = blankDungeon(2);
+    placeQuestKillMonsters(
+      levels,
+      [row("Goblins in the Hill", 0, 3), row("Goblins in the Hill", 1, 1, "Goblin Ambush", ["Goblin", "Goblin"])],
+      () => true,
+    );
+    // Step 0 → floor 0 (entry), step 1 → floor 1 (deepest).
+    const f0 = levels[0].monsters.filter((m) => m.questName === "Goblins in the Hill" && m.stepIdx === 0);
+    const f1 = levels[1].monsters.filter((m) => m.questName === "Goblins in the Hill" && m.stepIdx === 1);
+    expect(f0).toHaveLength(3);
+    expect(f1).toHaveLength(1);
+    // Each placed monster carries the encounter roster + display name.
+    for (const m of f0) {
+      expect(m.encounterName).toBe("Wolves and Goblins");
+      expect(m.encounterNames).toEqual(["Goblin", "Wolf"]);
+    }
+  });
+
+  it("clamps step index to the deepest floor when stepIdx >= levels.length", () => {
+    const levels = blankDungeon(2);
+    placeQuestKillMonsters(levels, [row("Q", 5, 2)], () => true);
+    expect(levels[0].monsters).toHaveLength(0);
+    expect(levels[1].monsters).toHaveLength(2);
+  });
+
+  it("never spawns on the entry tile", () => {
+    const levels = blankDungeon(1);
+    // Force every cell to be available — the entry exclusion should
+    // still hold.
+    placeQuestKillMonsters(levels, [row("Q", 0, 16)], () => true);
+    const onEntry = levels[0].monsters.find(
+      (m) => m.col === levels[0].entryCol && m.row === levels[0].entryRow,
+    );
+    expect(onEntry).toBeUndefined();
+  });
+
+  it("only tops up to remaining — re-running is idempotent", () => {
+    const levels = blankDungeon(1);
+    // First pass — places 3.
+    placeQuestKillMonsters(levels, [row("Q", 0, 3)], () => true);
+    expect(levels[0].monsters).toHaveLength(3);
+    // Pretend the player killed one — `remaining` drops to 2. Now
+    // there are 2 already on the floor (have=2). Top-up needed = 0.
+    levels[0].monsters.pop();
+    placeQuestKillMonsters(levels, [row("Q", 0, 2)], () => true);
+    expect(levels[0].monsters).toHaveLength(2);
+    // Same call again — still 2 (idempotent).
+    placeQuestKillMonsters(levels, [row("Q", 0, 2)], () => true);
+    expect(levels[0].monsters).toHaveLength(2);
+  });
+
+  it("respects the isWalkable predicate (forest tree-walls etc.)", () => {
+    const levels = blankDungeon(1);
+    // Mark every column except col 0 as un-walkable. The placement
+    // pool collapses to {(0,1), (0,2), (0,3)} — entry at (0,0) is
+    // excluded — so we can place at most 3.
+    placeQuestKillMonsters(
+      levels,
+      [row("Q", 0, 10)],
+      (col) => col === 0,
+    );
+    expect(levels[0].monsters.length).toBeLessThanOrEqual(3);
+    for (const m of levels[0].monsters) expect(m.col).toBe(0);
+  });
+
+  it("no-op when remaining is zero or the template has no monsters", () => {
+    const levels = blankDungeon(1);
+    placeQuestKillMonsters(levels, [row("Q", 0, 0)], () => true);
+    placeQuestKillMonsters(levels, [{
+      questName: "Q", stepIdx: 0, remaining: 5,
+      template: { name: "Empty", monsters: [], monsterPartyTile: "" },
+    }], () => true);
+    expect(levels[0].monsters).toHaveLength(0);
+  });
+
+  it("each placed monster carries questName + stepIdx for the renderer", () => {
+    const levels = blankDungeon(1);
+    placeQuestKillMonsters(levels, [row("Goblins", 0, 1)], () => true);
+    const m = levels[0].monsters[0];
+    expect(m.questName).toBe("Goblins");
+    expect(m.stepIdx).toBe(0);
+    // ID prefix follows the q-<questName>-<stepIdx>-<n> pattern so
+    // it can't collide with the random `m-<seed>-<i>` ids.
+    expect(m.id.startsWith("q-Goblins-0-")).toBe(true);
   });
 });

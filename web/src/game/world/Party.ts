@@ -226,9 +226,38 @@ export function memberFromRaw(raw: RawMember): PartyMember {
       body: null,
       head: null,
     },
-    inventory: raw.inventory ?? [],
+    inventory: normalizeInventory(raw.inventory),
     sprite: spriteForMember(raw.sprite, klass),
   };
+}
+
+/**
+ * Coerce a raw inventory list into `InventoryItem[]` even when the
+ * source is malformed. Hand-edits and JSON linters sometimes flatten
+ * an `{ item: "Arrows" }` entry to a bare `"Arrows"` string; without
+ * this helper the runtime ends up with a `string[]` typed as
+ * `InventoryItem[]`, and every downstream check that reads `.item`
+ * silently sees `undefined` (Range/Cast hide, stackable merge skips,
+ * the giver-item flow refuses). Auto-promote bare strings here so
+ * the rest of the engine never has to defend against the wrong
+ * shape. Unknown entry types are skipped rather than crashing the
+ * whole party load.
+ */
+function normalizeInventory(raw: unknown): InventoryItem[] {
+  if (!Array.isArray(raw)) return [];
+  const out: InventoryItem[] = [];
+  for (const entry of raw) {
+    if (typeof entry === "string") {
+      out.push({ item: entry });
+      continue;
+    }
+    if (entry && typeof entry === "object" && typeof (entry as InventoryItem).item === "string") {
+      out.push(entry as InventoryItem);
+      continue;
+    }
+    // Unknown shape — drop it rather than poison the inventory.
+  }
+  return out;
 }
 
 export function partyFromRaw(raw: RawParty): Party {
@@ -243,7 +272,7 @@ export function partyFromRaw(raw: RawParty): Party {
     partyEffects: raw.party_effects ?? {
       effect_1: null, effect_2: null, effect_3: null, effect_4: null,
     },
-    inventory: raw.inventory ?? [],
+    inventory: normalizeInventory(raw.inventory),
     torchSteps: raw.torch_steps ?? 0,
     galadrielsLightSteps: raw.galadriels_light_steps ?? 0,
     lastTinkerDay: raw.last_tinker_day,

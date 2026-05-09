@@ -144,6 +144,19 @@ export interface DungeonMonster {
   encounterNames: string[];
   /** Display name of the encounter template. */
   encounterName: string;
+  /**
+   * Quest this monster was placed for. Set by the dungeon's
+   * quest-spawn pass for kill-step targets (e.g. Goblin's Nest's
+   * "Wolves and Goblins" warbands); undefined for ordinary random
+   * encounters. Used by the renderer to add a soft gold halo so the
+   * player can see which sprites credit a quest, and by the spawn
+   * pass to count "how many do I still owe" on re-entry.
+   */
+  questName?: string;
+  /** Index of the kill step inside the quest definition. Combined
+   *  with `questName`, this is the per-step identity used by the
+   *  spawn top-up logic. */
+  stepIdx?: number;
 }
 
 /**
@@ -1036,4 +1049,93 @@ export function dungeonSeed(name: string, overworldCol: number, overworldRow: nu
   h ^= overworldRow & 0xffff;
   h = Math.imul(h, 0x01000193) >>> 0;
   return h >>> 0;
+}
+
+// ── Quest monster placement ─────────────────────────────────────
+
+/** Subset of the kill-step shape `placeQuestKillMonsters` consumes.
+ *  Mirrors `Quests.activeKillStepsForLocation`'s return rows so the
+ *  scene can pipe the helper's output straight in without reshaping. */
+export interface QuestKillSpawnRow {
+  questName: string;
+  stepIdx: number;
+  /** How many encounters of this step still need to be killed
+   *  (`target_count - already_killed`). */
+  remaining: number;
+  /** Encounter template to clone — usually pulled via
+   *  `Quests.rosterFor(encounterTable, step.encounter)`. */
+  template: { name: string; monsters: string[]; monsterPartyTile: string };
+}
+
+/**
+ * Place quest-required monsters into a multi-floor dungeon for every
+ * active kill step targeting it. Mirrors `TownScene.spawnInteriorMonstersIfNeeded`
+ * but for procedural dungeons.
+ *
+ * Distribution rule: step N drops onto floor `min(stepIdx, levels.length - 1)`,
+ * so step 0 is on the entry floor, step 1 on floor 1, and so on,
+ * with later steps clamped to the deepest floor. For Goblin's Nest
+ * (2 floors), the "kill 3 warbands" step lands on floor 0 and the
+ * "kill the war-leader" step lands on floor 1.
+ *
+ * Idempotent on re-entry: if an active step already has N monsters
+ * placed in `level.monsters` (matched by `questName + stepIdx`), the
+ * helper only tops up the missing copies. So re-entering after
+ * killing one of three warbands respawns nothing — it adds the
+ * remaining two only on the first entry.
+ *
+ * `isWalkable(col, row, levelIdx)` defers to the scene's tile-
+ * walkability rules (per-cell overrides for forest tree-walls,
+ * etc.). `entryByLevel` is the per-floor entry tile — we exclude it
+ * so a quest monster can't spawn on top of where the player drops in.
+ */
+export function placeQuestKillMonsters(
+  levels: DungeonLevel[],
+  rows: readonly QuestKillSpawnRow[],
+  isWalkable: (col: number, row: number, levelIdx: number) => boolean,
+  rng: () => number = Math.random,
+): void {
+  if (levels.length === 0) return;
+  for (const row of rows) {
+    if (row.remaining <= 0) continue;
+    if (!row.template.monsters.length) continue;
+    const floorIdx = Math.min(row.stepIdx, levels.length - 1);
+    const lvl = levels[floorIdx];
+    // How many monsters for this step are already on the floor?
+    const have = lvl.monsters.filter(
+      (m) => m.questName === row.questName && m.stepIdx === row.stepIdx,
+    ).length;
+    const needed = row.remaining - have;
+    if (needed <= 0) continue;
+    // Build the candidate cell pool — every walkable tile that
+    // isn't the entry stair and isn't already occupied by a
+    // monster (random or quest).
+    const occupied = new Set<string>();
+    occupied.add(`${lvl.entryCol},${lvl.entryRow}`);
+    for (const m of lvl.monsters) occupied.add(`${m.col},${m.row}`);
+    const pool: Array<[number, number]> = [];
+    for (let r = 0; r < lvl.height; r++) {
+      for (let c = 0; c < lvl.width; c++) {
+        if (!isWalkable(c, r, floorIdx)) continue;
+        if (occupied.has(`${c},${r}`)) continue;
+        pool.push([c, r]);
+      }
+    }
+    let nextN = lvl.monsters.length;
+    for (let n = 0; n < needed; n++) {
+      if (pool.length === 0) break;
+      const idx = Math.floor(rng() * pool.length);
+      const [c, r] = pool.splice(idx, 1)[0];
+      lvl.monsters.push({
+        id: `q-${row.questName}-${row.stepIdx}-${nextN++}`,
+        col: c,
+        row: r,
+        name: row.template.monsterPartyTile,
+        encounterNames: [...row.template.monsters],
+        encounterName: row.template.name,
+        questName: row.questName,
+        stepIdx: row.stepIdx,
+      });
+    }
+  }
 }

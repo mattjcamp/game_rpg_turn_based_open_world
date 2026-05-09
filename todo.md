@@ -6,7 +6,6 @@ python3 main.py
 ## Polish
 
 - Do a full QA on party creation attributes, combat, etc. Do a few playthroughs.
-- Gnomes should only be able to craft an item once per day, but they should be able to choose the item (general store)
 
 ## V2 Features
 - Lighting should not pass through walls and essentially only light based on Light of Sight and the lighting effect range
