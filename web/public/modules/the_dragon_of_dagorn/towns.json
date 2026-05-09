@@ -3484,7 +3484,6 @@
         "template_label": "General Shop Interior",
         "tile_properties": {
           "1,2": {
-            "shop_type": "general",
             "walkable": false
           },
           "7,4": {

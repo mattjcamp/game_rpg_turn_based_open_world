@@ -11,8 +11,7 @@ python3 main.py
 - In the character creation screen, add descriptions of races and classes with detailed lists of special abilities
 
 ## Bugs
-- The party graphics are missing in the published version
-- Again, I found in a second random monster encounter that the party did not have it's normal options appear on the right (range, cast, throw). No error appeared in the console.
+- Keep an eye open for when the party did not have it's normal options appear on the right (range, cast, throw).
 
 ## Features
 
