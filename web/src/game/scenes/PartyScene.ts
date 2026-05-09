@@ -123,13 +123,14 @@ interface PartySceneData {
   /** Scene key to resume on close. */
   from?: string;
   /**
-   * Number of NPCs adjacent to the party in the launching scene. Used
-   * to gate the PICKPOCKET action — the Python game requires at least
-   * one adjacent NPC. The launching scene computes this in 8 directions
-   * around the player before launching the overlay; OverworldScene
-   * passes 0.
+   * Stable per-NPC keys (`npcKey()` from state.ts) for every NPC in
+   * the 8 cells around the party in the launching scene. Used by
+   * the PICKPOCKET action to (a) confirm a target is in reach and
+   * (b) refuse when every nearby NPC is already in
+   * `gameState.pickpocketedNpcs`. The launching scene computes the
+   * list before launching the overlay; OverworldScene passes [].
    */
-  nearbyNpcCount?: number;
+  nearbyNpcKeys?: readonly string[];
 }
 
 /**
@@ -173,7 +174,14 @@ type SpellRow = { spell: Spell; castable: boolean };
 export class PartyScene extends Phaser.Scene {
   private from = "OverworldScene";
   /** NPCs within 1 tile (8-direction) of the party in the launching scene. */
-  private nearbyNpcCount = 0;
+  /**
+   * Stable keys for every NPC the party can pickpocket from this
+   * party-screen open. Empty when no NPCs are adjacent (or the
+   * launching scene was the overworld). Drives both the
+   * PICKPOCKET row's "ready / no targets" hint and the actual
+   * `pickpocket()` call.
+   */
+  private nearbyNpcKeys: readonly string[] = [];
   private party: Party | null = null;
   private effects: Effect[] = [];
   private spells: Spell[] = [];
@@ -256,7 +264,7 @@ export class PartyScene extends Phaser.Scene {
 
   init(data?: PartySceneData): void {
     this.from = data?.from ?? "OverworldScene";
-    this.nearbyNpcCount = data?.nearbyNpcCount ?? 0;
+    this.nearbyNpcKeys = data?.nearbyNpcKeys ?? [];
     this.mode = "inventory";
     this.cursor = 0;
     this.detailIndex = 0;
@@ -690,17 +698,24 @@ export class PartyScene extends Phaser.Scene {
       return;
     }
     if (row.kind === "pickpocket") {
-      // The Python game requires at least one NPC adjacent (8-dir) to
-      // the party in town. If we were launched from a scene with no
-      // adjacent NPCs (overworld, or an empty patch of town), refuse
-      // here — the underlying loot roll only fires once a target is
-      // in reach.
-      if (this.nearbyNpcCount === 0) {
-        this.feedback = "No one nearby to pickpocket.";
-        this.render();
-        return;
+      // Pickpocket is gated three ways:
+      //   1. There must be at least one NPC adjacent.
+      //   2. That NPC must not already be in
+      //      `gameState.pickpocketedNpcs` (once-per-NPC rule).
+      //   3. There must be a Halfling in the active party (the
+      //      action helper enforces this last one).
+      // The action helper handles 1 + 2 internally and returns
+      // `pickedKey` when it commits — we stamp it into the gate
+      // Set on success so future opens see this NPC as spent.
+      const r = pickpocket(
+        this.party,
+        members,
+        this.nearbyNpcKeys,
+        gameState.pickpocketedNpcs,
+      );
+      if (r.ok && r.pickedKey) {
+        gameState.pickpocketedNpcs.add(r.pickedKey);
       }
-      const r = pickpocket(this.party, members);
       this.feedback = r.message;
       this.buildRows();
       this.render();
@@ -1541,23 +1556,36 @@ export class PartyScene extends Phaser.Scene {
       return;
     }
     if (row.kind === "pickpocket") {
-      const ready = this.nearbyNpcCount > 0;
-      this.text(x, y, "PICKPOCKET", FONT_HEAD(ready ? C.gold : C.faint));
+      // Three states the player can be in:
+      //   - "ready": at least one nearby NPC hasn't been lifted from yet
+      //   - "spent": NPCs are in reach but every one's been hit already
+      //   - "no-targets": nothing nearby to even try
+      const total = this.nearbyNpcKeys.length;
+      const fresh = this.nearbyNpcKeys.filter(
+        (k) => !gameState.pickpocketedNpcs.has(k),
+      ).length;
+      const state: "ready" | "spent" | "no-targets" =
+        total === 0 ? "no-targets" : fresh === 0 ? "spent" : "ready";
+      const titleColor = state === "ready" ? C.gold : C.faint;
+      this.text(x, y, "PICKPOCKET", FONT_HEAD(titleColor));
       this.text(x, y + 24,
                 "Your Halfling lifts something useful from a nearby NPC. "
-                + "Could be coins, herbs, arrows, even a Dagger.",
+                + "Each person can only be pickpocketed once per run.",
                 FONT_BODY(C.dim), [0, 0], w);
-      // Status line — "Ready" when the launching scene reported at least
-      // one adjacent NPC, otherwise an instruction.
-      this.text(x, y + h - 38,
-                ready
-                  ? `${this.nearbyNpcCount} target${this.nearbyNpcCount === 1 ? "" : "s"} within reach.`
-                  : "Stand next to an NPC in a town, then re-open this menu.",
-                FONT_MONO(ready ? C.gold : C.faint), [0, 0], w);
-      this.text(x, y + h - 18,
-                ready ? "Enter to attempt a pickpocket"
-                      : "No target — Enter has no effect",
-                FONT_MONO(ready ? C.gold : C.faint));
+      const status =
+        state === "ready"
+          ? `${fresh} fresh target${fresh === 1 ? "" : "s"} within reach`
+            + (fresh < total ? ` (${total - fresh} already lifted)` : ".")
+          : state === "spent"
+            ? "Already pickpocketed everyone in reach. Try a different NPC."
+            : "Stand next to an NPC in a town, then re-open this menu.";
+      const statusColor = state === "ready" ? C.gold : C.faint;
+      this.text(x, y + h - 38, status, FONT_MONO(statusColor), [0, 0], w);
+      const hint =
+        state === "ready" ? "Enter to attempt a pickpocket"
+        : state === "spent" ? "No fresh targets — Enter has no effect"
+        : "No target — Enter has no effect";
+      this.text(x, y + h - 18, hint, FONT_MONO(statusColor));
       return;
     }
     if (row.kind === "tinker") {

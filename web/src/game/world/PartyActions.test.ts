@@ -672,28 +672,68 @@ describe("brewPotion / pickpocket / tinker", () => {
   it("pickpocket either drops gold or pushes an item, depending on the roll", () => {
     const p = makeParty(); // Merry the Halfling is already in the active party
     const members = activeMembers(p);
+    const nearby = ["Plainstown|Innkeeper|3,3", "Plainstown|Villager|7,5"];
+    const spent = new Set<string>();
 
     // rng=0 → first row of the loot table (Gold)
     const beforeGold = p.gold;
-    const r1 = pickpocket(p, members, () => 0);
+    const r1 = pickpocket(p, members, nearby, spent, () => 0);
     expect(r1.ok).toBe(true);
     expect(r1.message.toLowerCase()).toContain("gold");
+    expect(r1.pickedKey).toBe(nearby[0]);
     expect(p.gold).toBeGreaterThan(beforeGold);
 
-    // rng nudged so the weighted-pick lands on a non-Gold row.
-    // Calls: pickWeighted uses one rng() call. Easiest: feed 0.99
-    // which should land on the last row (Holy Water).
+    // Stamp the first NPC as spent and roll again — should pick
+    // the second one. rng=0.99 lands on the last loot row (Holy Water).
+    spent.add(r1.pickedKey!);
     const beforeInv = p.inventory.length;
-    const r2 = pickpocket(p, members, () => 0.99);
+    const r2 = pickpocket(p, members, nearby, spent, () => 0.99);
     expect(r2.ok).toBe(true);
+    expect(r2.pickedKey).toBe(nearby[1]);
     expect(p.inventory.length).toBeGreaterThan(beforeInv);
   });
 
   it("pickpocket refuses when no Halfling is present", () => {
     const p = makeParty();
     p.activeParty = [0, 2, 3]; // drop Merry from the active four
-    const r = pickpocket(p, activeMembers(p));
+    const r = pickpocket(p, activeMembers(p), ["Town|X|0,0"], new Set());
     expect(r.ok).toBe(false);
+  });
+
+  it("pickpocket refuses when no NPCs are nearby", () => {
+    const p = makeParty();
+    const r = pickpocket(p, activeMembers(p), [], new Set());
+    expect(r.ok).toBe(false);
+    expect(r.message.toLowerCase()).toContain("nearby");
+  });
+
+  it("pickpocket refuses when every nearby NPC is already pickpocketed", () => {
+    const p = makeParty();
+    const members = activeMembers(p);
+    const nearby = ["Plainstown|Innkeeper|3,3", "Plainstown|Villager|7,5"];
+    const spent = new Set(nearby);
+    const beforeGold = p.gold;
+    const beforeInv = p.inventory.length;
+    const r = pickpocket(p, members, nearby, spent);
+    expect(r.ok).toBe(false);
+    expect(r.message.toLowerCase()).toContain("already");
+    // Loot must NOT have been awarded on a refusal.
+    expect(p.gold).toBe(beforeGold);
+    expect(p.inventory.length).toBe(beforeInv);
+  });
+
+  it("pickpocket picks the first un-spent NPC, skipping spent ones", () => {
+    const p = makeParty();
+    const members = activeMembers(p);
+    const nearby = [
+      "Plainstown|Innkeeper|3,3",  // already spent
+      "Plainstown|Bard|5,5",        // already spent
+      "Plainstown|Villager|7,5",   // fresh — should be picked
+    ];
+    const spent = new Set([nearby[0], nearby[1]]);
+    const r = pickpocket(p, members, nearby, spent, () => 0);
+    expect(r.ok).toBe(true);
+    expect(r.pickedKey).toBe(nearby[2]);
   });
 
   it("tinker adds the chosen item to the stash when a Gnome is present", () => {
@@ -895,15 +935,13 @@ describe("Galadriel's Light step burnout", () => {
   });
 });
 
-describe("pickpocket gating (NPC adjacency lives in the scene)", () => {
-  it("pickpocket helper itself does NOT check adjacency", () => {
-    // The adjacency rule is enforced by the scene before the helper
-    // is even called — when it IS called we expect it to do its
-    // weighted roll regardless. The scene's own test covers the
-    // refusal path.
+describe("pickpocket gating (helper enforces both adjacency + once-per-NPC)", () => {
+  it("the helper refuses outright when the nearby list is empty", () => {
+    // Used to live in the scene; moved into the helper so save-game
+    // restores can't bypass it on a stale localStorage payload.
     const p = makeParty();
-    const r = pickpocket(p, activeMembers(p), () => 0.5);
-    expect(r.ok).toBe(true);
+    const r = pickpocket(p, activeMembers(p), [], new Set(), () => 0.5);
+    expect(r.ok).toBe(false);
   });
 });
 

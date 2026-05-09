@@ -68,6 +68,7 @@ interface RawSave {
   partyPosInitialized: boolean;
   consumedTriggers: string[];
   destroyedSpawns: string[];
+  pickpocketedNpcs: string[];
   roamingMonsters: RoamingMonster[];
   defeated: boolean;
   clock: GameClock;
@@ -152,6 +153,7 @@ function toRaw(s: GameState): RawSave {
     partyPosInitialized: s.partyPosInitialized,
     consumedTriggers: [...s.consumedTriggers],
     destroyedSpawns: [...s.destroyedSpawns],
+    pickpocketedNpcs: [...s.pickpocketedNpcs],
     roamingMonsters: s.roamingMonsters,
     defeated: s.defeated,
     clock: s.clock,
@@ -185,6 +187,7 @@ function fromRaw(raw: RawSave, target: GameState): void {
   target.partyPosInitialized = !!raw.partyPosInitialized;
   target.consumedTriggers = new Set(raw.consumedTriggers ?? []);
   target.destroyedSpawns = new Set(raw.destroyedSpawns ?? []);
+  target.pickpocketedNpcs = new Set(raw.pickpocketedNpcs ?? []);
   target.roamingMonsters = raw.roamingMonsters ?? [];
   target.defeated = !!raw.defeated;
   target.clock = raw.clock;

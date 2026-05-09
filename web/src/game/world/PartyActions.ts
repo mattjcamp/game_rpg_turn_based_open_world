@@ -613,32 +613,79 @@ const PICKPOCKET_LOOT: ReadonlyArray<readonly [number, string]> = [
 ];
 
 /**
- * A Halfling tries to pickpocket. Picks a random reward from the
- * loot table, adding either gold or an item to the shared stash.
- * Returns a feedback line.
+ * Result of a pickpocket attempt. Adds the consumed-NPC key to the
+ * common ActionResult shape so the caller can stamp it into the
+ * `pickpocketedNpcs` Set on gameState — that way the once-per-NPC
+ * gate is enforced in one place rather than relying on every call
+ * site to remember.
+ */
+export interface PickpocketResult extends ActionResult {
+  /** NPC the Halfling lifted from on success. Undefined on refusal. */
+  pickedKey?: string;
+}
+
+/**
+ * A Halfling tries to pickpocket someone in `nearbyNpcKeys`. Returns
+ * the loot result + which NPC was hit (so the caller can mark them
+ * spent). Refuses when:
  *
- * The Python game gates this on an adjacent NPC + a DEX skill check;
- * we elide both for the menu-cast version (the screen has no notion
- * of which NPC is adjacent today). A later slice can wire in the
- * scene-context to do the proper check.
+ *   - There's no Halfling in the active party.
+ *   - `nearbyNpcKeys` is empty (no targets in reach).
+ *   - Every nearby NPC is already in `alreadyPickpocketed`.
+ *
+ * Picks the *first un-pickpocketed key* in `nearbyNpcKeys` rather
+ * than the random nearest, which keeps tests deterministic without
+ * an extra RNG roll. The scene is responsible for ordering the list
+ * by adjacency or whatever feels right at the UI layer; the helper
+ * just commits.
+ *
+ * `rng` is consumed for the loot weighted-pick + the gold roll.
+ * The consumed-NPC key is returned in `pickedKey` so the caller can
+ * stamp gameState.pickpocketedNpcs without us reaching into
+ * scene-only state from a pure-logic helper.
  */
 export function pickpocket(
   party: Party,
   members: PartyMember[],
+  nearbyNpcKeys: readonly string[],
+  alreadyPickpocketed: ReadonlySet<string>,
   rng: () => number = Math.random,
-): ActionResult {
+): PickpocketResult {
   const halfling = findRace(members, "Halfling");
   if (!halfling) {
     return { ok: false, message: "No Halfling in the party." };
+  }
+  if (nearbyNpcKeys.length === 0) {
+    return { ok: false, message: "No one nearby to pickpocket." };
+  }
+  // First un-pickpocketed key in the supplied order. Filtering and
+  // taking the first match avoids reshuffling the caller's list.
+  const target = nearbyNpcKeys.find((k) => !alreadyPickpocketed.has(k));
+  if (!target) {
+    return {
+      ok: false,
+      message:
+        nearbyNpcKeys.length === 1
+          ? "You've already pickpocketed everyone you can reach."
+          : "Already lifted from everyone nearby — try someone else.",
+    };
   }
   const reward = pickWeighted(PICKPOCKET_LOOT, rng);
   if (reward === "Gold") {
     const amount = 3 + Math.floor(rng() * 13); // 3–15 inclusive
     party.gold += amount;
-    return { ok: true, message: `${halfling.name} pilfers ${amount} gold.` };
+    return {
+      ok: true,
+      message: `${halfling.name} pilfers ${amount} gold.`,
+      pickedKey: target,
+    };
   }
   party.inventory.push({ item: reward });
-  return { ok: true, message: `${halfling.name} swipes a ${reward}.` };
+  return {
+    ok: true,
+    message: `${halfling.name} swipes a ${reward}.`,
+    pickedKey: target,
+  };
 }
 
 /** Small set of recipes an Alchemist can brew on the fly. */

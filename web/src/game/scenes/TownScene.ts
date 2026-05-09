@@ -136,7 +136,7 @@ import {
 } from "../world/GameTime";
 import { paintMoonPhase, MOON_HUD_SIZE } from "../world/MoonIcon";
 import { withBase, dataPath } from "../world/Module";
-import { gameState } from "../state";
+import { gameState, npcKey } from "../state";
 import { rememberScene, save as saveGame } from "../save";
 
 const TILE = 32;
@@ -569,7 +569,10 @@ export class TownScene extends Phaser.Scene {
     // items in tile_properties without shipping a sprite per kind.
     // Depth 7 puts them under the player but above tiles & NPCs.
     for (const [key, entry] of Object.entries(this.tileMap.tileProperties)) {
-      const spec = decorationFor(entry);
+      // Pass the items catalog so a `tile_properties.item` field
+      // resolves to its per-icon glyph (torch flame, potion phial,
+      // sword, …) rather than the generic gold star.
+      const spec = decorationFor(entry, this.itemCatalog);
       if (!spec) continue;
       const [c, r] = key.split(",").map((s) => parseInt(s, 10));
       if (!Number.isFinite(c) || !Number.isFinite(r)) continue;
@@ -1432,19 +1435,23 @@ export class TownScene extends Phaser.Scene {
     // Don't open the party screen while a dialog is up — let the
     // player finish the conversation first.
     if (this.dialog) return;
-    // Count NPCs in the 8 cells around the player so the Party screen
-    // can gate PICKPOCKET on having a target in reach (mirrors
-    // inventory_mixin._get_adjacent_npc in the Python game).
-    let nearby = 0;
+    // Build the list of NPC keys in the 8 cells around the player.
+    // Used by the Party screen's PICKPOCKET action to (a) gate on
+    // having a target in reach and (b) refuse on already-spent
+    // targets via the pickpocketedNpcs gate. The key shape lives in
+    // state.ts so save/load and tests speak the same language.
+    const nearbyNpcKeys: string[] = [];
     for (const { def } of this.npcs) {
       const dc = Math.abs(def.col - this.playerCol);
       const dr = Math.abs(def.row - this.playerRow);
-      if (dc <= 1 && dr <= 1 && (dc + dr) > 0) nearby += 1;
+      if (dc <= 1 && dr <= 1 && (dc + dr) > 0) {
+        nearbyNpcKeys.push(npcKey(this.townName, def.name, def.homeCol, def.homeRow));
+      }
     }
     this.scene.pause();
     this.scene.launch("PartyScene", {
       from: "TownScene",
-      nearbyNpcCount: nearby,
+      nearbyNpcKeys,
     });
   }
 

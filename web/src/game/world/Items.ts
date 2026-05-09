@@ -43,6 +43,15 @@ export interface Item {
   acBonus?: number;
   durability?: number;
   itemType?: string;
+  /**
+   * Render-glyph hint from items.json (e.g. "torch", "potion",
+   * "sword", "key", "scroll"). Drives how the item is drawn when
+   * dropped on a tile (Decorations.ts) and matches the Python
+   * game's `_draw_item_icon` switch. Distinct from `itemType`,
+   * which is the gameplay category — e.g. Antidote has
+   * `itemType: "antidote"` but `icon: "potion"`.
+   */
+  icon?: string;
   /** Buy price at shops (gold). 0 / missing = not for sale. */
   buy?: number;
   /** Sell price (gold) at shops. 0 / missing = nobody will buy it. */
@@ -91,6 +100,7 @@ interface RawItem {
   stackable?: boolean;
   charges?: number;
   ammo?: string;
+  icon?: string;
 }
 
 interface RawItems {
@@ -129,6 +139,7 @@ function itemFromRaw(name: string, category: Item["category"], r: RawItem): Item
     stackable: r.stackable,
     charges: r.charges,
     ammo: r.ammo,
+    icon: r.icon,
   };
 }
 

@@ -30,6 +30,7 @@ import {
   type LightSource,
 } from "../world/Lighting";
 import { decorationFor } from "../world/Decorations";
+import { loadItems, type Item } from "../world/Items";
 import { installTileEffects } from "../world/TileEffects";
 import {
   advanceClock,
@@ -116,6 +117,9 @@ export class OverworldScene extends Phaser.Scene {
   private dark = false;
   /** Loaded spawn-tile catalog keyed by tile id. */
   private spawnPoints: Map<number, SpawnPoint> = new Map();
+  /** Items catalog (loaded once in create) — passed to decorationFor
+   *  so tile_properties.item entries render with per-item glyphs. */
+  private items: Map<string, Item> = new Map();
   /** Live monster catalog — used to resolve spawn-list names + sprites. */
   private monsterCatalog: Map<string, MonsterSpec> = new Map();
   /** Per-roamer-id sprite shown over its current tile. Rebuilt every
@@ -260,6 +264,12 @@ export class OverworldScene extends Phaser.Scene {
     } catch {
       /* spawn data missing — degrade gracefully */
     }
+    // Items catalog drives per-icon glyphs on tile_properties.item
+    // overlays (drawMap below). A failure here just leaves us with
+    // the generic gold-star fallback — every dropped item still
+    // renders, just without the type-specific glyph.
+    try { this.items = await loadItems(); }
+    catch { /* items catalog missing — fall back to ★ */ }
 
     // Lift any TILE_BOAT cells into gameState.boatPositions and
     // overwrite the underlying data with water — boats are rendered
@@ -396,7 +406,10 @@ export class OverworldScene extends Phaser.Scene {
     // Decoration glyphs (rising_smoke at the dragon's lair, fairy
     // lights along certain paths, etc.) drawn from tile_properties.
     for (const [key, entry] of Object.entries(this.tileMap.tileProperties)) {
-      const spec = decorationFor(entry);
+      // Pass the items catalog so a `tile_properties.item` field
+      // resolves to its per-icon glyph (torch flame, potion phial,
+      // sword, …) rather than the generic gold star.
+      const spec = decorationFor(entry, this.items);
       if (!spec) continue;
       const [c, r] = key.split(",").map((s) => parseInt(s, 10));
       if (!Number.isFinite(c) || !Number.isFinite(r)) continue;

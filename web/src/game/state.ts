@@ -150,12 +150,42 @@ export interface GameState {
    */
   shopInventories: Map<string, string[]>;
   /**
+   * NPCs the party has already pickpocketed this run. Each entry is
+   * a stable per-NPC key composed via `npcKey()` below — typically
+   * `"<sceneKey>|<npcName>|<homeCol>,<homeRow>"`. The home position
+   * disambiguates NPCs that share a name (every village has an
+   * "Innkeeper"); the scene key disambiguates across towns and
+   * building interiors.
+   *
+   * The Halfling pickpocket action refuses when every nearby NPC's
+   * key is already in this Set, mirroring the design rule that a
+   * given NPC can only be lifted from once per run.
+   */
+  pickpocketedNpcs: Set<string>;
+  /**
    * The active scene + its init payload — written by each scene's
    * create() and read by the resume path on "Return to Game" so the
    * player lands back in whichever map they were on. Null until any
    * scene boots for the first time (which it does within ~1s of the
    * world page loading). */
   lastScene: LastSceneSnapshot | null;
+}
+
+/**
+ * Compose a stable per-NPC key for the pickpocket gate. Combines
+ * the scene path (town name, "building:Foo:Space", or "overview")
+ * with the NPC's name and home anchor so two villagers named
+ * "Villager" in the same town are still distinct, and the same
+ * villager wandering around their tile range still resolves to one
+ * key (their home position never changes).
+ */
+export function npcKey(
+  sceneKey: string,
+  npcName: string,
+  homeCol: number,
+  homeRow: number,
+): string {
+  return `${sceneKey}|${npcName}|${homeCol},${homeRow}`;
 }
 
 export interface InteriorMonster {
@@ -209,6 +239,7 @@ function makeFreshState(): GameState {
     pendingKilledMonsters: [],
     interiorMonsters: new Map(),
     shopInventories: new Map(),
+    pickpocketedNpcs: new Set(),
     lastScene: null,
   };
 }
@@ -243,6 +274,7 @@ export function resetGameState(): void {
   gameState.pendingKilledMonsters = fresh.pendingKilledMonsters;
   gameState.interiorMonsters = fresh.interiorMonsters;
   gameState.shopInventories = fresh.shopInventories;
+  gameState.pickpocketedNpcs = fresh.pickpocketedNpcs;
   gameState.lastScene = fresh.lastScene;
 }
 

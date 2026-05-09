@@ -20,9 +20,9 @@
       "level": 1,
       "exp": 0,
       "equipped": {
-        "right_hand": null,
+        "right_hand": "Sword",
         "left_hand": null,
-        "body": null,
+        "body": "Chain",
         "head": null
       },
       "inventory": [],
@@ -42,9 +42,9 @@
       "level": 1,
       "exp": 0,
       "equipped": {
-        "right_hand": null,
+        "right_hand": "Short Bow",
         "left_hand": null,
-        "body": null,
+        "body": "Leather",
         "head": null
       },
       "inventory": [],
