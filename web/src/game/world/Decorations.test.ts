@@ -34,18 +34,24 @@ describe("decorationFor", () => {
 
   it("renders the generic gold star when no items catalog is supplied", () => {
     // Backwards-compat path — the helper still works without the
-    // catalog (tests, scenes that haven't loaded items yet).
-    const d = decorationFor({ item: "Torch" });
+    // catalog (tests, scenes that haven't loaded items yet). Without
+    // a catalog we can't tell if the item is animated, so we fall
+    // through to the star.
+    const d = decorationFor({ item: "Healing Potion" });
     expect(d?.glyph).toBe("★");
     expect(d?.color).toBe("#ffd470");
   });
 
-  it("renders the per-icon glyph + colour when the items catalog is supplied", () => {
+  it("returns null for animated icons (TileEffects renders those)", () => {
+    // A `tile_properties.item: "Torch"` tile gets the live flame
+    // animation from TileEffects.ts. We must NOT also draw a static
+    // glyph or the tile renders both — a flame stacked on a diamond.
     const cat = items();
-    const torch = decorationFor({ item: "Torch" }, cat);
-    expect(torch?.glyph).toBe("♦");
-    expect(torch?.color).toBe("#ffb84a");
+    expect(decorationFor({ item: "Torch" }, cat)).toBeNull();
+  });
 
+  it("renders the per-icon glyph + colour for non-animated icons", () => {
+    const cat = items();
     const sword = decorationFor({ item: "Sword" }, cat);
     expect(sword?.glyph).toBe("†");
 

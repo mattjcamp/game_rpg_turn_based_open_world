@@ -19,6 +19,7 @@
  */
 
 import type { Item } from "./Items";
+import { ANIMATED_ITEM_ICONS } from "./TileEffects";
 
 export interface DecoSpec {
   glyph: string;
@@ -101,6 +102,11 @@ export function decorationFor(
   if (e.item) {
     const def = items?.get(e.item);
     const icon = def?.icon;
+    // Some icons are rendered as live animations by TileEffects.ts
+    // (torches especially — the static glyph never read as a torch).
+    // Return null here so the scene draws ONLY the animation; we'd
+    // otherwise double-render with a glyph stacked on the flame.
+    if (icon && ANIMATED_ITEM_ICONS.has(icon)) return null;
     const base = (icon && ICON_DECOS[icon]) ? ICON_DECOS[icon] : FALLBACK_ITEM_DECO;
     return { ...base, stroke: "#1a1a2e" };
   }

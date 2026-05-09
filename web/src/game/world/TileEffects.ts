@@ -19,6 +19,7 @@
 
 import type Phaser from "phaser";
 import type { TileMap } from "./TileMap";
+import type { Item } from "./Items";
 
 // Phaser scene event names. Hardcoding the strings (rather than
 // reaching into `Phaser.Scenes.Events.*` at runtime) keeps this
@@ -33,10 +34,36 @@ const KNOWN: ReadonlySet<string> = new Set([
   "torch", "fire", "fairy_light", "rising_smoke",
 ]);
 
+/**
+ * Set of items.json `icon` values that map cleanly onto an animated
+ * effect — a tile with `item: "Torch"` (icon "torch") gets the same
+ * flickering flame TileEffects draws for `effect: "torch"`. Exported
+ * so `Decorations.decorationFor` can skip the static-glyph fallback
+ * for these icons (otherwise the tile would render both the
+ * animation AND a Unicode character on top).
+ */
+export const ANIMATED_ITEM_ICONS: ReadonlySet<string> = new Set([
+  "torch",
+]);
+
 /** Parse a tile_properties.effect string into a known kind, or null. */
 export function parseTileEffect(value: unknown): TileEffectKind | null {
   if (typeof value !== "string") return null;
   return KNOWN.has(value) ? (value as TileEffectKind) : null;
+}
+
+/**
+ * Map an items.json `icon` value to the animated effect kind that
+ * should render it. Returns null when the icon doesn't map (e.g.
+ * "potion", "scroll" — those use static decorations). Today only
+ * "torch" maps, but the table is open so future items with their
+ * own animated effect can plug in (e.g. an "embers" icon for a
+ * dying campfire).
+ */
+function iconToEffect(icon: unknown): TileEffectKind | null {
+  if (typeof icon !== "string") return null;
+  if (icon === "torch") return "torch";
+  return null;
 }
 
 export interface AnimatedTile {
@@ -46,19 +73,43 @@ export interface AnimatedTile {
 }
 
 /**
- * Scan a tile map's `tileProperties` for entries whose `effect` is one
- * of the four animated kinds. Out-of-bounds keys are skipped silently.
+ * Scan a tile map's `tileProperties` for entries that should animate.
+ * Two paths land here:
+ *
+ *   - `tile_properties.effect` is one of the four animated kinds —
+ *     e.g. authors deliberately mark a hearth with `effect: "fire"`.
+ *   - `tile_properties.item` resolves to a catalog item whose `icon`
+ *     is an animated kind — most commonly `item: "Torch"` (icon
+ *     "torch"), which authors drop in town walls to indicate a
+ *     wall-mounted torch. We honour this so the player sees an
+ *     animated flame instead of a static glyph that doesn't
+ *     visually read as a torch.
+ *
+ * `effect` wins when both are present on the same tile (the author
+ * was explicit). Out-of-bounds keys are skipped silently.
+ *
+ * Pass `items` to enable the icon-driven path; without it only
+ * `effect` is honoured (matching the pre-icon behaviour for tests
+ * that don't want to set up a catalog).
  */
-export function collectAnimatedTiles(tileMap: TileMap): AnimatedTile[] {
+export function collectAnimatedTiles(
+  tileMap: TileMap,
+  items?: Map<string, Item>,
+): AnimatedTile[] {
   const out: AnimatedTile[] = [];
   for (const [key, entry] of Object.entries(tileMap.tileProperties)) {
     if (!entry || typeof entry !== "object") continue;
-    const eff = parseTileEffect((entry as { effect?: unknown }).effect);
-    if (!eff) continue;
+    const e = entry as { effect?: unknown; item?: unknown };
+    let kind = parseTileEffect(e.effect);
+    if (!kind && items && typeof e.item === "string") {
+      const def = items.get(e.item);
+      kind = iconToEffect(def?.icon);
+    }
+    if (!kind) continue;
     const [c, r] = key.split(",").map((s) => parseInt(s, 10));
     if (!Number.isFinite(c) || !Number.isFinite(r)) continue;
     if (!tileMap.inBounds(c, r)) continue;
-    out.push({ col: c, row: r, effect: eff });
+    out.push({ col: c, row: r, effect: kind });
   }
   return out;
 }
@@ -272,8 +323,9 @@ export function installTileEffects(
   tileMap: TileMap,
   tileSize: number,
   depth: number,
+  items?: Map<string, Item>,
 ): () => void {
-  const tiles = collectAnimatedTiles(tileMap);
+  const tiles = collectAnimatedTiles(tileMap, items);
   if (tiles.length === 0) return () => {};
   const g = scene.add.graphics().setDepth(depth);
   const handler = (time: number) => {

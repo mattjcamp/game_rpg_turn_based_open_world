@@ -318,7 +318,7 @@ export class OverworldScene extends Phaser.Scene {
     // Animated tile_properties.effect overlays — torches flicker, fires
     // dance, smoke rises, fairy lights twinkle. Depth 7 puts them above
     // tiles + decoration glyphs but below darkness (9) and player (10).
-    installTileEffects(this, this.tileMap, TILE, 7);
+    installTileEffects(this, this.tileMap, TILE, 7, this.items);
     this.drawPlayer();
     this.drawHud();
     this.installCamera();

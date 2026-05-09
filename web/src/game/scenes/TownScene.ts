@@ -483,7 +483,11 @@ export class TownScene extends Phaser.Scene {
 
     this.drawMap();
     // Animated tile_properties.effect overlays — see TileEffects.ts.
-    installTileEffects(this, this.tileMap, TILE, 7);
+    // Pass the items catalog so `item: "Torch"` tiles route into the
+    // same animated-flame painter as `effect: "torch"` (otherwise the
+    // wall sconce in the town renders blank — there's no `effect`
+    // field on those tiles, just the `item` attribute).
+    installTileEffects(this, this.tileMap, TILE, 7, this.itemCatalog);
     this.drawNpcs();
     this.drawInteriorMonsters();
     this.drawPlayer();
