@@ -49,6 +49,8 @@ import { gameState } from "../state";
 import { tileSpriteKey, populateRuntimeDefs, spriteManifest } from "../world/Tiles";
 import { assetUrl, dataPath } from "../world/Module";
 import { loadItems, type Item } from "../world/Items";
+import { loadCounters } from "../world/Counters";
+import { rollLootDrop } from "../world/Loot";
 import { loadSpells, minLevelFor, type Spell } from "../world/Spells";
 import { loadParty } from "../world/Party";
 import { loadClass, loadRaces, type ClassTemplate } from "../world/Classes";
@@ -2950,6 +2952,13 @@ export class CombatScene extends Phaser.Scene {
    * member. If any member levelled, a modal "Level Up!" dialog blocks
    * the exit until the player presses Space / Enter.
    *
+   * On top of XP and gold, the party rolls once on the post-combat
+   * loot table — a 25% chance to find a piece of mundane gear from
+   * the union of the general store / weapon shop / armor shop stock.
+   * The drop lands in the shared party inventory (the stash) so any
+   * member can grab it from the Party screen. Counter / item data
+   * loads lazily; if either fetch fails we silently skip the drop.
+   *
    * Class templates are fetched lazily; if the fetch fails we silently
    * skip the level-up step rather than blocking the post-combat
    * transition. XP is still added to the member's `exp` either way.
@@ -2960,6 +2969,7 @@ export class CombatScene extends Phaser.Scene {
     const totalGold = enemies.reduce((s, m) => s + (m.goldReward ?? 0), 0);
     const party = gameState.partyData;
     const levelUps: LevelUpEvent[] = [];
+    let lootDrop: string | null = null;
     if (party) {
       party.gold += totalGold;
       const aliveMembers: PartyMember[] = [];
@@ -2985,8 +2995,24 @@ export class CombatScene extends Phaser.Scene {
         // Refresh the HUD so HP/MP bars catch any gains.
         for (const c of this.combat.combatants) this.refreshHp(c);
       }
+      // Roll for a post-combat item drop from the shop pool. Loaders
+      // are cached so the first encounter pays the fetch cost and
+      // subsequent ones are instant; either failure just skips the
+      // drop without breaking the exit flow.
+      try {
+        const [items, counters] = await Promise.all([
+          loadItems(),
+          loadCounters(),
+        ]);
+        lootDrop = rollLootDrop(items, counters);
+        if (lootDrop) {
+          party.inventory.push({ item: lootDrop });
+        }
+      } catch {
+        /* counters/items unavailable — skip drop */
+      }
     }
-    this.showRewardSummary(totalXp, totalGold);
+    this.showRewardSummary(totalXp, totalGold, lootDrop);
     if (levelUps.length > 0) {
       // Let the rewards panel breathe before stacking the dialog over it.
       await new Promise<void>((r) => this.time.delayedCall(700, () => r()));
@@ -2998,12 +3024,13 @@ export class CombatScene extends Phaser.Scene {
   }
 
   /** Stack a short reward-summary panel under the "Victory!" overlay
-   *  so the player can see XP / gold gained. Level-ups land in a
-   *  separate modal — see showLevelUpDialog. */
-  private showRewardSummary(xp: number, gold: number): void {
+   *  so the player can see XP / gold / loot gained. Level-ups land in
+   *  a separate modal — see showLevelUpDialog. */
+  private showRewardSummary(xp: number, gold: number, loot: string | null): void {
     const lines: string[] = [];
     if (xp > 0)   lines.push(`+${xp} XP`);
     if (gold > 0) lines.push(`+${gold} gold`);
+    if (loot)     lines.push(`Found: ${loot}`);
     if (lines.length === 0) return;
     const text = lines.join("\n");
     const t = this.add.text(
