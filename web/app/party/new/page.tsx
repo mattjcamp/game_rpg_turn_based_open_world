@@ -10,11 +10,13 @@
  *   3. Class (filtered by what the chosen race can be)
  *   4. Avatar — pick the 32×32 sprite that represents this character
  *   5. Stats — every attribute starts at the floor (8) and the player
- *      distributes BONUS_POINTS on top, up to STAT_MAX (18). Racial
- *      modifiers add on top at runtime. Total floor + bonus budget is
- *      preserved at 63 across all five stats. Floor-based allocation
- *      makes the choice space feel deliberate: "I have 23 points to
- *      spend" reads better than "rebalance these defaults."
+ *      distributes BONUS_POINTS (15) on top, up to STAT_MAX (18).
+ *      Racial modifiers add on top at runtime. The 15-point budget
+ *      is deliberately tight: maxing one stat costs 10, leaving 5 to
+ *      scatter, so the player must accept real weaknesses rather
+ *      than max-ing both their primary AND Constitution. Forces a
+ *      meaningful build choice instead of converging to one optimal
+ *      stat line.
  *   6. Confirm → append to roster, save to localStorage, return to
  *      /party
  *
@@ -134,11 +136,6 @@ const STAT_LABELS: Record<StatKey, string> = {
   intelligence: "INT", wisdom: "WIS",
 };
 
-/** Per-stat budget. The Python game shipped 50 points across 4 stats
- *  (STR/DEX/INT/WIS) — average 12.5 per stat. Adding Constitution
- *  rescales to 63 points across 5 stats so the per-stat average is
- *  preserved (5 × 12.5 ≈ 63). */
-const POINTS_TOTAL = 63;
 /** Floor for every attribute — also the starting value, so the player
  *  begins with every stat at 8 and chooses where the bonus goes. The
  *  + button can never push a stat past STAT_MAX, the - button can
@@ -146,12 +143,23 @@ const POINTS_TOTAL = 63;
 const STAT_MIN = 8;
 const STAT_MAX = 18;
 
-/** Bonus points the player has to allocate above the floor. Derived
- *  from POINTS_TOTAL so the total budget stays at 63 if STAT_MIN
- *  ever moves. Today: 63 − 8×5 = 23 points to spend, average ~4-5
- *  per stat with room to pump one stat to 18 (10 over the floor)
- *  and still have 13 left for the rest. */
-const BONUS_POINTS = POINTS_TOTAL - STAT_MIN * STAT_KEYS.length;
+/** Bonus points the player has to allocate above the floor.
+ *
+ *  Tuning history: the per-stat budget was originally 63 (12.5/stat
+ *  average, rescaled from the Python game's 50 across 4 stats), which
+ *  meant 23 bonus points above an 8-floor — enough to max the primary
+ *  AND Constitution with 3 to spare. That made every build converge
+ *  to "18/8/8/13/18" or similar, with no real trade-offs.
+ *
+ *  We pulled the budget down to 15 so the math forces a choice:
+ *  maxing one stat costs 10 of those 15, leaving 5 to scatter (so
+ *  one strong primary + a moderate secondary, OR a flat spread of
+ *  ~+3 across all five). The "max two stats" pattern is no longer
+ *  reachable, which is the whole point. */
+const BONUS_POINTS = 15;
+/** Total points across all five stats when the build is complete.
+ *  Floor (8 per stat) + the bonus pool. */
+const POINTS_TOTAL = STAT_MIN * STAT_KEYS.length + BONUS_POINTS;
 
 /** Starting stats — every attribute begins at the floor so the
  *  player allocates the full BONUS_POINTS pool from a clean slate.
@@ -585,8 +593,10 @@ export default function NewCharacterPage() {
             </div>
           </div>
           <p className="mt-1 text-xs text-parchment/50">
-            Each attribute starts at {STAT_MIN}. Allocate the bonus where
-            you want it — pump one stat to {STAT_MAX} or spread evenly.
+            Each attribute starts at {STAT_MIN}. {BONUS_POINTS} points to
+            spend, max {STAT_MAX} per stat — enough to max one and lift
+            another, or spread roughly +3 across all five. Pick what
+            matters most; you can&apos;t have everything.
           </p>
           <div className="mt-3 space-y-2">
             {STAT_KEYS.map((k) => {
