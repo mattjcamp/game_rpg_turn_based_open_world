@@ -9,10 +9,12 @@
  *   2. Race + gender
  *   3. Class (filtered by what the chosen race can be)
  *   4. Avatar — pick the 32×32 sprite that represents this character
- *   5. Stats — 63 points across STR/DEX/CON/INT/WIS, min 5 max 18 base
- *      (racial modifiers add on top at runtime). The Python game used
- *      50 across 4 stats (avg 12.5 per stat); rescaled to keep the
- *      same per-stat budget after adding Constitution.
+ *   5. Stats — every attribute starts at the floor (8) and the player
+ *      distributes BONUS_POINTS on top, up to STAT_MAX (18). Racial
+ *      modifiers add on top at runtime. Total floor + bonus budget is
+ *      preserved at 63 across all five stats. Floor-based allocation
+ *      makes the choice space feel deliberate: "I have 23 points to
+ *      spend" reads better than "rebalance these defaults."
  *   6. Confirm → append to roster, save to localStorage, return to
  *      /party
  *
@@ -75,6 +77,56 @@ const CLASS_BASE_HP: Record<ClassName, number> = {
   Cleric: 8,  Druid: 8,    Alchemist: 6, Wizard: 6,
 };
 
+/**
+ * Per-class `mp_per_level` from data/classes/*.json. Seed starting
+ * MP at level 1 from this same value plus the casting-stat modifier
+ * (mirrors the formula `awardXp` applies on every subsequent
+ * level-up, so leveling N→N+1 always adds the same shape of MP gain
+ * the character started with). Non-caster classes are 0 — they get
+ * no `mp` field at all on the new member.
+ */
+const CLASS_MP_PER_LEVEL: Record<ClassName, number> = {
+  Fighter: 0, Paladin: 5, Ranger: 3, Thief: 0,
+  Cleric: 10, Druid: 8, Alchemist: 8, Wizard: 15,
+};
+
+/**
+ * Casting stat for each class — drives the MP modifier at creation
+ * and at level-up. Mirrors `mp_source.ability` in the JSON for
+ * single-stat classes; Druid's dual-stat formula (average INT/WIS)
+ * is special-cased in `startingMpFor` below since it's the only
+ * class that uses the multi-ability shape today.
+ */
+const CLASS_MP_STAT: Record<ClassName, StatKey | null> = {
+  Fighter: null, Paladin: "wisdom", Ranger: "wisdom", Thief: null,
+  Cleric: "wisdom", Druid: null, Alchemist: "intelligence", Wizard: "intelligence",
+};
+
+/**
+ * Compute starting MP for a freshly created character. Matches the
+ * MP formula `awardXp` uses on level-up (`mp_per_level + casting_mod`)
+ * so seed wizards in party.json (Gandolf: INT 18 → 15+4=19 MP) and
+ * newly-created wizards land on the same numbers. Returns 0 for
+ * non-casters; the caller leaves their `mp`/`maxMp` fields unset.
+ *
+ * Druid is the only class whose casting stat is derived from two
+ * abilities — averaging INT and WIS, mirroring the JSON's
+ * `mp_source.abilities + mode: "average"` shape.
+ */
+function startingMpFor(klass: ClassName, eff: Record<StatKey, number>): number {
+  const perLevel = CLASS_MP_PER_LEVEL[klass];
+  if (perLevel <= 0) return 0;
+  let mod = 0;
+  if (klass === "Druid") {
+    const avg = Math.floor((eff.intelligence + eff.wisdom) / 2);
+    mod = statMod(avg);
+  } else {
+    const stat = CLASS_MP_STAT[klass];
+    if (stat) mod = statMod(eff[stat]);
+  }
+  return Math.max(0, perLevel + mod);
+}
+
 type StatKey = "strength" | "dexterity" | "constitution" | "intelligence" | "wisdom";
 const STAT_KEYS: StatKey[] = ["strength", "dexterity", "constitution", "intelligence", "wisdom"];
 const STAT_LABELS: Record<StatKey, string> = {
@@ -87,15 +139,27 @@ const STAT_LABELS: Record<StatKey, string> = {
  *  rescales to 63 points across 5 stats so the per-stat average is
  *  preserved (5 × 12.5 ≈ 63). */
 const POINTS_TOTAL = 63;
-const STAT_MIN = 5;
+/** Floor for every attribute — also the starting value, so the player
+ *  begins with every stat at 8 and chooses where the bonus goes. The
+ *  + button can never push a stat past STAT_MAX, the - button can
+ *  never drop it below STAT_MIN. */
+const STAT_MIN = 8;
 const STAT_MAX = 18;
 
-/** Default starting stats — sums to POINTS_TOTAL. Spread is mildly
- *  caster-friendly (CON/INT/WIS slightly higher than STR/DEX) so a
- *  freshly-created Wizard isn't crippled and a Fighter can shift
- *  points into STR without scrabbling. */
+/** Bonus points the player has to allocate above the floor. Derived
+ *  from POINTS_TOTAL so the total budget stays at 63 if STAT_MIN
+ *  ever moves. Today: 63 − 8×5 = 23 points to spend, average ~4-5
+ *  per stat with room to pump one stat to 18 (10 over the floor)
+ *  and still have 13 left for the rest. */
+const BONUS_POINTS = POINTS_TOTAL - STAT_MIN * STAT_KEYS.length;
+
+/** Starting stats — every attribute begins at the floor so the
+ *  player allocates the full BONUS_POINTS pool from a clean slate.
+ *  Mirrors the "you have N points to spend" framing in classic RPG
+ *  character creators rather than the "tweak these defaults" model. */
 const STAT_DEFAULTS: Record<StatKey, number> = {
-  strength: 12, dexterity: 12, constitution: 13, intelligence: 13, wisdom: 13,
+  strength: STAT_MIN, dexterity: STAT_MIN, constitution: STAT_MIN,
+  intelligence: STAT_MIN, wisdom: STAT_MIN,
 };
 
 /** Available avatar sprites — every humanoid PNG the game ships,
@@ -243,7 +307,8 @@ export default function NewCharacterPage() {
       return;
     }
     if (step === 5 && pointsLeft !== 0) {
-      setError(`Spend exactly ${POINTS_TOTAL} points (${pointsSpent} so far).`);
+      const spent = BONUS_POINTS - pointsLeft;
+      setError(`Distribute all ${BONUS_POINTS} bonus points (${spent} of ${BONUS_POINTS} so far).`);
       return;
     }
     setError(null);
@@ -264,7 +329,7 @@ export default function NewCharacterPage() {
       return;
     }
     if (pointsLeft !== 0) {
-      setError(`Spend exactly ${POINTS_TOTAL} points first.`);
+      setError(`Distribute all ${BONUS_POINTS} bonus points first.`);
       setStep(5);
       return;
     }
@@ -279,6 +344,7 @@ export default function NewCharacterPage() {
       wisdom: stats.wisdom + mods.wisdom,
     };
     const hp = Math.max(1, CLASS_BASE_HP[klass] + statMod(eff.constitution));
+    const mp = startingMpFor(klass, eff);
     const newMember: PartyMember = {
       name: trimmedName,
       class: klass,
@@ -286,6 +352,11 @@ export default function NewCharacterPage() {
       gender,
       hp,
       maxHp: hp,
+      // Casters carry mp/maxMp fields; non-casters omit them
+      // entirely so `member.maxMp == null` reads as "this class
+      // doesn't cast" downstream (the spell pickers and HUD bars
+      // already check that exact null path).
+      ...(mp > 0 ? { mp, maxMp: mp } : {}),
       strength: eff.strength,
       dexterity: eff.dexterity,
       constitution: eff.constitution,
@@ -475,7 +546,7 @@ export default function NewCharacterPage() {
         <section>
           <div className="flex items-baseline justify-between">
             <h2 className="text-sm uppercase tracking-wider text-parchment/60">
-              Stats — distribute {POINTS_TOTAL} points
+              Stats — distribute {BONUS_POINTS} bonus points
             </h2>
             <div className="text-sm text-parchment/70">
               Remaining: <span className={pointsLeft === 0 ? "text-ember" : "text-parchment"}>
@@ -483,6 +554,10 @@ export default function NewCharacterPage() {
               </span>
             </div>
           </div>
+          <p className="mt-1 text-xs text-parchment/50">
+            Each attribute starts at {STAT_MIN}. Allocate the bonus where
+            you want it — pump one stat to {STAT_MAX} or spread evenly.
+          </p>
           <div className="mt-3 space-y-2">
             {STAT_KEYS.map((k) => {
               const base = stats[k];
@@ -569,6 +644,21 @@ export default function NewCharacterPage() {
             </strong>
             {" "}({CLASS_BASE_HP[klass]} base + CON mod)
           </div>
+          {CLASS_MP_PER_LEVEL[klass] > 0 && (
+            <div className="mt-1 text-sm text-parchment/70">
+              Starting MP:{" "}
+              <strong className="text-parchment">
+                {startingMpFor(klass, {
+                  strength: stats.strength + mods.strength,
+                  dexterity: stats.dexterity + mods.dexterity,
+                  constitution: stats.constitution + mods.constitution,
+                  intelligence: stats.intelligence + mods.intelligence,
+                  wisdom: stats.wisdom + mods.wisdom,
+                })}
+              </strong>
+              {" "}({CLASS_MP_PER_LEVEL[klass]} base + casting mod)
+            </div>
+          )}
         </section>
       )}
 

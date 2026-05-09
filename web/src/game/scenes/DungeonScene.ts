@@ -25,6 +25,7 @@
  */
 
 import Phaser from "phaser";
+import { Music } from "../audio/Music";
 import { gameState } from "../state";
 import { rememberScene } from "../save";
 import {
@@ -219,6 +220,11 @@ export class DungeonScene extends Phaser.Scene {
 
   async create(): Promise<void> {
     this.cameras.main.setBackgroundColor("#0c0c14");
+    // Crossfade into the dungeon playlist. Re-entry from a combat
+    // encounter inside the dungeon is a no-op (we're already on
+    // the dungeon track when we left); fresh entries from the
+    // overworld trigger the standard 1.5s crossfade.
+    Music.playArea("dungeon");
 
     // Re-entry from combat hits a Phaser texture cache where the
     // runtime tile defs may already be populated (OverworldScene

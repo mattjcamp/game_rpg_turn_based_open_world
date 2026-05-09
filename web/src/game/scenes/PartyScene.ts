@@ -1489,9 +1489,15 @@ export class PartyScene extends Phaser.Scene {
 
     // Stats
     this.text(x + padX, cy, "ATTRIBUTES", FONT_HEAD()); cy += 22;
+    // Constitution drives HP at level-up via its modifier, so the
+    // detail panel needs to surface it alongside the other four
+    // attributes — otherwise CON 17 looks identical to CON 8 from
+    // this screen and the player can't see why their toughness
+    // changed when they swap members in/out.
     const stats: [string, number][] = [
       ["Strength",     m.strength],
       ["Dexterity",    m.dexterity],
+      ["Constitution", m.constitution],
       ["Intelligence", m.intelligence],
       ["Wisdom",       m.wisdom],
     ];

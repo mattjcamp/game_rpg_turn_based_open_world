@@ -13,6 +13,7 @@
  */
 
 import Phaser from "phaser";
+import { Music } from "../audio/Music";
 import { TileMap, loadTileMap } from "../world/TileMap";
 import {
   tileDef,
@@ -212,6 +213,11 @@ export class OverworldScene extends Phaser.Scene {
 
   async create(): Promise<void> {
     this.cameras.main.setBackgroundColor("#0f0f1a");
+    // Switch to the overworld playlist. No-op when already playing
+    // it (e.g. returning from a town or dungeon back to the same
+    // area mid-session); a fresh boot triggers a 1.5s crossfade
+    // from whatever was playing before.
+    Music.playArea("overworld");
     try {
       this.tileMap = await loadTileMap();
     } catch (err) {

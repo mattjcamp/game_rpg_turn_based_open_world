@@ -29,6 +29,7 @@
  */
 
 import Phaser from "phaser";
+import { Music } from "../audio/Music";
 import {
   loadTowns,
   resolveTownOrInterior,
@@ -350,6 +351,10 @@ export class TownScene extends Phaser.Scene {
   async create(): Promise<void> {
     this.cameras.main.setBackgroundColor("#0f0f1a");
     this.cameras.main.fadeIn(220, 0, 0, 0);
+    // Crossfade into the town playlist. Building interiors share
+    // the town theme — they're all part of the "you've stopped to
+    // talk to people" mood.
+    Music.playArea("town");
 
     try {
       // tile_defs.json is small and idempotent to reload (the cache

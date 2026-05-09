@@ -94,6 +94,7 @@ import {
   VFX_COLOURS,
 } from "../combat/Vfx";
 import { Sfx } from "../audio/Sfx";
+import { Music } from "../audio/Music";
 import type { Combatant, AttackResult } from "../types";
 import type { PartyMember } from "../world/Party";
 
@@ -429,6 +430,12 @@ export class CombatScene extends Phaser.Scene {
     if (typeof window !== "undefined") {
       (window as unknown as { __combat?: CombatScene }).__combat = this;
     }
+    // Slam-cut into the combat playlist. The post-fight transition
+    // hands control back to whichever scene we came from
+    // (overworld / town / dungeon), and that scene's `create()`
+    // calls Music.playArea(...) to swap back — so combat's track
+    // bookends the encounter automatically.
+    Music.playArea("combat");
     // Items + spells back the action sub-menus and the
     // party-bridge's stat derivation, so load them up-front before
     // we build Combat.
