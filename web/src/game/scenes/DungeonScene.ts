@@ -236,12 +236,21 @@ export class DungeonScene extends Phaser.Scene {
     // depends on for wall-torch radiance.
     try { await loadTileDefs(); } catch { /* tile_defs absent — leave fallback colours */ }
 
-    try {
-      this.partyData = await loadParty();
-      gameState.partyData = this.partyData;
-    } catch {
-      this.partyData = gameState.partyData;
+    // Only load from disk when no live party is in memory yet —
+    // matches the guard the other world scenes use. Calling
+    // `loadParty()` unconditionally here used to hand back the
+    // stale module cache and silently overwrite the player's live
+    // inventory (gold, bought weapons, quest items, …) with seed
+    // party.json data, manifesting as "my stash reset to five
+    // rocks the moment I entered the cave."
+    if (!gameState.partyData) {
+      try {
+        gameState.partyData = await loadParty();
+      } catch {
+        /* couldn't load — leave null; this.partyData stays null too */
+      }
     }
+    this.partyData = gameState.partyData;
 
     try {
       const defs = await loadDungeons();

@@ -518,3 +518,18 @@ export function swapToMeleeIfOutOfAmmo(
 export function _clearPartyCache(): void {
   _partyCache = null;
 }
+
+/**
+ * Override the module-level party cache. Used by `save.ts::load()`
+ * after hydrating `gameState.partyData` from localStorage so the
+ * cache and the live state stay pointing at the same Party object.
+ *
+ * Without this, loading a save would leave a stale `_partyCache`
+ * (or null), and any later `loadParty()` call — e.g. the one
+ * DungeonScene fires on entry — would return that stale data and
+ * silently overwrite the live party with seed-file inventory. Pass
+ * the same Party reference that was just stored on `gameState`.
+ */
+export function _setPartyCache(p: Party | null): void {
+  _partyCache = p;
+}

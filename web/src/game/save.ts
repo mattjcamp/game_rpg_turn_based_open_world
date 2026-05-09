@@ -37,7 +37,12 @@
 import { gameState, resetGameState, type GameState, type InteriorMonster } from "./state";
 import type { DungeonLevel, DungeonMonster } from "./world/Dungeon";
 import type { QuestState } from "./world/Quests";
-import { clearStoredRoster, _clearPartyCache, type Party } from "./world/Party";
+import {
+  clearStoredRoster,
+  _clearPartyCache,
+  _setPartyCache,
+  type Party,
+} from "./world/Party";
 import type { ExamineLayout } from "./world/Examine";
 import type { RoamingMonster } from "./world/SpawnPoints";
 import type { GameClock } from "./world/GameTime";
@@ -169,6 +174,13 @@ function toRaw(s: GameState): RawSave {
 
 function fromRaw(raw: RawSave, target: GameState): void {
   target.partyData = raw.party ?? null;
+  // Keep the Party module's cache in sync with the hydrated live
+  // state — otherwise a later loadParty() call would hand back a
+  // stale party (or, worse, fall through to seed party.json) and
+  // overwrite the player's progress with starter inventory. See
+  // the bug where entering a dungeon after a save → reload reset
+  // the stash to "five rocks and a torch".
+  _setPartyCache(target.partyData);
   target.playerPos = raw.playerPos ?? { col: 0, row: 0 };
   target.partyPosInitialized = !!raw.partyPosInitialized;
   target.consumedTriggers = new Set(raw.consumedTriggers ?? []);
