@@ -37,7 +37,7 @@
 import { gameState, resetGameState, type GameState, type InteriorMonster } from "./state";
 import type { DungeonLevel, DungeonMonster } from "./world/Dungeon";
 import type { QuestState } from "./world/Quests";
-import type { Party } from "./world/Party";
+import { clearStoredRoster, _clearPartyCache, type Party } from "./world/Party";
 import type { ExamineLayout } from "./world/Examine";
 import type { RoamingMonster } from "./world/SpawnPoints";
 import type { GameClock } from "./world/GameTime";
@@ -75,6 +75,7 @@ interface RawSave {
   combatLocation: string;
   pendingKilledMonsters: string[];
   interiorMonsters: Array<[string, InteriorMonster[]]>;
+  shopInventories: Array<[string, string[]]>;
   party_combat: Combatant[];
   lastScene: LastSceneSnapshot | null;
 }
@@ -160,6 +161,7 @@ function toRaw(s: GameState): RawSave {
     combatLocation: s.combatLocation,
     pendingKilledMonsters: [...s.pendingKilledMonsters],
     interiorMonsters: [...s.interiorMonsters.entries()],
+    shopInventories: [...s.shopInventories.entries()],
     party_combat: s.party,
     lastScene: s.lastScene ?? null,
   };
@@ -187,6 +189,7 @@ function fromRaw(raw: RawSave, target: GameState): void {
   target.combatLocation = raw.combatLocation ?? "";
   target.pendingKilledMonsters = raw.pendingKilledMonsters ?? [];
   target.interiorMonsters = new Map(raw.interiorMonsters ?? []);
+  target.shopInventories = new Map(raw.shopInventories ?? []);
   target.party = raw.party_combat ?? [];
   target.lastScene = raw.lastScene ?? null;
 }
@@ -263,8 +266,15 @@ export function rememberScene(snapshot: LastSceneSnapshot): void {
 /**
  * Convenience: clear the save AND reset gameState. Used by "Start
  * New Game" so the next world boot is genuinely fresh.
+ *
+ * Also clears the form-party screen's stored-roster localStorage entry
+ * (separate key from the rolling save) and the in-memory party cache —
+ * otherwise a previous run's roster edits would survive into the new
+ * game when the form-party page hydrates from localStorage.
  */
 export function startFreshSession(): void {
   clearSave();
+  clearStoredRoster();
+  _clearPartyCache();
   resetGameState();
 }

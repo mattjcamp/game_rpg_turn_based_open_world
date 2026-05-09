@@ -140,6 +140,16 @@ export interface GameState {
    */
   interiorMonsters: Map<string, InteriorMonster[]>;
   /**
+   * Per-shop-instance inventory, keyed by `${townName}|${shopType}`.
+   * Each value is the list of item names currently in stock at that
+   * counter. Seeded lazily from `counters.json` on first visit, then
+   * mutated by buy (item removed) and sell (item appended). Persists
+   * across scene transitions and the rolling save so a sold-out shop
+   * stays sold out, and items the party offloaded earlier remain on
+   * the shelf when they return.
+   */
+  shopInventories: Map<string, string[]>;
+  /**
    * The active scene + its init payload — written by each scene's
    * create() and read by the resume path on "Return to Game" so the
    * player lands back in whichever map they were on. Null until any
@@ -162,6 +172,15 @@ export interface InteriorMonster {
   /** Encounter template name — needed by `creditKills` so the right
    *  quest step gets credited when this monster is defeated. */
   encounterName: string;
+  /** Quest this monster was placed for. Lets the spawn pass tell
+   *  "already placed for this step" apart from "this is for some
+   *  other step", so accepting a quest *after* first entering the
+   *  interior still tops up the population correctly. */
+  questName: string;
+  /** Index of the kill step inside the quest definition. Combined
+   *  with `questName`, this is the per-step identity used to decide
+   *  whether more monsters need spawning on re-entry. */
+  stepIdx: number;
 }
 
 function makeFreshState(): GameState {
@@ -189,6 +208,7 @@ function makeFreshState(): GameState {
     combatLocation: "",
     pendingKilledMonsters: [],
     interiorMonsters: new Map(),
+    shopInventories: new Map(),
     lastScene: null,
   };
 }
@@ -222,6 +242,7 @@ export function resetGameState(): void {
   gameState.combatLocation = fresh.combatLocation;
   gameState.pendingKilledMonsters = fresh.pendingKilledMonsters;
   gameState.interiorMonsters = fresh.interiorMonsters;
+  gameState.shopInventories = fresh.shopInventories;
   gameState.lastScene = fresh.lastScene;
 }
 

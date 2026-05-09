@@ -61,15 +61,22 @@ export function sellPriceOf(
 }
 
 /**
- * Buy *itemName* from a counter. Debits gold and pushes a fresh entry
- * onto the shared stash. Refuses when the counter doesn't price the
- * item or the party can't afford it.
+ * Buy the item at `stockIndex` from the shop's stock list. Debits gold,
+ * pushes a fresh entry onto the party stash, and removes the item from
+ * the shop's stock so it can't be bought again until somebody sells one
+ * back. Refuses when the index is out of range, the counter doesn't
+ * price the item, or the party can't afford it.
  */
 export function buyItem(
   party: Party,
-  itemName: string,
+  stock: string[],
+  stockIndex: number,
   items: Map<string, Item>,
 ): ActionResult {
+  if (stockIndex < 0 || stockIndex >= stock.length) {
+    return { ok: false, message: "That item is no longer on the shelf." };
+  }
+  const itemName = stock[stockIndex];
   const price = buyPriceOf(itemName, items);
   if (price <= 0) {
     return { ok: false, message: `${itemName} isn't for sale here.` };
@@ -79,17 +86,21 @@ export function buyItem(
   }
   party.gold -= price;
   party.inventory.push({ item: itemName });
+  stock.splice(stockIndex, 1);
   return { ok: true, message: `Bought ${itemName} for ${price}g.` };
 }
 
 /**
  * Sell the stash entry at *index* to a counter. Removes it from the
- * stash and credits the sell price. Refuses when the index is out of
- * range or the item has no resolvable sell price.
+ * stash, credits the sell price, and appends the item name to the
+ * shop's `stock` list so it shows up on the BUY tab next time. Refuses
+ * when the index is out of range or the item has no resolvable sell
+ * price.
  */
 export function sellItem(
   party: Party,
   inventoryIndex: number,
+  stock: string[],
   items: Map<string, Item>,
 ): ActionResult {
   if (inventoryIndex < 0 || inventoryIndex >= party.inventory.length) {
@@ -102,7 +113,41 @@ export function sellItem(
   }
   party.inventory.splice(inventoryIndex, 1);
   party.gold += price;
+  stock.push(entry.item);
   return { ok: true, message: `Sold ${entry.item} for ${price}g.` };
+}
+
+/**
+ * Compose the unique key for a shop instance. A general store in
+ * Plainstown is a different shop than the general store in another
+ * town, so we key by `(townName, shopType)`. Building interiors keep
+ * their `building:Foo` prefix in `townName`, which is exactly what we
+ * want — each interior's shop is its own counter.
+ */
+export function shopStockKey(townName: string, shopType: string): string {
+  return `${townName}|${shopType}`;
+}
+
+/**
+ * Resolve the live stock array for a shop, seeding it from `defaults`
+ * (the bundled `counters.json` items list) the first time the party
+ * walks into this counter. The returned array is the same reference
+ * stored in `inventories`, so mutations from buy/sell propagate
+ * naturally and survive serialisation.
+ */
+export function getOrSeedShopStock(
+  inventories: Map<string, string[]>,
+  townName: string,
+  shopType: string,
+  defaults: string[],
+): string[] {
+  const key = shopStockKey(townName, shopType);
+  let stock = inventories.get(key);
+  if (!stock) {
+    stock = [...defaults];
+    inventories.set(key, stock);
+  }
+  return stock;
 }
 
 /**

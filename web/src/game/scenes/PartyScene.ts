@@ -55,6 +55,7 @@ import {
   loadSpells,
   spellsCastableFromMenu,
   castersFor,
+  minLevelFor,
   type Spell,
 } from "../world/Spells";
 import {
@@ -700,13 +701,21 @@ export class PartyScene extends Phaser.Scene {
     const members = activeMembers(this.party);
     const castable = spellsCastableFromMenu(this.spells, members);
     const castableIds = new Set(castable.map((s) => s.id));
-    // Keep all spells that COULD be cast outside combat (so the
-    // player sees what they're missing) but mark only currently-
-    // castable ones as activatable.
-    const outsideCombat = this.spells.filter((s) =>
-      s.usable_in.some((c) => c !== "battle")
+    // Filter to spells the active party has at least *learned* — i.e.
+    // some member's class allows the spell AND that member meets its
+    // min_level. Higher-level spells nobody has unlocked yet are
+    // hidden entirely, not greyed out, so a level-1 wizard doesn't see
+    // Fireball staring back at them. MP-shortfall and similar runtime
+    // gates still flow through the `castable` flag below.
+    const learned = this.spells.filter((s) =>
+      s.usable_in.some((c) => c !== "battle") &&
+      members.some(
+        (m) =>
+          s.allowable_classes.includes(m.class) &&
+          m.level >= minLevelFor(s, m.class),
+      ),
     );
-    this.spellRows = outsideCombat.map((s) => ({
+    this.spellRows = learned.map((s) => ({
       spell: s, castable: castableIds.has(s.id),
     }));
     // Sort: castable first, then by name.

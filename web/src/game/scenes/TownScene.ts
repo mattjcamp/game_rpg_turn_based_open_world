@@ -50,6 +50,7 @@ import {
   rosterFor,
   creditKills,
   type QuestDef,
+  type QuestStepCallout,
 } from "../world/Quests";
 import {
   loadEncounters,
@@ -86,6 +87,7 @@ import {
   sellItem,
   sellPriceOf,
   performTempleService,
+  getOrSeedShopStock,
 } from "../world/TownActions";
 import { loadItems, type Item } from "../world/Items";
 import { loadParty } from "../world/Party";
@@ -132,7 +134,7 @@ import {
 import { paintMoonPhase, MOON_HUD_SIZE } from "../world/MoonIcon";
 import { withBase, dataPath } from "../world/Module";
 import { gameState } from "../state";
-import { rememberScene } from "../save";
+import { rememberScene, save as saveGame } from "../save";
 
 const TILE = 32;
 const HUD_HEIGHT = 56;
@@ -163,6 +165,12 @@ export class TownScene extends Phaser.Scene {
    *  top-level town. Used to gate quest-monster spawning + the
    *  combat-location stamp. */
   private isInterior = false;
+  /** Step-completion callouts queued by `applyPendingKillCredit()` and
+   *  drained at the end of `create()`. We credit kills before the
+   *  interior-monster spawn pass (so the spawn sees up-to-date kill
+   *  counts), but defer the banner UI until the scene is fully drawn
+   *  so it stacks correctly on top. */
+  private pendingStepCallouts: QuestStepCallout[] = [];
   /** Glow handles for monsters / non-keyed overlays — flat list,
    *  cleared on scene restart. */
   private questOverlayHandles: PulsingGlowHandle[] = [];
@@ -224,6 +232,10 @@ export class TownScene extends Phaser.Scene {
     /** Header label, e.g. "Brennan — General Store" or "General Store". */
     title: string;
     counter: Counter;
+    /** Live reference to this shop's per-instance stock list, kept in
+     *  `gameState.shopInventories`. Buying splices it out, selling pushes
+     *  onto it — the same array the save layer serialises. */
+    stock: string[];
     mode: "buy" | "sell";
     buyCursor: number;
     sellCursor: number;
@@ -284,6 +296,7 @@ export class TownScene extends Phaser.Scene {
     for (const e of this.questGiverOverlays.values()) e.glow.destroy();
     this.questGiverOverlays = new Map();
     this.interiorMonsterSprites = new Map();
+    this.pendingStepCallouts = [];
     this.darkness = new Map();
     this.tintRects = new Map();
     this.tileSprites = new Map();
@@ -448,6 +461,13 @@ export class TownScene extends Phaser.Scene {
           }
         }
         if (queued > 0) this.load.start();
+        // CRITICAL: credit kills BEFORE spawning. Otherwise on a return
+        // from combat the spawn pass sees stale `stepKills` (the rat we
+        // just killed hasn't been credited yet) and re-spawns the
+        // quest target on every round-trip. Credit is also responsible
+        // for marking the step complete, which the spawn pass then
+        // honours by skipping the step entirely.
+        this.applyPendingKillCredit();
         this.spawnInteriorMonstersIfNeeded();
       } catch {
         /* keep empty */
@@ -473,35 +493,17 @@ export class TownScene extends Phaser.Scene {
     this.refreshHud();
     this.refreshDarkness();
 
-    // Combat-return kill credit. Mirrors DungeonScene's pattern:
-    // CombatScene populates `pendingKilledMonsters` on victory, and
-    // the scene we return to runs creditKills against the encounter
-    // table + the stamped combat location. Cleared in either branch
-    // so a subsequent fight credits cleanly.
-    if (
-      gameState.pendingKilledMonsters.length > 0 &&
-      this.encounterTable &&
-      this.questDefs.length > 0
-    ) {
-      const result = creditKills(
-        this.questDefs,
-        gameState.moduleQuestStates,
-        this.encounterTable,
-        gameState.pendingKilledMonsters,
-        gameState.combatLocation,
-      );
-      // One callout per step that just completed — the renderer
-      // stacks them so multi-step turn-ins show every transition.
-      for (const c of result.callouts) {
-        showStepCompleteCallout(this, {
-          questName: c.questName,
-          description: c.description,
-          questComplete: c.questComplete,
-        });
-      }
-      for (const m of result.messages) console.log("[quest]", m);
+    // Pending callouts from the kill-credit pass that ran earlier in
+    // create() (before spawn). We deferred the UI until after the
+    // scene was actually drawn so the banners can stack on top of it.
+    for (const c of this.pendingStepCallouts) {
+      showStepCompleteCallout(this, {
+        questName: c.questName,
+        description: c.description,
+        questComplete: c.questComplete,
+      });
     }
-    gameState.pendingKilledMonsters = [];
+    this.pendingStepCallouts = [];
 
     // Save snapshot — the player can close the tab here and pick
     // up exactly where they left off. The payload mirrors the init
@@ -726,15 +728,66 @@ export class TownScene extends Phaser.Scene {
 
   // ── Interior quest monsters ─────────────────────────────────────
 
-  /** Spawn quest monsters in the current interior if the active
-   *  quest list calls for them and the interior doesn't already have
-   *  a cached entry. Idempotent — once an interior's monster list
-   *  has been populated this session, re-entries reuse the same
-   *  entries (so killed monsters stay killed, surviving monsters
-   *  stay where they were). */
+  /**
+   * Apply pending kill credit from the most recent combat. Runs early
+   * in create() — BEFORE the interior-monster spawn pass — so the
+   * spawn sees up-to-date `stepKills` and doesn't replace the rat we
+   * just killed with a fresh one. Banner UI is queued onto
+   * `pendingStepCallouts` and rendered later, after the scene is
+   * fully drawn.
+   *
+   * Cleans up any interior monsters whose step has now completed —
+   * extras spawned before the targetCount was clear (e.g. a 1-target
+   * step that briefly held more) get dropped so they don't linger
+   * on the floor with the quest glow after the step is done.
+   */
+  private applyPendingKillCredit(): void {
+    if (
+      gameState.pendingKilledMonsters.length === 0 ||
+      !this.encounterTable ||
+      this.questDefs.length === 0
+    ) {
+      gameState.pendingKilledMonsters = [];
+      return;
+    }
+    const result = creditKills(
+      this.questDefs,
+      gameState.moduleQuestStates,
+      this.encounterTable,
+      gameState.pendingKilledMonsters,
+      gameState.combatLocation,
+    );
+    this.pendingStepCallouts.push(...result.callouts);
+    for (const m of result.messages) console.log("[quest]", m);
+    gameState.pendingKilledMonsters = [];
+
+    // Drop interior monsters belonging to any step that's now done —
+    // a target-1 step with one rat alive on the floor and one in the
+    // pending list would otherwise leave the surviving rat behind
+    // glowing.
+    const list = gameState.interiorMonsters.get(this.townName);
+    if (!list || list.length === 0) return;
+    const stillActive = (m: import("../state").InteriorMonster): boolean => {
+      const state = gameState.moduleQuestStates.get(m.questName);
+      if (!state) return true;
+      return !state.stepProgress[m.stepIdx];
+    };
+    const filtered = list.filter(stillActive);
+    if (filtered.length !== list.length) {
+      gameState.interiorMonsters.set(this.townName, filtered);
+    }
+  }
+
+  /** Spawn quest monsters in the current interior. Re-entrant: each
+   *  active kill step is topped up on every entry to match its
+   *  remaining count, so a quest accepted *after* the first visit
+   *  still gets its monsters placed, and surviving monsters from a
+   *  prior visit are left where they were. The previous early-bail on
+   *  "did we already cache for this town?" hid this case — accepting
+   *  the Rat Problem after entering the shop once meant no rats ever
+   *  spawned. */
   private spawnInteriorMonstersIfNeeded(): void {
     if (!this.isInterior) return;
-    if (gameState.interiorMonsters.has(this.townName)) return;
 
     const target = `interior:${this.townName}`;
     const steps = activeKillStepsForLocation(
@@ -742,17 +795,19 @@ export class TownScene extends Phaser.Scene {
       gameState.moduleQuestStates,
       target,
     );
-    if (steps.length === 0) {
+    const existing = gameState.interiorMonsters.get(this.townName) ?? [];
+    if (steps.length === 0 && existing.length === 0) {
       gameState.interiorMonsters.set(this.townName, []);
       return;
     }
 
-    // Build a pool of walkable cells the monsters can stand on. We
-    // exclude the entry tile + every NPC tile so a fresh entry
-    // doesn't drop the player onto a goblin.
+    // Build the walkable pool, excluding the entry tile, every NPC
+    // tile, and every cell already occupied by a surviving monster
+    // from a prior visit.
     const occupied = new Set<string>();
     occupied.add(`${this.entryCol},${this.entryRow}`);
     for (const npc of this.town.npcs) occupied.add(`${npc.col},${npc.row}`);
+    for (const m of existing) occupied.add(`${m.col},${m.row}`);
     const walkable: Array<[number, number]> = [];
     for (let r = 0; r < this.tileMap.height; r++) {
       for (let c = 0; c < this.tileMap.width; c++) {
@@ -761,14 +816,20 @@ export class TownScene extends Phaser.Scene {
         walkable.push([c, r]);
       }
     }
-    const placed: import("../state").InteriorMonster[] = [];
-    let nextId = 0;
+
+    const placed: import("../state").InteriorMonster[] = [...existing];
+    let nextId = placed.length;
     for (const { questName, stepIdx, step, remaining } of steps) {
       const tmpl = this.encounterTable
         ? rosterFor(this.encounterTable, step.encounter)
         : null;
       if (!tmpl || tmpl.monsters.length === 0) continue;
-      for (let n = 0; n < remaining; n++) {
+      // How many entries does this step already have on the floor?
+      const have = existing.filter(
+        (m) => m.questName === questName && m.stepIdx === stepIdx,
+      ).length;
+      const needed = remaining - have;
+      for (let n = 0; n < needed; n++) {
         if (walkable.length === 0) break;
         const idx = Math.floor(Math.random() * walkable.length);
         const [c, r] = walkable.splice(idx, 1)[0];
@@ -779,6 +840,8 @@ export class TownScene extends Phaser.Scene {
           name: tmpl.monsterPartyTile,
           encounterNames: [...tmpl.monsters],
           encounterName: tmpl.name,
+          questName,
+          stepIdx,
         });
       }
     }
@@ -1818,9 +1881,20 @@ export class TownScene extends Phaser.Scene {
       this.openTempleAtCounter(counter, title);
       return;
     }
+    // Resolve (or seed) this shop's per-instance stock — keyed by
+    // (townName, shopType) so each physical counter tracks its own
+    // wares. Building interiors keep their `building:Foo` prefix on
+    // `townName`, which is exactly what we want.
+    const stock = getOrSeedShopStock(
+      gameState.shopInventories,
+      this.townName,
+      counter.shopType,
+      counter.items,
+    );
     this.shop = {
       title,
       counter,
+      stock,
       mode: "buy",
       buyCursor: 0,
       sellCursor: 0,
@@ -1841,7 +1915,7 @@ export class TownScene extends Phaser.Scene {
     const Y = 80;
     const gold = gameState.partyData?.gold ?? 0;
     const stash = gameState.partyData?.inventory ?? [];
-    const buyItems = counter.items;
+    const buyItems = shop.stock;
 
     const bg = this.add
       .rectangle(X, Y, W, H, 0x161629, 0.98)
@@ -1922,6 +1996,12 @@ export class TownScene extends Phaser.Scene {
     }
 
     if (mode === "buy") {
+      if (buyItems.length === 0) {
+        shop.objects.push(this.add
+          .text(listX + 8, listY + 4, "The shelves are bare.", {
+            fontFamily: "Georgia, serif", fontSize: "14px", color: "#bdb38a",
+          }).setScrollFactor(0).setDepth(52));
+      }
       for (let i = 0; i < visibleCount; i++) {
         const idx = topRow + i;
         const name = buyItems[idx];
@@ -2011,7 +2091,7 @@ export class TownScene extends Phaser.Scene {
   private moveShopCursor(delta: number): void {
     if (!this.shop) return;
     if (this.shop.mode === "buy") {
-      const n = this.shop.counter.items.length;
+      const n = this.shop.stock.length;
       if (n === 0) return;
       this.shop.buyCursor = (this.shop.buyCursor + delta + n) % n;
     } else {
@@ -2031,25 +2111,38 @@ export class TownScene extends Phaser.Scene {
       this.renderShop();
       return;
     }
+    let mutated = false;
     if (this.shop.mode === "buy") {
-      const items = this.shop.counter.items;
-      if (items.length === 0) return;
-      const itemName = items[this.shop.buyCursor];
-      const r = buyItem(party, itemName, this.itemCatalog);
-      this.shop.message = r.message;
+      const stock = this.shop.stock;
+      if (stock.length === 0) {
+        this.shop.message = "The shelves are bare.";
+      } else {
+        const idx = Math.max(0, Math.min(stock.length - 1, this.shop.buyCursor));
+        const r = buyItem(party, stock, idx, this.itemCatalog);
+        this.shop.message = r.message;
+        mutated = r.ok;
+        // Stock shrank on success — clamp the cursor.
+        if (this.shop.buyCursor >= stock.length) {
+          this.shop.buyCursor = Math.max(0, stock.length - 1);
+        }
+      }
     } else {
       if (party.inventory.length === 0) {
         this.shop.message = "Nothing in the stash to sell.";
       } else {
         const idx = Math.max(0, Math.min(party.inventory.length - 1, this.shop.sellCursor));
-        const r = sellItem(party, idx, this.itemCatalog);
+        const r = sellItem(party, idx, this.shop.stock, this.itemCatalog);
         this.shop.message = r.message;
+        mutated = r.ok;
         // Clamp the cursor in case the stash shrank.
         if (this.shop.sellCursor >= party.inventory.length) {
           this.shop.sellCursor = Math.max(0, party.inventory.length - 1);
         }
       }
     }
+    // Persist immediately on a successful trade so a tab close mid-shop
+    // doesn't lose the purchase / sale.
+    if (mutated) saveGame();
     this.renderShop();
   }
 

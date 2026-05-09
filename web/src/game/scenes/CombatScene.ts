@@ -49,7 +49,7 @@ import { gameState } from "../state";
 import { tileSpriteKey, populateRuntimeDefs, spriteManifest } from "../world/Tiles";
 import { assetUrl, dataPath } from "../world/Module";
 import { loadItems, type Item } from "../world/Items";
-import { loadSpells, type Spell } from "../world/Spells";
+import { loadSpells, minLevelFor, type Spell } from "../world/Spells";
 import { loadParty } from "../world/Party";
 import { loadClass, loadRaces, type ClassTemplate } from "../world/Classes";
 import { awardXp, type LevelUpEvent } from "../world/Leveling";
@@ -918,6 +918,7 @@ export class CombatScene extends Phaser.Scene {
       this.spells.some(
         (s) =>
           spellIsCombatCastable(s, member.class) &&
+          member.level >= minLevelFor(s, member.class) &&
           (member.mp ?? 0) >= s.mp_cost
       );
     const equippedWeapon =
@@ -1362,6 +1363,7 @@ export class CombatScene extends Phaser.Scene {
     const opts = this.spells.filter(
       (s) =>
         spellIsCombatCastable(s, member.class) &&
+        member.level >= minLevelFor(s, member.class) &&
         member.maxMp != null &&
         (member.mp ?? 0) >= s.mp_cost
     );
@@ -2686,6 +2688,7 @@ export class CombatScene extends Phaser.Scene {
       this.spells.some(
         (s) =>
           spellIsCombatCastable(s, member.class) &&
+          member.level >= minLevelFor(s, member.class) &&
           (member.mp ?? 0) >= s.mp_cost
       );
     // Range is enabled when the equipped weapon has ranged: true.

@@ -5,7 +5,6 @@ python3 main.py
 
 ## Polish
 
-- Add worflow (Return to Game, New Game)
 - Do a full QA on party creation attributes, combat, etc. Do a few playthroughs.
 - Add soundtrack (only two mpg3 to keep it small)
 - Lighting should not pass through walls and essentially only light based on Light of Sight and the lighting effect range

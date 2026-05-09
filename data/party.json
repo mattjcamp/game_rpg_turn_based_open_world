@@ -11,27 +11,19 @@
       "class": "Fighter",
       "race": "Dwarf",
       "gender": "Male",
-      "hp": 60,
+      "hp": 17,
       "strength": 18,
       "dexterity": 14,
       "intelligence": 9,
       "wisdom": 9,
-      "level": 10,
+      "level": 1,
       "equipped": {
-        "right_hand": "Sword",
+        "right_hand": "Club",
         "left_hand": null,
-        "body": "Chain",
+        "body": "Cloth",
         "head": null
       },
-      "inventory": [
-        {
-          "item": "Crossbow"
-        },
-        {
-          "item": "Bolts",
-          "charges": 15
-        }
-      ],
+      "inventory": [],
       "sprite": "src/assets/game/characters/fighter.png",
       "constitution": 14
     },
@@ -40,28 +32,20 @@
       "class": "Thief",
       "race": "Halfling",
       "gender": "Male",
-      "hp": 45,
+      "hp": 6,
       "mp": 0,
       "strength": 12,
       "dexterity": 18,
       "intelligence": 10,
       "wisdom": 10,
-      "level": 10,
+      "level": 1,
       "equipped": {
-        "right_hand": "Dagger",
+        "right_hand": "Club",
         "left_hand": null,
-        "body": "Leather",
+        "body": "Cloth",
         "head": null
       },
-      "inventory": [
-        {
-          "item": "Short Bow"
-        },
-        {
-          "item": "Arrows",
-          "charges": 20
-        }
-      ],
+      "inventory": [],
       "sprite": "src/assets/game/characters/thief.png",
       "constitution": 12
     },
@@ -70,15 +54,15 @@
       "class": "Wizard",
       "race": "Elf",
       "gender": "Male",
-      "hp": 35,
-      "mp": 40,
+      "hp": 4,
+      "mp": 19,
       "strength": 9,
       "dexterity": 11,
       "intelligence": 18,
       "wisdom": 12,
-      "level": 10,
+      "level": 1,
       "equipped": {
-        "right_hand": "Dagger",
+        "right_hand": "Club",
         "left_hand": null,
         "body": "Cloth",
         "head": null
@@ -92,17 +76,17 @@
       "class": "Cleric",
       "race": "Human",
       "gender": "Female",
-      "hp": 45,
-      "mp": 38,
+      "hp": 7,
+      "mp": 14,
       "strength": 10,
       "dexterity": 12,
       "intelligence": 10,
       "wisdom": 18,
-      "level": 10,
+      "level": 1,
       "equipped": {
-        "right_hand": "Mace",
+        "right_hand": "Club",
         "left_hand": null,
-        "body": "Chain",
+        "body": "Cloth",
         "head": null
       },
       "inventory": [],
@@ -123,163 +107,11 @@
     "effect_4": null
   },
   "inventory": [
-    {
-      "item": "Torch"
-    },
-    {
-      "item": "Arrows"
-    },
-    {
-      "item": "Torch"
-    },
-    {
-      "item": "Rock"
-    },
-    {
-      "item": "Rock"
-    },
-    {
-      "item": "Rock"
-    },
-    {
-      "item": "Healing Herb"
-    },
-    {
-      "item": "Camping Supplies",
-      "charges": 1
-    },
-    {
-      "item": "Lockpick",
-      "charges": 5
-    },
-    {
-      "item": "Moonpetal",
-      "charges": 3
-    },
-    {
-      "item": "Spring Water",
-      "charges": 3
-    },
-    {
-      "item": "Glowcap Mushroom",
-      "charges": 2
-    },
-    {
-      "item": "Serpent Root",
-      "charges": 2
-    },
-    {
-      "item": "Brimite Ore",
-      "charges": 1
-    },
-    {
-      "item": "Dagger"
-    },
-    {
-      "item": "Dagger"
-    },
-    {
-      "item": "Mace"
-    },
-    {
-      "item": "Axe"
-    },
-    {
-      "item": "Sword"
-    },
-    {
-      "item": "Spear"
-    },
-    {
-      "item": "Leather"
-    },
-    {
-      "item": "Leather"
-    },
-    {
-      "item": "Chain"
-    },
-    {
-      "item": "Short Bow"
-    },
-    {
-      "item": "Long Bow"
-    },
-    {
-      "item": "Crossbow"
-    },
-    {
-      "item": "Sling"
-    },
-    {
-      "item": "Arrows",
-      "charges": 20
-    },
-    {
-      "item": "Arrows",
-      "charges": 20
-    },
-    {
-      "item": "Bolts",
-      "charges": 15
-    },
-    {
-      "item": "Bolts",
-      "charges": 15
-    },
-    {
-      "item": "Healing Herb"
-    },
-    {
-      "item": "Healing Herb"
-    },
-    {
-      "item": "Antidote"
-    },
-    {
-      "item": "Antidote"
-    },
-    {
-      "item": "Mana Potion"
-    },
-    {
-      "item": "Mana Potion"
-    },
-    {
-      "item": "Healing Potion"
-    },
-    {
-      "item": "Healing Potion"
-    },
-    {
-      "item": "Elixir of Strength"
-    },
-    {
-      "item": "Elixir of Warding"
-    },
-    {
-      "item": "Poison Vial"
-    },
-    {
-      "item": "Poison Vial"
-    },
-    {
-      "item": "Paralytic Poison"
-    },
-    {
-      "item": "Paralytic Poison"
-    },
-    {
-      "item": "Weakening Poison"
-    },
-    {
-      "item": "Weakening Poison"
-    },
-    {
-      "item": "Lingering Venom"
-    },
-    {
-      "item": "Lingering Venom"
-    }
+    { "item": "Torch" },
+    { "item": "Rock" },
+    { "item": "Rock" },
+    { "item": "Rock" },
+    { "item": "Rock" },
+    { "item": "Rock" }
   ]
 }
