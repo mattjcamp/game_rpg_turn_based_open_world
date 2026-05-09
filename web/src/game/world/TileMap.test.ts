@@ -343,3 +343,76 @@ describe("TileMap — getCounterKey", () => {
     expect(m.getCounterKey(0, 0)).toBe("healing");
   });
 });
+
+// ── Sign resolution ────────────────────────────────────────────────
+
+describe("TileMap — getSignText", () => {
+  // Tile id 52 = General Store Sign per data/tile_defs.json. Same
+  // runtime-defs trick as the counter tests.
+  const TILE_GENERAL_STORE_SIGN = 52;
+  function withRuntimeSignDef<T>(fn: () => T): T {
+    populateRuntimeDefs({
+      [String(TILE_GENERAL_STORE_SIGN)]: {
+        name: "General Store Sign",
+        walkable: false,
+        sprite: "town/shop_sign",
+        interaction_type: "sign",
+        interaction_data: "General Store",
+      },
+    });
+    try {
+      return fn();
+    } finally {
+      _clearRuntimeTileDefs();
+    }
+  }
+
+  it("returns null for a plain grass tile (not a sign)", () => {
+    const m = new TileMap(1, 1, [[TILE_GRASS]]);
+    expect(m.getSignText(0, 0)).toBeNull();
+  });
+
+  it("reads the tile-id default sign text from interaction_data", () => {
+    withRuntimeSignDef(() => {
+      const m = new TileMap(1, 1, [[TILE_GENERAL_STORE_SIGN]]);
+      expect(m.getSignText(0, 0)).toBe("General Store");
+    });
+  });
+
+  it("per-cell `sign` override beats the tile-id default", () => {
+    withRuntimeSignDef(() => {
+      const m = new TileMap(1, 1, [[TILE_GENERAL_STORE_SIGN]], {
+        tileProperties: { "0,0": { sign: "Closed for the festival" } },
+      });
+      expect(m.getSignText(0, 0)).toBe("Closed for the festival");
+    });
+  });
+
+  it("a per-cell `sign` on a non-sign tile still resolves", () => {
+    // Authors can stick a plaque on any tile (e.g. a brick wall, a
+    // rock, a tree stump) by setting tile_properties.sign without
+    // shipping a new tile id.
+    const m = new TileMap(1, 1, [[TILE_GRASS]], {
+      tileProperties: { "0,0": { sign: "Memorial to the Fallen" } },
+    });
+    expect(m.getSignText(0, 0)).toBe("Memorial to the Fallen");
+  });
+
+  it("returns null when interaction_type is something other than 'sign'", () => {
+    populateRuntimeDefs({
+      "200": {
+        name: "Pretend Counter",
+        walkable: false,
+        sprite: "town/counter",
+        interaction_type: "shop",  // shop, not sign
+        interaction_data: "weapon",
+      },
+    });
+    try {
+      const m = new TileMap(1, 1, [[200]]);
+      expect(m.getSignText(0, 0)).toBeNull();
+    } finally {
+      _clearRuntimeTileDefs();
+    }
+  });
+});

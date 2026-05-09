@@ -195,6 +195,29 @@ export class TileMap {
       : null;
   }
 
+  /**
+   * Sign text for a tile, or null when it isn't a sign. Reads
+   * `tile_defs.json::interaction_type: "sign"` (per the data — town
+   * "General Store Sign" tiles, "Armor & Weapons", etc.) and
+   * returns the companion `interaction_data` string verbatim.
+   *
+   * Per-tile `tile_properties.sign` overrides the catalog default —
+   * authors can re-purpose a generic sign sprite with a custom
+   * message for one-off cases (a posted notice, a memorial plaque,
+   * etc.) without shipping a new tile id.
+   */
+  getSignText(col: number, row: number): string | null {
+    const props = this.tileProperties[`${col},${row}`];
+    const override = props?.sign;
+    if (typeof override === "string" && override.length > 0) return override;
+    const id = this.getTile(col, row);
+    const def = tileDef(id);
+    if (def.interactionType !== "sign") return null;
+    return def.interactionData && def.interactionData.length > 0
+      ? def.interactionData
+      : null;
+  }
+
   getTileLink(col: number, row: number): TileLink | null {
     const props = this.tileProperties[`${col},${row}`];
     if (!props) return null;

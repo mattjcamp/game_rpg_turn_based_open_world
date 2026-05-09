@@ -483,8 +483,12 @@ export class OverworldScene extends Phaser.Scene {
           rect.setFillStyle(clockParams.tint, clockParams.maxAlpha);
           continue;
         }
-        // Night — full black except a soft pool around the party.
-        const b = brightnessAt(col, row, [], party, partyR);
+        // Night — full black except pools around the party AND
+        // every map-defined light (spawn-tile campfires, fairy
+        // lights, etc.). Previously this passed [] for the lights
+        // array, so the player had no way to navigate by torchlight
+        // even in tile patches the map clearly marks as lit.
+        const b = brightnessAt(col, row, this.mapLights, party, partyR);
         const alpha = Math.max(0, Math.min(1, (1 - b) * clockParams.maxAlpha));
         rect.setFillStyle(clockParams.tint, alpha);
       }

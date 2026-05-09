@@ -67,6 +67,7 @@ import {
   openQuestDialog as buildQuestDialog,
   closeQuestDialog as destroyQuestDialog,
   flashQuestMessage,
+  flashSignMessage,
   openQuestLog,
   openVictoryModal,
   showQuestAcceptedCallout,
@@ -641,12 +642,18 @@ export class TownScene extends Phaser.Scene {
             rect.setFillStyle(clockParams.tint, clockParams.maxAlpha);
             continue;
           }
-          // Night — full black with a soft party-light pool.
+          // Night — full black with a soft party-light pool. Also
+          // honour every map-defined light (wall torches, lanterns,
+          // braziers) so the player can SEE the wards/sconces that
+          // were placed in the town map. Previously this passed []
+          // for the lights array — the torches were drawn but their
+          // illumination was ignored, so a Plainstown packed with
+          // lit sconces stayed pitch-black at midnight.
           const partyData = gameState.partyData;
           const radius = partyData
             ? partyLightRadius(partyData, PARTY_LIGHT_RADIUS)
             : PARTY_LIGHT_RADIUS;
-          const b = brightnessAt(col, row, [], party, radius);
+          const b = brightnessAt(col, row, this.mapLights, party, radius);
           const alpha = Math.max(0, Math.min(1, (1 - b) * clockParams.maxAlpha));
           rect.setFillStyle(clockParams.tint, alpha);
         }
@@ -1269,6 +1276,17 @@ export class TownScene extends Phaser.Scene {
       }
     }
     if (!this.tileMap.isWalkable(nc, nr)) {
+      // Bumping a sign tile reads its text — `interaction_data` from
+      // tile_defs.json (e.g. "General Store") floats up from the
+      // sign tile and fades. World-space coords so the label stays
+      // attached to the sign as the camera moves. Returns before
+      // the bump-shake so the player gets a clean read instead of
+      // a wall jiggle.
+      const signText = this.tileMap.getSignText(nc, nr);
+      if (signText) {
+        flashSignMessage(this, signText, this.tileX(nc), this.tileY(nr));
+        return;
+      }
       // Bumping a locked door opens the pick-lock / Knock dialog
       // instead of the regular wall-shake.
       if (isLockedAt(this.tileMap, nc, nr)) {

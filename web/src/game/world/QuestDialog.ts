@@ -376,6 +376,65 @@ export function flashQuestMessage(scene: Phaser.Scene, text: string, durationMs 
   scene.time.delayedCall(durationMs, () => { bg.destroy(); t.destroy(); });
 }
 
+/**
+ * Sign-reading flavour text — fires when the party bumps into a
+ * tile whose `tile_defs.json` entry has `interaction_type: "sign"`.
+ * The text floats up from the sign tile and fades, anchoring the
+ * read to the specific sign rather than a generic top-of-screen
+ * banner. Mirrors the floating-damage label pattern combat uses,
+ * just slower and on the world layer.
+ *
+ * `(x, y)` are world-space pixel coords — pass the sign tile's
+ * centre. The label renders **without** `setScrollFactor(0)` so it
+ * stays attached to the sign as the camera moves; if the player
+ * walks past the sign while the message is up, it scrolls along
+ * with the world.
+ *
+ * Visual treatment: bold cream text with a thick dark stroke (no
+ * filled backdrop — the float-up is the read cue, not the framing)
+ * so the message reads cleanly over wall sprites or floor tiles
+ * without a heavy popup. Floats ~32 px upward over `durationMs`,
+ * fading to 0 alpha across the same window.
+ */
+export function flashSignMessage(
+  scene: Phaser.Scene,
+  text: string,
+  x: number,
+  y: number,
+  durationMs = 1800,
+): void {
+  // Start just above the sign sprite; finish ~32 px higher.
+  const startY = y - 22;
+  const endY   = startY - 32;
+  const label = scene.add
+    .text(x, startY, text, {
+      fontFamily: "Georgia, serif",
+      fontSize: "16px",
+      fontStyle: "bold",
+      color: "#f6efd6",         // cream
+      stroke: "#1a1a2e",
+      strokeThickness: 5,
+    })
+    .setOrigin(0.5, 1)
+    .setDepth(60);
+  // Subtle wood-tan inner glow via a faint underline so the label
+  // visually ties back to the sign frame's colour without a heavy
+  // backdrop. Drawn once (not animated) — the alpha tween below
+  // takes the parent label and the underline together.
+  const underline = scene.add
+    .rectangle(x, startY - 1, label.width + 8, 2, 0xa37f5a, 0.85)
+    .setOrigin(0.5, 1)
+    .setDepth(59);
+  scene.tweens.add({
+    targets: [label, underline],
+    y: `-=${startY - endY}`,
+    alpha: 0,
+    duration: durationMs,
+    ease: "Cubic.Out",
+    onComplete: () => { label.destroy(); underline.destroy(); },
+  });
+}
+
 /** Read-only quest log overlay. Lists quests the party has actually
  *  engaged with — active (in progress), completed (objectives met,
  *  awaiting turn-in), and finished (turned in, historical record).
