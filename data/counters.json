@@ -14,7 +14,6 @@
     "description": "Sells supplies, tools, and everyday adventuring gear.",
     "items": [
       "Torch",
-      "Rope",
       "Lockpick",
       "Camping Supplies",
       "Healing Herb",
@@ -22,7 +21,8 @@
       "Arrows",
       "Bolts",
       "Stones",
-      "Dagger"
+      "Dagger",
+      "Camping Supplies"
     ]
   },
   "guild": {

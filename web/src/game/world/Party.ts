@@ -7,7 +7,7 @@
  * (state.ts) so HP/gold/inventory edits survive scene transitions.
  */
 
-import { dataPath } from "./Module";
+import { BASE_PATH, dataPath, withBase } from "./Module";
 import { normalizeSpritePath } from "./Towns";
 
 export interface EquipmentSlots {
@@ -159,12 +159,25 @@ export function spriteForMember(rawSprite: string | undefined, klass: string): s
   // /assets/<folder>/<name>.png path is honoured as-is — broken
   // paths show a 404 in the network tab rather than silently
   // resetting the avatar.
-  if (HUMANOID_SPRITE_PREFIXES.some((p) => norm.startsWith(p)) && norm.endsWith(".png")) {
+  //
+  // `norm` already carries the deploy-time BASE_PATH (normalizeSpritePath
+  // pipes through withBase). Strip it before comparing against the
+  // /assets/<folder>/ roots so the prefix check doesn't fail on
+  // GH-Pages-style sub-path deployments — without this strip every
+  // member squashed back to the class fallback below, and the
+  // fallback's unprefixed path didn't match the texture keys
+  // CombatScene preloads under, so all party avatars rendered as the
+  // gray "missing texture" rectangle.
+  const noBase = BASE_PATH && norm.startsWith(BASE_PATH)
+    ? norm.slice(BASE_PATH.length)
+    : norm;
+  if (HUMANOID_SPRITE_PREFIXES.some((p) => noBase.startsWith(p)) && noBase.endsWith(".png")) {
     return norm;
   }
-  // Otherwise fall back to /assets/characters/<class>.png.
-  const fallback = `/assets/characters/${klass.toLowerCase()}.png`;
-  return fallback;
+  // Otherwise fall back to /assets/characters/<class>.png — base-
+  // prefixed so the resulting key matches the one CombatScene /
+  // PartyScene preload these PNGs under (assetUrl(...)).
+  return withBase(`/assets/characters/${klass.toLowerCase()}.png`);
 }
 
 export function memberFromRaw(raw: RawMember): PartyMember {

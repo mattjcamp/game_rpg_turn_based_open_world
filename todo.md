@@ -8,6 +8,7 @@ python3 main.py
 - Do a full QA on party creation attributes, combat, etc. Do a few playthroughs.
 - Add soundtrack (only two mpg3 to keep it small)
 - Lighting should not pass through walls and essentially only light based on Light of Sight and the lighting effect range
+- In the character creation screen, add descriptions of races and classes with detailed lists of special abilities
 
 ## Bugs
 - The party graphics are missing in the published version
