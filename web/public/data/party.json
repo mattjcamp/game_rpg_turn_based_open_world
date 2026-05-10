@@ -18,7 +18,7 @@
       "intelligence": 8,
       "wisdom": 9,
       "level": 1,
-      "exp": 0,
+      "exp": 1499,
       "equipped": {
         "right_hand": "Sword",
         "left_hand": null,
@@ -40,7 +40,7 @@
       "intelligence": 8,
       "wisdom": 9,
       "level": 1,
-      "exp": 0,
+      "exp": 1499,
       "equipped": {
         "right_hand": "Short Bow",
         "left_hand": null,
@@ -63,7 +63,7 @@
       "intelligence": 18,
       "wisdom": 8,
       "level": 1,
-      "exp": 0,
+      "exp": 1124,
       "equipped": {
         "right_hand": null,
         "left_hand": null,
@@ -86,7 +86,7 @@
       "intelligence": 10,
       "wisdom": 19,
       "level": 1,
-      "exp": 0,
+      "exp": 1499,
       "equipped": {
         "right_hand": null,
         "left_hand": null,
