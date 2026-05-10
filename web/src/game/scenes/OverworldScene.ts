@@ -70,6 +70,9 @@ import {
   acceptQuest,
   markTurnedIn,
   findQuest,
+  applyTurnedInWorldUnlocks,
+  applyWorldUnlocks,
+  summariseUnlocks,
   type QuestDef,
 } from "../world/Quests";
 import {
@@ -291,6 +294,17 @@ export class OverworldScene extends Phaser.Scene {
     try {
       this.questDefs = await loadQuests();
       ensureQuestStates(this.questDefs, gameState.moduleQuestStates);
+      // Re-apply world-unlock rewards from any turned-in quests so
+      // the freshly-loaded JSON tile map matches the player's
+      // history. Same idempotent design the Python game uses on
+      // save load — the unlocks aren't persisted as a tile diff,
+      // they're rederived from the (persisted) `turned_in` quest
+      // statuses every time the overworld scene boots.
+      applyTurnedInWorldUnlocks(
+        this.tileMap,
+        this.questDefs,
+        gameState.moduleQuestStates,
+      );
       // The overworld is the first scene the user lands on, so a
       // freshly-booted session may not have loaded party.json yet —
       // do it now so quest reward delivery has a party to mutate.
@@ -1624,6 +1638,18 @@ export class OverworldScene extends Phaser.Scene {
       for (const m of recipients) m.exp = (m.exp ?? 0) + share;
     }
     for (const item of def.rewardItems) party.inventory.push({ item });
+    // World-unlock rewards (e.g. a Bridge tile dropped at quest end).
+    // Apply to the live tile map so the data is correct immediately;
+    // the visible redraw lands on the next OverworldScene boot via
+    // `applyTurnedInWorldUnlocks`, which is the natural lifecycle
+    // for the rare overworld-claim case (most quests turn in inside
+    // a town and the player walks out into a fresh draw). The
+    // per-cell sprite cache `drawMap` builds isn't keyed by coord
+    // today, so an in-place repaint would need a wider refactor we
+    // can defer until a quest ships with `giver_location: "overview"`
+    // and a world-unlock reward.
+    const applied = applyWorldUnlocks(this.tileMap, def.rewardWorldUnlocks);
+    const unlockSummary = summariseUnlocks(applied);
     markTurnedIn(gameState.moduleQuestStates, questName);
     this.closeOverworldQuestDialog();
     // Despawn the giver sprite now that the quest is turned in.
@@ -1634,7 +1660,11 @@ export class OverworldScene extends Phaser.Scene {
     if (def.isFinalQuest) {
       openVictoryModal(this, def.victoryText);
     } else {
-      flashQuestMessage(this, `Quest "${def.name}" complete!`);
+      const baseMsg = `Quest "${def.name}" complete!`;
+      flashQuestMessage(
+        this,
+        unlockSummary ? `${baseMsg} ${unlockSummary}` : baseMsg,
+      );
     }
     this.refreshHud();
   }

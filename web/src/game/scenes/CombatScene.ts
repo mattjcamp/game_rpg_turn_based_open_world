@@ -164,6 +164,18 @@ interface CombatSceneData {
   interiorPath?: string;
 }
 
+// ── Debug cheats ──────────────────────────────────────────────────
+//
+// `SMITE_ALL_CHEAT` enables the Shift+K shortcut that zeros every
+// alive enemy's HP and routes through the standard victory flow so
+// playtesting can tear through encounters quickly. Flip to `false`
+// before shipping to disable the binding entirely; the constant is
+// used as a guard so removing the cheat at release time is one
+// edit (or, eventually, a build-config gate). Not surfaced in the
+// action menu — it's deliberately a hidden key chord so a curious
+// player can't trip into it.
+const SMITE_ALL_CHEAT = true;
+
 // ── Layout (canvas is 960×720) ────────────────────────────────────
 // TILE matches the rest of the engine (overworld + town interiors)
 // so monster / character sprites — which ship as native 32×32 PNGs
@@ -1074,6 +1086,52 @@ export class CombatScene extends Phaser.Scene {
     for (let i = 1; i <= 9; i++) {
       k.on(`keydown-${["ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE"][i-1]}`, () => this.onDigit(i));
     }
+    // Debug cheat: Shift+K instantly defeats every alive enemy and
+    // routes through the standard victory path (so quest credit,
+    // dungeon-monster cleanup, XP/loot drops all run normally). Hidden
+    // chord — a player who happens to mash K won't trigger it without
+    // also holding Shift. Gated by `SMITE_ALL_CHEAT` for an easy
+    // disable when we ship.
+    if (SMITE_ALL_CHEAT) {
+      k.on("keydown-K", (event: KeyboardEvent) => {
+        if (event.shiftKey) this.cheatSmiteAll();
+      });
+    }
+  }
+
+  /**
+   * Debug-only "Smite All" — zero every alive enemy's HP, refresh
+   * the HP bars, log a flavor line, and ride the standard
+   * `endEncounter` flow. Bound to Shift+K via `installInput`.
+   *
+   * Skips when the encounter is already over (avoid double-firing
+   * the victory transition) or when player input is locked (mid-
+   * animation, in a picker sub-mode, etc. — we don't want a stray
+   * Shift+K mashing through during a tween).
+   */
+  private cheatSmiteAll(): void {
+    if (this.combat.isOver || this.ended) return;
+    if (this.busy) return;
+    const alive = this.combat.combatants.filter(
+      (c) => c.side === "enemies" && c.hp > 0,
+    );
+    if (alive.length === 0) return;
+    for (const e of alive) {
+      e.hp = 0;
+      this.refreshHp(e);
+    }
+    this.combat.log.push(
+      `*** Divine wrath descends — ${alive.length} foe${alive.length === 1 ? "" : "s"} smitten! ***`
+    );
+    this.refreshLog();
+    Sfx.play("critical");
+    // Standard victory path — endEncounter shows the "Victory!"
+    // overlay, plays the victory sting, and chains into
+    // awardRewardsThenExit for XP / loot / quest credit / dungeon
+    // monster cleanup. Setting every enemy hp to 0 above is enough
+    // for `combat.isOver` to be true and `combat.winner` to read
+    // "party", which is all endEncounter checks.
+    this.endEncounter();
   }
 
   /** ESC backs out of any sub-mode, or does nothing in default mode. */

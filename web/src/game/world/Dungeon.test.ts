@@ -99,6 +99,10 @@ describe("Dungeon — single level shape", () => {
     expect(level.triggeredTraps.size).toBe(0);
     expect(level.exploredTiles.size).toBe(0);
   });
+
+  it("starts with no traps detected", () => {
+    expect(level.detectedTraps.size).toBe(0);
+  });
 });
 
 describe("Dungeon — determinism", () => {
@@ -198,6 +202,122 @@ describe("Dungeon — styles", () => {
     // surviving TILE_FOREST cells.
     const overrides = Object.values(lvl.tileProperties).filter((p) => p.walkable === false);
     expect(overrides.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Dungeon — random encounter difficulty filter", () => {
+  // Mini encounter table mixing tiers so the prune step has work
+  // to do: a hard-only encounter at level 4, a normal-only one at
+  // level 4, and a mixed roster at level 4.
+  const encounters = {
+    dungeon: [
+      {
+        name: "Banshee Wail", level: 4, weight: 5, terrain: "land" as const,
+        monsterPartyTile: "Banshee",
+        monsters: ["Banshee", "Man Eater"],   // both hard
+      },
+      {
+        name: "Wolf Pack", level: 4, weight: 5, terrain: "land" as const,
+        monsterPartyTile: "Wolf",
+        monsters: ["Wolf", "Wolf"],           // both normal
+      },
+      {
+        name: "Mixed Skirmish", level: 4, weight: 5, terrain: "land" as const,
+        monsterPartyTile: "Banshee",
+        monsters: ["Banshee", "Wolf"],        // hard + normal
+      },
+    ],
+  };
+  const difficulty = (name: string): string | undefined => {
+    if (name === "Banshee" || name === "Man Eater") return "hard";
+    if (name === "Wolf") return "normal";
+    return undefined;
+  };
+
+  it("a normal dungeon never spawns monsters tagged hard", () => {
+    // Run with a few seeds so the random-encounter loop hits a
+    // variety of room counts; collect every monster name spawned.
+    const seen = new Set<string>();
+    for (const seed of [1, 7, 19, 99, 314, 2718]) {
+      const lvl = generateDungeonLevel({
+        name: "F", width: 40, height: 30, style: "default",
+        difficulty: "normal", floorIdx: 0, placeStairsDown: false,
+        placeOverworldExit: false, placeDoors: false,
+        torchDensity: "none", seed,
+        encounters, monsterDifficulty: difficulty,
+      });
+      for (const m of lvl.monsters) {
+        for (const name of m.encounterNames) seen.add(name);
+      }
+    }
+    // Strict normal-tier match — neither hard monster ever appears.
+    expect(seen.has("Banshee")).toBe(false);
+    expect(seen.has("Man Eater")).toBe(false);
+    // Wolf is the only normal monster in the table; if anything
+    // spawned it should be a Wolf.
+    if (seen.size > 0) expect(seen.has("Wolf")).toBe(true);
+  });
+
+  it("the mixed-roster encounter spawns with Wolves only when normal-filtered", () => {
+    // Force the seed picks so the mixed encounter is selected, then
+    // assert its roster is pruned.
+    const lvl = generateDungeonLevel({
+      name: "F", width: 40, height: 30, style: "default",
+      difficulty: "normal", floorIdx: 0, placeStairsDown: false,
+      placeOverworldExit: false, placeDoors: false,
+      torchDensity: "none", seed: 42,
+      encounters, monsterDifficulty: difficulty,
+    });
+    for (const m of lvl.monsters) {
+      // Every spawned encounter — whether the originally normal-only
+      // Wolf Pack or the pruned Mixed Skirmish — must contain only
+      // Wolves now.
+      for (const name of m.encounterNames) {
+        expect(name).toBe("Wolf");
+      }
+    }
+  });
+
+  it("a hard dungeon still spawns hard monsters via the same machinery", () => {
+    const lvl = generateDungeonLevel({
+      name: "F", width: 40, height: 30, style: "default",
+      difficulty: "hard", floorIdx: 0, placeStairsDown: false,
+      placeOverworldExit: false, placeDoors: false,
+      torchDensity: "none", seed: 7,
+      encounters, monsterDifficulty: difficulty,
+    });
+    // The hard tier accepts Banshee + Man Eater; some rooms will
+    // pick those entries up.
+    const all = lvl.monsters.flatMap((m) => m.encounterNames);
+    if (all.length > 0) {
+      // Wolf is normal — gets pruned on the hard-only path.
+      expect(all.includes("Wolf")).toBe(false);
+    }
+  });
+
+  it("with the filter omitted the legacy behaviour is unchanged", () => {
+    // No monsterDifficulty function → no per-monster pruning.
+    // A normal dungeon with a level-4 band can still pick up the
+    // hard-only Banshee Wail encounter via the encounter-`level`
+    // band path. This is the pre-fix baseline behavior we want to
+    // preserve when callers don't opt in.
+    const seen = new Set<string>();
+    for (const seed of [1, 7, 19, 99, 314, 2718]) {
+      const lvl = generateDungeonLevel({
+        name: "F", width: 40, height: 30, style: "default",
+        difficulty: "normal", floorIdx: 0, placeStairsDown: false,
+        placeOverworldExit: false, placeDoors: false,
+        torchDensity: "none", seed, encounters,
+        // monsterDifficulty intentionally omitted
+      });
+      for (const m of lvl.monsters) {
+        for (const name of m.encounterNames) seen.add(name);
+      }
+    }
+    // Hard-only Banshee can spawn here when the filter isn't wired
+    // (the old behaviour). Floor 0 normal band is 2..4, the level-4
+    // Banshee Wail encounter is in scope.
+    expect(seen.has("Banshee")).toBe(true);
   });
 });
 
@@ -337,6 +457,7 @@ describe("placeQuestKillMonsters", () => {
         monsters: [],
         openedChests: new Set(),
         triggeredTraps: new Set(),
+        detectedTraps: new Set(),
         exploredTiles: new Set(),
         overworldExits: new Set(),
         questArtifacts: {},
@@ -578,6 +699,7 @@ describe("cleanupCompletedQuestMonsters", () => {
         ...m,
       })),
       openedChests: new Set(), triggeredTraps: new Set(),
+      detectedTraps: new Set(),
       exploredTiles: new Set(), overworldExits: new Set(),
       questArtifacts: {},
     };

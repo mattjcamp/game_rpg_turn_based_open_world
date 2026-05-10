@@ -34,9 +34,42 @@
 
 import { modulePath } from "./Module";
 import { sampleEncounter, type EncounterTemplate } from "./Encounters";
+import { tileDef } from "./Tiles";
+import type { TileMap } from "./TileMap";
 
 export type QuestStatus = "available" | "active" | "completed" | "turned_in";
 export type QuestStepKind = "kill" | "collect";
+
+// ── World-unlock rewards ──────────────────────────────────────────
+//
+// A quest can declare a list of overworld tile mutations that fire
+// when the quest is turned in — used in modules like Dragon of
+// Dagorn to drop a Bridge across an impassable river once the
+// Stolen Sealstone quest is delivered. The Python implementation
+// lives in `src/module_editor_quest.py:apply_world_unlocks`; this
+// is a faithful port.
+//
+// `kind` is preserved as a designer hint so the quest editor can
+// re-open the right tile picker on a round-trip; at runtime the
+// two kinds are identical (a single `set_tile`):
+//   - "add_tile"        — paint any overworld tile id
+//   - "remove_obstacle" — paint a passable tile (subset of add_tile)
+//
+// Out-of-bounds entries and ones missing required ints are skipped
+// silently rather than crashing on a malformed quests.json.
+export type WorldUnlockKind = "add_tile" | "remove_obstacle" | "";
+
+export interface WorldUnlock {
+  kind: WorldUnlockKind;
+  col: number;
+  row: number;
+  tile: number;
+}
+
+/** Triple returned by `applyWorldUnlocks` — used by the reward-summary
+ *  line so the player sees "World changed: Bridge at (5,13)" when a
+ *  quest's world-unlock op completes. */
+export type AppliedUnlock = readonly [col: number, row: number, tile: number];
 
 export interface QuestStep {
   description: string;
@@ -77,6 +110,13 @@ export interface QuestDef {
   rewardXp: number;
   rewardGold: number;
   rewardItems: string[];
+  /**
+   * Overworld tile mutations applied on turn-in. Most quests carry an
+   * empty list. Mirrors the Python `reward_world_unlocks` field —
+   * the data is a list (not a singleton) so authors can hand-edit a
+   * multi-tile unlock (e.g. a 2-wide bridge) by adding entries.
+   */
+  rewardWorldUnlocks: WorldUnlock[];
   isFinalQuest: boolean;
   victoryText: string;
   steps: QuestStep[];
@@ -108,6 +148,13 @@ interface RawQuestStep {
   spawn_row?: number | string;
 }
 
+interface RawWorldUnlock {
+  kind?: string;
+  col?: number | string;
+  row?: number | string;
+  tile?: number | string;
+}
+
 interface RawQuest {
   name?: string;
   description?: string;
@@ -120,6 +167,7 @@ interface RawQuest {
   reward_xp?: number;
   reward_gold?: number;
   reward_items?: string[];
+  reward_world_unlocks?: RawWorldUnlock[];
   is_final_quest?: boolean;
   victory_text?: string;
   steps?: RawQuestStep[];
@@ -150,11 +198,39 @@ function stepFromRaw(raw: RawQuestStep): QuestStep | null {
   };
 }
 
+function unlockFromRaw(raw: RawWorldUnlock): WorldUnlock | null {
+  if (!raw || typeof raw !== "object") return null;
+  const c = coerceInt(raw.col);
+  const r = coerceInt(raw.row);
+  const t = coerceInt(raw.tile);
+  if (c === undefined || r === undefined || t === undefined) return null;
+  // Accept anything the editor might have written for `kind`, but only
+  // round-trip the two values the editor surfaces; anything else
+  // (including the empty string) collapses to "add_tile" so a hand-
+  // edited entry without a kind still applies cleanly at runtime.
+  let kind: WorldUnlockKind = "add_tile";
+  if (raw.kind === "remove_obstacle") kind = "remove_obstacle";
+  else if (raw.kind === "add_tile" || raw.kind === undefined || raw.kind === "") {
+    kind = "add_tile";
+  } else {
+    // Unknown kinds still apply — preserve the string the editor wrote
+    // so a future round-trip doesn't lose data, but TS narrows it to
+    // the empty-string branch of the union for callers.
+    kind = "";
+  }
+  return { kind, col: c, row: r, tile: t };
+}
+
 function fromRaw(raw: RawQuest): QuestDef | null {
   if (!raw || typeof raw !== "object" || typeof raw.name !== "string") return null;
   const steps = (raw.steps ?? [])
     .map(stepFromRaw)
     .filter((s): s is QuestStep => s !== null);
+  const rewardWorldUnlocks = Array.isArray(raw.reward_world_unlocks)
+    ? raw.reward_world_unlocks
+        .map(unlockFromRaw)
+        .filter((u): u is WorldUnlock => u !== null)
+    : [];
   return {
     name: raw.name,
     description: raw.description ?? "",
@@ -169,6 +245,7 @@ function fromRaw(raw: RawQuest): QuestDef | null {
     rewardItems: Array.isArray(raw.reward_items)
       ? raw.reward_items.filter((s): s is string => typeof s === "string")
       : [],
+    rewardWorldUnlocks,
     isFinalQuest: raw.is_final_quest === true,
     victoryText: raw.victory_text ?? "",
     steps,
@@ -502,6 +579,90 @@ export function markTurnedIn(states: Map<string, QuestState>, questName: string)
   if (!state || state.status !== "completed") return false;
   state.status = "turned_in";
   return true;
+}
+
+// ── World-unlock application ───────────────────────────────────
+
+/**
+ * Display name for a tile id — falls back to "Tile <id>" when the
+ * runtime def table doesn't recognise it. Mirrors the Python
+ * `world_unlock_tile_name` so reward summary text reads identically
+ * across the two ports ("World changed: Bridge at (5,13)").
+ */
+export function worldUnlockTileName(tileId: number): string {
+  const name = tileDef(tileId).name;
+  return name && name !== "Unknown" ? name : `Tile ${tileId}`;
+}
+
+/**
+ * Apply a list of world-unlock ops to *tileMap* in place. Returns
+ * the entries that actually landed — useful for the reward summary
+ * the turn-in dialog shows. Bad / out-of-bounds entries are skipped
+ * silently so a malformed quests.json never crashes a run.
+ *
+ * Mirrors `apply_world_unlocks` in `src/module_editor_quest.py`.
+ */
+export function applyWorldUnlocks(
+  tileMap: TileMap | null | undefined,
+  unlocks: readonly WorldUnlock[] | null | undefined,
+): AppliedUnlock[] {
+  const applied: AppliedUnlock[] = [];
+  if (!tileMap || !unlocks || unlocks.length === 0) return applied;
+  for (const op of unlocks) {
+    if (!op || typeof op !== "object") continue;
+    const c = op.col;
+    const r = op.row;
+    const t = op.tile;
+    if (!Number.isFinite(c) || !Number.isFinite(r) || !Number.isFinite(t)) continue;
+    if (c < 0 || c >= tileMap.width || r < 0 || r >= tileMap.height) continue;
+    tileMap.setTile(c, r, t);
+    applied.push([c, r, t]);
+  }
+  return applied;
+}
+
+/**
+ * Re-apply every turned-in quest's world unlocks to the overworld
+ * tile map. Called by OverworldScene after `loadTileMap()` so the
+ * reward survives the natural "fetch fresh JSON on every scene
+ * boot" lifecycle of the web port — same idempotent design the
+ * Python game's save/load path uses (see
+ * `_apply_turned_in_world_unlocks` in `src/save_load.py`).
+ *
+ * Returns the flat list of applied triples in the order they were
+ * walked, mainly for tests and the resume-time reward log.
+ */
+export function applyTurnedInWorldUnlocks(
+  tileMap: TileMap | null | undefined,
+  defs: QuestDef[],
+  states: Map<string, QuestState>,
+): AppliedUnlock[] {
+  const applied: AppliedUnlock[] = [];
+  if (!tileMap) return applied;
+  for (const def of defs) {
+    if (def.rewardWorldUnlocks.length === 0) continue;
+    const state = states.get(def.name);
+    if (!state || state.status !== "turned_in") continue;
+    for (const a of applyWorldUnlocks(tileMap, def.rewardWorldUnlocks)) {
+      applied.push(a);
+    }
+  }
+  return applied;
+}
+
+/**
+ * Build a short description of an applied world-unlock list — used
+ * by the turn-in reward summary line. Single-tile unlocks name the
+ * tile and coords ("Bridge at (5,13)"); multi-tile unlocks roll up
+ * to a count to keep the dialog from overflowing.
+ */
+export function summariseUnlocks(applied: readonly AppliedUnlock[]): string {
+  if (applied.length === 0) return "";
+  if (applied.length === 1) {
+    const [c, r, t] = applied[0];
+    return `World changed: ${worldUnlockTileName(t)} at (${c},${r})`;
+  }
+  return `World changed: ${applied.length} tiles updated`;
 }
 
 // ── Misc helpers ────────────────────────────────────────────────

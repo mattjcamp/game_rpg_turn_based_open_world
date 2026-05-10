@@ -9,10 +9,17 @@ import {
   creditCollect,
   activeCollectStepFor,
   locationHint,
+  applyWorldUnlocks,
+  applyTurnedInWorldUnlocks,
+  summariseUnlocks,
+  worldUnlockTileName,
+  type AppliedUnlock,
   type QuestDef,
   type QuestState,
+  type WorldUnlock,
 } from "./Quests";
 import type { EncounterTemplate } from "./Encounters";
+import { TileMap } from "./TileMap";
 
 function killStep(overrides: Partial<QuestDef["steps"][number]> = {}): QuestDef["steps"][number] {
   return {
@@ -55,6 +62,7 @@ function quest(name: string, overrides: Partial<QuestDef> = {}): QuestDef {
     rewardXp: 100,
     rewardGold: 50,
     rewardItems: [],
+    rewardWorldUnlocks: [],
     isFinalQuest: false,
     victoryText: "",
     steps: [killStep()],
@@ -294,5 +302,131 @@ describe("Quests — locationHint", () => {
   it("flags guardian for collect steps", () => {
     const hint = locationHint(quest("Q1", { steps: [collectStep()] }));
     expect(hint).toContain("guardian");
+  });
+});
+
+// ── World-unlock rewards ─────────────────────────────────────────
+
+// 5×4 sandbox tile map: 0 = TILE_GRASS by convention, 4 = TILE_WATER
+// stand-ins. We don't need real tile_defs entries for these tests
+// because applyWorldUnlocks just calls setTile / getTile — both of
+// which are pure positional ops on the array.
+function makeTileMap(): TileMap {
+  const tiles: number[][] = [];
+  for (let r = 0; r < 4; r++) {
+    const row: number[] = [];
+    for (let c = 0; c < 5; c++) row.push(0);
+    tiles.push(row);
+  }
+  return new TileMap(5, 4, tiles);
+}
+
+describe("Quests — applyWorldUnlocks", () => {
+  it("mutates the tile map for in-bounds ops", () => {
+    const tm = makeTileMap();
+    const unlocks: WorldUnlock[] = [
+      { kind: "add_tile", col: 2, row: 1, tile: 8 },
+      { kind: "remove_obstacle", col: 0, row: 0, tile: 1 },
+    ];
+    const applied = applyWorldUnlocks(tm, unlocks);
+    expect(tm.getTile(2, 1)).toBe(8);
+    expect(tm.getTile(0, 0)).toBe(1);
+    expect(applied).toEqual([
+      [2, 1, 8],
+      [0, 0, 1],
+    ]);
+  });
+
+  it("skips out-of-bounds ops without throwing", () => {
+    const tm = makeTileMap();
+    const unlocks: WorldUnlock[] = [
+      { kind: "add_tile", col: -1, row: 0, tile: 8 },
+      { kind: "add_tile", col: 0, row: 99, tile: 8 },
+      { kind: "add_tile", col: 5, row: 0, tile: 8 },  // width = 5 → 5 is OOB
+      { kind: "add_tile", col: 4, row: 3, tile: 7 },  // last cell, in bounds
+    ];
+    const applied = applyWorldUnlocks(tm, unlocks);
+    expect(applied).toEqual([[4, 3, 7]]);
+    expect(tm.getTile(4, 3)).toBe(7);
+  });
+
+  it("returns an empty list when the tile map is null or unlocks empty", () => {
+    expect(applyWorldUnlocks(null, [])).toEqual([]);
+    expect(applyWorldUnlocks(makeTileMap(), [])).toEqual([]);
+    expect(applyWorldUnlocks(null, [{ kind: "add_tile", col: 0, row: 0, tile: 1 }])).toEqual([]);
+  });
+});
+
+describe("Quests — applyTurnedInWorldUnlocks", () => {
+  it("re-applies every turned-in quest's unlocks and skips others", () => {
+    const tm = makeTileMap();
+    const defs = [
+      quest("DoneQ", {
+        rewardWorldUnlocks: [{ kind: "add_tile", col: 1, row: 1, tile: 8 }],
+      }),
+      quest("ActiveQ", {
+        rewardWorldUnlocks: [{ kind: "add_tile", col: 2, row: 2, tile: 9 }],
+      }),
+      quest("AvailableQ", {
+        rewardWorldUnlocks: [{ kind: "add_tile", col: 3, row: 3, tile: 7 }],
+      }),
+    ];
+    const states = new Map<string, QuestState>();
+    ensureQuestStates(defs, states);
+    // DoneQ → turned_in via the lifecycle helpers (status-gated).
+    acceptQuest(states, "DoneQ");
+    states.get("DoneQ")!.status = "completed";
+    markTurnedIn(states, "DoneQ");
+    // ActiveQ stays in `active`; AvailableQ stays in `available`.
+    acceptQuest(states, "ActiveQ");
+
+    const applied = applyTurnedInWorldUnlocks(tm, defs, states);
+
+    expect(applied).toEqual([[1, 1, 8]]);
+    expect(tm.getTile(1, 1)).toBe(8);
+    expect(tm.getTile(2, 2)).toBe(0);  // active quest — not yet
+    expect(tm.getTile(3, 3)).toBe(0);  // never accepted
+  });
+
+  it("is idempotent — replaying the pass leaves the map identical", () => {
+    const tm = makeTileMap();
+    const defs = [
+      quest("Q", { rewardWorldUnlocks: [{ kind: "add_tile", col: 0, row: 0, tile: 5 }] }),
+    ];
+    const states = new Map<string, QuestState>();
+    ensureQuestStates(defs, states);
+    acceptQuest(states, "Q");
+    states.get("Q")!.status = "completed";
+    markTurnedIn(states, "Q");
+
+    applyTurnedInWorldUnlocks(tm, defs, states);
+    const snap = JSON.stringify(tm.tiles);
+    applyTurnedInWorldUnlocks(tm, defs, states);
+    expect(JSON.stringify(tm.tiles)).toBe(snap);
+  });
+
+  it("no-ops on a null tile map", () => {
+    const defs = [quest("Q", { rewardWorldUnlocks: [{ kind: "add_tile", col: 0, row: 0, tile: 1 }] })];
+    const states = new Map<string, QuestState>();
+    ensureQuestStates(defs, states);
+    expect(applyTurnedInWorldUnlocks(null, defs, states)).toEqual([]);
+  });
+});
+
+describe("Quests — summary helpers", () => {
+  it("worldUnlockTileName falls back to a numeric label for unknown ids", () => {
+    // tile id 9999 is not in the runtime def table — name should be "Tile 9999".
+    expect(worldUnlockTileName(9999)).toBe("Tile 9999");
+  });
+
+  it("summariseUnlocks formats single vs. multi cleanly", () => {
+    expect(summariseUnlocks([])).toBe("");
+    const single: AppliedUnlock[] = [[5, 13, 8]];
+    expect(summariseUnlocks(single)).toContain("at (5,13)");
+    const multi: AppliedUnlock[] = [
+      [5, 13, 8],
+      [6, 13, 8],
+    ];
+    expect(summariseUnlocks(multi)).toBe("World changed: 2 tiles updated");
   });
 });

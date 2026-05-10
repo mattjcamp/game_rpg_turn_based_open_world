@@ -152,7 +152,9 @@
         "row": 13,
         "tile": 8
       }
-    ]
+    ],
+    "is_final_quest": false,
+    "victory_text": ""
   },
   {
     "name": "The Veyron Heirloom",

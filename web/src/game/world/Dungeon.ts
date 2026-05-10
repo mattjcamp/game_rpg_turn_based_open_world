@@ -188,6 +188,11 @@ export interface DungeonLevel {
   openedChests: Set<string>;
   /** "col,row" of traps already triggered. */
   triggeredTraps: Set<string>;
+  /** "col,row" of traps the party has already spotted via the Detect
+   *  Traps effect. Mirrors the Python game's `detected_traps` —
+   *  detected traps render with a pulsing red overlay so the player
+   *  can route around them. They still trigger if stepped on. */
+  detectedTraps: Set<string>;
   /** Cells the party has stepped onto / seen — drives fog of war. */
   exploredTiles: Set<string>;
   /** "col,row" of stair tiles that exit directly to the overworld
@@ -788,6 +793,18 @@ export interface GenerateLevelOptions {
   encounters?: Record<string, EncounterTemplate[]>;
   /** Encounter area key. Defaults to "dungeon". */
   encounterArea?: string;
+  /**
+   * Lookup: monster catalog name → difficulty tag from monsters.json.
+   * When supplied, the random-encounter spawner prunes each rolled
+   * encounter's roster to monsters whose individual `difficulty`
+   * matches the dungeon's tier (strict match — `easy ↔ easy`,
+   * `normal ↔ normal`, …). Encounters whose roster empties out are
+   * skipped. Without this lookup, only the encounter-`level` band
+   * filter applies, which can let a level-6 encounter mix hard /
+   * deadly monsters into a "normal" dungeon (the bug this guards
+   * against).
+   */
+  monsterDifficulty?: (name: string) => string | undefined;
   /** Deterministic seed. Required so dungeons regenerate identically
    *  across sessions. */
   seed: number;
@@ -910,10 +927,17 @@ export function generateDungeonLevel(opts: GenerateLevelOptions): DungeonLevel {
       mx += randInt(rng, -1, 1);
       my += randInt(rng, -1, 1);
       if (getTile(grid, mx, my) !== floorTile) continue;
+      // Strict per-monster difficulty match — a "normal" dungeon
+      // only accepts monsters tagged "normal". The level-band filter
+      // above is kept (it shapes the candidate encounter pool) but
+      // the per-monster tier is what the user actually sees.
+      const allowedDifficulties: ReadonlySet<string> = new Set([opts.difficulty]);
       const enc = sampleEncounter(opts.encounters, opts.encounterArea ?? "dungeon", {
         minLevel: profile.encMin,
         maxLevel: profile.encMax,
         rng,
+        allowedDifficulties,
+        monsterDifficulty: opts.monsterDifficulty,
       });
       if (!enc) continue;
       monsters.push({
@@ -978,6 +1002,7 @@ export function generateDungeonLevel(opts: GenerateLevelOptions): DungeonLevel {
     monsters,
     openedChests: new Set<string>(),
     triggeredTraps: new Set<string>(),
+    detectedTraps: new Set<string>(),
     exploredTiles: new Set<string>(),
     overworldExits,
     questArtifacts: {},
@@ -996,6 +1021,9 @@ export interface GenerateDungeonOptions {
   seedBase: number;
   /** Encounter table (loaded from encounters.json). Optional. */
   encounters?: Record<string, EncounterTemplate[]>;
+  /** Forwarded to each level for per-monster difficulty filtering.
+   *  See `GenerateLevelOptions.monsterDifficulty` for the contract. */
+  monsterDifficulty?: (name: string) => string | undefined;
 }
 
 /**
@@ -1024,6 +1052,7 @@ export function generateDungeon(opts: GenerateDungeonOptions): DungeonLevel[] {
       torchDensity: opts.torchDensity,
       encounters: opts.encounters,
       encounterArea: "dungeon",
+      monsterDifficulty: opts.monsterDifficulty,
       seed: (opts.seedBase + li) >>> 0,
     }));
   }

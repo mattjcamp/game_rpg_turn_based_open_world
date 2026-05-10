@@ -94,6 +94,8 @@ import {
 import {
   partyLightRadius,
   partyLightTint,
+  partyHasEffect,
+  statMod,
   tickGaladrielsLight,
   consumeTorch,
 } from "../world/PartyActions";
@@ -165,6 +167,11 @@ export class DungeonScene extends Phaser.Scene {
    *  red for Infravision) and washes lit cells with it. Mirrors the
    *  same pair of rectangles TownScene maintains for interior darkness. */
   private tintRects: Map<string, Phaser.GameObjects.Rectangle> = new Map();
+  /** Per-cell red-X overlay drawn over traps the party has spotted via
+   *  the Detect Traps effect. Keyed by "col,row" — torn down on
+   *  scene shutdown / floor change so phantom markers don't survive
+   *  re-entry. The graphics are pulsed in update(). */
+  private detectedTrapMarks: Map<string, Phaser.GameObjects.Graphics> = new Map();
   private player!: Phaser.GameObjects.Image;
   private status!: Phaser.GameObjects.Text;
   private hpSummary!: Phaser.GameObjects.Text;
@@ -204,6 +211,8 @@ export class DungeonScene extends Phaser.Scene {
     this.darknessRects = new Map();
     for (const r of this.tintRects.values()) r?.destroy();
     this.tintRects = new Map();
+    for (const g of this.detectedTrapMarks.values()) g?.destroy();
+    this.detectedTrapMarks = new Map();
     this.busy = false;
     this.message?.destroy();
     this.message = undefined;
@@ -346,6 +355,14 @@ export class DungeonScene extends Phaser.Scene {
         lockedDoors: this.dungeonDef.lockedDoors,
         seedBase: dungeonSeed(this.dungeonDef.name, this.overworldCol, this.overworldRow),
         encounters: this.encounterTable ?? undefined,
+        // Per-monster difficulty filter — strict match against the
+        // dungeon's tier so a "normal" forest doesn't silently roll
+        // hard / deadly monsters via a level-6 encounter that mixes
+        // tiers. monsterCatalog is loaded above, so this lookup
+        // always returns a real difficulty by the time generation
+        // runs.
+        monsterDifficulty: (name) =>
+          this.monsterCatalog?.get(name)?.difficulty,
       });
       gameState.dungeonCache.set(key, cached);
     }
@@ -397,6 +414,13 @@ export class DungeonScene extends Phaser.Scene {
 
     this.refreshDarkness();
     this.refreshHud();
+
+    // Roll trap detection for the cells already in view at entry —
+    // matches the Python game's behaviour where a Thief/Ranger with
+    // Detect Traps active spots traps in the entry room as soon as
+    // they walk in.
+    this.attemptTrapDetection();
+    this.refreshDetectedTrapMarks();
 
     if (isFreshEntry) {
       this.showMessage(`You enter ${this.level.name}. ${entryTorchMsg}`, 2400);
@@ -481,6 +505,8 @@ export class DungeonScene extends Phaser.Scene {
     this.darknessRects.clear();
     for (const r of this.tintRects.values()) r.destroy();
     this.tintRects.clear();
+    for (const g of this.detectedTrapMarks.values()) g.destroy();
+    this.detectedTrapMarks.clear();
 
     for (let row = 0; row < this.level.height; row++) {
       const rowSprites: Phaser.GameObjects.GameObject[] = [];
@@ -534,6 +560,41 @@ export class DungeonScene extends Phaser.Scene {
           .setDepth(9.5);
         this.tintRects.set(`${col},${row}`, t);
       }
+    }
+  }
+
+  /**
+   * Per-frame pulse for the detected-trap red-X overlays. Phaser's
+   * Scene base class calls `update(time, delta)` every frame; we use
+   * `time` (ms since boot) as the input to a sine so the wash + X
+   * lines breathe at roughly 0.6 Hz, matching the Python renderer's
+   * trap pulse. Bails immediately when no markers are live so the
+   * overhead on a normal floor is a single map-size check.
+   */
+  update(time: number): void {
+    if (this.detectedTrapMarks.size === 0) return;
+    const pulse = 0.55 + 0.45 * Math.sin(time * 0.005);
+    const washAlpha = 0.27 * pulse;
+    const lineColor = Phaser.Display.Color.GetColor(
+      255,
+      Math.round(50 * pulse),
+      Math.round(50 * pulse),
+    );
+    for (const g of this.detectedTrapMarks.values()) {
+      g.clear();
+      // Soft red wash filling the cell.
+      g.fillStyle(0xff1e1e, washAlpha);
+      g.fillRect(0, 0, TILE, TILE);
+      // Bright red X across the middle of the cell.
+      g.lineStyle(2, lineColor, 1);
+      const cx = TILE / 2;
+      const cy = TILE / 2;
+      g.beginPath();
+      g.moveTo(cx - 6, cy - 6);
+      g.lineTo(cx + 6, cy + 6);
+      g.moveTo(cx + 6, cy - 6);
+      g.lineTo(cx - 6, cy + 6);
+      g.strokePath();
     }
   }
 
@@ -848,6 +909,13 @@ export class DungeonScene extends Phaser.Scene {
         this.refreshDarkness();
         this.refreshHud();
         this.handleStandingTile();
+        // After the standing-tile handler — same order as Python's
+        // `_check_tile_events` → `_attempt_trap_detection` chain. If
+        // the party stepped onto a trap it triggered above; otherwise
+        // we get a chance to roll detection on still-hidden traps in
+        // the freshly-lit area around the new position.
+        this.attemptTrapDetection();
+        this.refreshDetectedTrapMarks();
       },
     });
   }
@@ -1020,6 +1088,9 @@ export class DungeonScene extends Phaser.Scene {
     const floor = styleFloorTile(this.level.style);
     this.level.tiles[row][col] = floor;
     this.replaceTileSprite(col, row);
+    // Sprung trap — drop any leftover detection overlay so the X
+    // doesn't hang in the air over a now-floor tile.
+    this.refreshDetectedTrapMarks();
     this.refreshHud();
   }
 
@@ -1027,6 +1098,116 @@ export class DungeonScene extends Phaser.Scene {
     const old = this.tileSprites[row][col];
     if (old) old.destroy();
     this.tileSprites[row][col] = this.drawTile(col, row);
+  }
+
+  // ── Trap detection ──────────────────────────────────────────────
+  //
+  // Mirrors `DungeonState._attempt_trap_detection` in
+  // `src/states/dungeon.py`. When the party has the Detect Traps
+  // effect active and a Thief (or trained Ranger lvl 3+) in the
+  // active members, every step rolls saving throws against any
+  // still-hidden trap currently lit by the party's light pool. A
+  // success marks the trap for the rest of the dungeon visit and
+  // surfaces a "spotted a trap!" message; the trap continues to
+  // trigger if the player walks onto it, but the red-X overlay lets
+  // them route around it instead.
+  //
+  // The render layer is `refreshDetectedTrapMarks`, called whenever
+  // the detected set changes (after detection rolls, after the
+  // entry pass, and after a trap triggers — which adds the cell to
+  // `triggeredTraps`, so we need to retire any overlay sitting on
+  // top of it). Per-cell graphics live at depth 1 so they sit
+  // between the base tile and decorations / monsters / darkness.
+
+  /**
+   * Pick the active member best qualified to spot traps — Thief at
+   * any level wins; otherwise a Ranger at level 3+ stands in. Returns
+   * null when nobody fits or every qualified member is downed.
+   */
+  private chooseTrapSpotter(): { name: string; dexterity: number } | null {
+    if (!this.partyData) return null;
+    const live = activeMembers(this.partyData).filter((m) => m.hp > 0);
+    const thief = live.find((m) => m.class === "Thief");
+    if (thief) return { name: thief.name, dexterity: thief.dexterity };
+    const ranger = live.find((m) => m.class === "Ranger" && m.level >= 3);
+    if (ranger) return { name: ranger.name, dexterity: ranger.dexterity };
+    return null;
+  }
+
+  /**
+   * Roll detection on every still-hidden TILE_TRAP within the
+   * party's light radius. Called after each movement step and once
+   * on entry — mirrors the Python `_attempt_trap_detection` cadence.
+   *
+   * No-op when the party doesn't have the Detect Traps effect or
+   * when no qualified spotter is present in the active party.
+   */
+  private attemptTrapDetection(): void {
+    if (!this.partyData) return;
+    if (!partyHasEffect(this.partyData, "detect_traps")) return;
+    const spotter = this.chooseTrapSpotter();
+    if (!spotter) return;
+    const dp = gameState.dungeonPos!;
+    // Use the party's light radius as the "in view" envelope. This
+    // matches the spirit of the Python `_compute_visible_tiles`
+    // (which is bounded by lighting + LOS) without having to port
+    // the full ray-cast helper — detection only fires on cells the
+    // player can see lit. Floor of 2 keeps the immediate neighbours
+    // checkable even in pitch-dark when the party has no torch.
+    const radius = partyLightRadius(this.partyData, 2);
+    const dexMod = statMod(spotter.dexterity);
+    const newlyDetected: Array<[number, number]> = [];
+    for (let dr = -radius; dr <= radius; dr++) {
+      for (let dc = -radius; dc <= radius; dc++) {
+        const c = dp.col + dc;
+        const r = dp.row + dr;
+        if (c < 0 || c >= this.level.width || r < 0 || r >= this.level.height) continue;
+        if (this.level.tiles[r][c] !== TILE_TRAP) continue;
+        const k = `${c},${r}`;
+        if (this.level.detectedTraps.has(k)) continue;
+        if (this.level.triggeredTraps.has(k)) continue;
+        // d20 + DEX modifier ≥ 10 — same DC the Python game uses.
+        const roll = 1 + Math.floor(Math.random() * 20) + dexMod;
+        if (roll >= 10) {
+          this.level.detectedTraps.add(k);
+          newlyDetected.push([c, r]);
+        }
+      }
+    }
+    if (newlyDetected.length > 0) {
+      // One message even if multiple traps spotted in the same step,
+      // so the bottom-of-screen banner doesn't flood. The X markers
+      // tell the player how many were found.
+      const word = newlyDetected.length === 1 ? "a trap" : `${newlyDetected.length} traps`;
+      this.showMessage(`${spotter.name} spotted ${word}!`, 1800);
+    }
+  }
+
+  /**
+   * Rebuild the per-cell red-X graphics over every detected trap on
+   * the current floor. Called after detection rolls (which may have
+   * added cells) and after a trap triggers (which removes the cell
+   * via `triggeredTraps` and replaces the tile, so any leftover
+   * overlay should disappear). Cheap to redo from scratch — the
+   * detected set is small.
+   */
+  private refreshDetectedTrapMarks(): void {
+    for (const g of this.detectedTrapMarks.values()) g.destroy();
+    this.detectedTrapMarks.clear();
+    for (const k of this.level.detectedTraps) {
+      // Skip cells that are no longer traps — a spotted trap that
+      // gets stepped on is replaced with floor + added to
+      // triggeredTraps, and its overlay would just dangle in space.
+      if (this.level.triggeredTraps.has(k)) continue;
+      const [c, r] = k.split(",").map((s) => parseInt(s, 10));
+      if (!Number.isFinite(c) || !Number.isFinite(r)) continue;
+      if (this.level.tiles[r][c] !== TILE_TRAP) continue;
+      const g = this.add.graphics({ x: c * TILE, y: r * TILE });
+      // Soft red wash + bright X — same visual language the Python
+      // renderer uses. The per-frame pulse is applied in update().
+      g.setDepth(1);
+      this.detectedTrapMarks.set(k, g);
+    }
   }
 
   // ── Quest collect artifacts ─────────────────────────────────────
@@ -1301,6 +1482,11 @@ export class DungeonScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true, 0.2, 0.2);
     this.refreshDarkness();
     this.refreshHud();
+    // Fresh floor view → re-roll detection on traps the spotter can
+    // already see, and rebuild any markers that were spotted on a
+    // previous visit to this same floor.
+    this.attemptTrapDetection();
+    this.refreshDetectedTrapMarks();
     this.showMessage(`You ascend... (Floor ${this.currentLevel + 1}/${this.levels.length})`, 1800);
   }
 
@@ -1324,6 +1510,11 @@ export class DungeonScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true, 0.2, 0.2);
     this.refreshDarkness();
     this.refreshHud();
+    // Fresh floor view → re-roll detection on traps the spotter can
+    // already see, and rebuild any markers that were spotted on a
+    // previous visit to this same floor.
+    this.attemptTrapDetection();
+    this.refreshDetectedTrapMarks();
     this.showMessage(`You descend... (Floor ${this.currentLevel + 1}/${this.levels.length})`, 1800);
   }
 

@@ -7,6 +7,7 @@ python3 main.py
 - Link to other page to show Python and editor version since that is really a challenging process for people to use. In the figure, I will build a cleaner version of this along with a module sharing feature.
 
 ## Bugs
+- On quests where the result is that a tile is added or removed, this is not happening and must be ported
 
 ## Polish
 

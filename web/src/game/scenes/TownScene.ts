@@ -51,6 +51,8 @@ import {
   activeKillStepsForLocation,
   rosterFor,
   creditKills,
+  summariseUnlocks,
+  type AppliedUnlock,
   type QuestDef,
   type QuestStepCallout,
 } from "../world/Quests";
@@ -1668,6 +1670,19 @@ export class TownScene extends Phaser.Scene {
     for (const item of def.rewardItems) {
       party.inventory.push({ item });
     }
+    // World-unlock rewards mutate the OVERWORLD tile map. The town
+    // scene doesn't hold a reference to it, but `loadTileMap()` has
+    // no in-memory cache and `OverworldScene.create()` re-applies
+    // every turned-in quest's unlocks on entry — so just marking
+    // the quest turned in (below) is enough to make the bridge /
+    // path / etc. show up the next time the player exits to the
+    // overworld. The summary string is built from the quest def
+    // so the player can see "World changed: Bridge at (5,13)" the
+    // moment the dialog closes.
+    const synthApplied: AppliedUnlock[] = def.rewardWorldUnlocks.map(
+      (u) => [u.col, u.row, u.tile] as AppliedUnlock,
+    );
+    const unlockSummary = summariseUnlocks(synthApplied);
     markTurnedIn(gameState.moduleQuestStates, questName);
     // Despawn the giver — glow goes away first so a single-frame
     // flicker doesn't paint an unparented halo when the sprite
@@ -1694,7 +1709,11 @@ export class TownScene extends Phaser.Scene {
     if (def.isFinalQuest) {
       openVictoryModal(this, def.victoryText);
     } else {
-      flashQuestMessage(this, `Quest "${def.name}" complete!`);
+      const baseMsg = `Quest "${def.name}" complete!`;
+      flashQuestMessage(
+        this,
+        unlockSummary ? `${baseMsg} ${unlockSummary}` : baseMsg,
+      );
     }
   }
 

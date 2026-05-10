@@ -100,6 +100,7 @@ interface RawDungeonLevel {
   monsters: DungeonMonster[];
   openedChests: string[];
   triggeredTraps: string[];
+  detectedTraps?: string[];
   exploredTiles: string[];
   overworldExits: string[];
   questArtifacts: DungeonLevel["questArtifacts"];
@@ -119,6 +120,7 @@ function dungeonLevelToRaw(lvl: DungeonLevel): RawDungeonLevel {
     monsters: lvl.monsters,
     openedChests: [...lvl.openedChests],
     triggeredTraps: [...lvl.triggeredTraps],
+    detectedTraps: [...lvl.detectedTraps],
     exploredTiles: [...lvl.exploredTiles],
     overworldExits: [...lvl.overworldExits],
     questArtifacts: lvl.questArtifacts,
@@ -139,6 +141,7 @@ function dungeonLevelFromRaw(raw: RawDungeonLevel): DungeonLevel {
     monsters: raw.monsters ?? [],
     openedChests: new Set(raw.openedChests ?? []),
     triggeredTraps: new Set(raw.triggeredTraps ?? []),
+    detectedTraps: new Set(raw.detectedTraps ?? []),
     exploredTiles: new Set(raw.exploredTiles ?? []),
     overworldExits: new Set(raw.overworldExits ?? []),
     questArtifacts: raw.questArtifacts ?? {},

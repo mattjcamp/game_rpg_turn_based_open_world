@@ -91,12 +91,41 @@ export interface SampleOptions {
   /** Inclusive upper bound on encounter level. Default 8. */
   maxLevel?: number;
   rng?: RNG;
+  /**
+   * Monster difficulty tiers ("easy" / "normal" / "hard" / "deadly")
+   * the dungeon will accept. When set together with `monsterDifficulty`,
+   * candidate encounters get their `monsters` rosters pruned to entries
+   * whose individual difficulty falls in this set. Encounters whose
+   * roster empties out after pruning are excluded entirely; encounters
+   * whose lead got pruned have it swapped to the first surviving
+   * monster.
+   *
+   * When undefined the filter is a no-op — callers that don't care
+   * about per-monster tiering keep the prior behaviour.
+   */
+  allowedDifficulties?: ReadonlySet<string>;
+  /**
+   * Lookup: monster catalog name → difficulty tag (from monsters.json).
+   * Required when `allowedDifficulties` is set; without it the prune
+   * step can't tell which monsters belong to which tier and the
+   * filter no-ops to avoid silently dropping every encounter.
+   */
+  monsterDifficulty?: (name: string) => string | undefined;
 }
 
 /**
  * Roll one encounter from the named area, restricted to the given
  * level band. Returns null when nothing matches (caller decides
  * whether to leave the room empty or fall back to a hardcoded fight).
+ *
+ * When `allowedDifficulties` + `monsterDifficulty` are supplied, the
+ * sampler additionally enforces per-monster tier matching: each
+ * candidate encounter's roster is pruned to monsters whose individual
+ * `difficulty` is in the allowed set, and encounters that lose their
+ * full roster are removed from the pool. Used by dungeon generation
+ * to honour per-dungeon difficulty without leaning on the encounter
+ * `level` field alone (a level-6 encounter can mix hard + normal
+ * monsters; we only want the matching ones).
  */
 export function sampleEncounter(
   table: Record<string, EncounterTemplate[]>,
@@ -108,7 +137,32 @@ export function sampleEncounter(
   const minLv = opts.minLevel ?? 1;
   const maxLv = opts.maxLevel ?? 8;
   const rng = opts.rng ?? defaultRng;
-  const eligible = list.filter((e) => e.level >= minLv && e.level <= maxLv);
+  let eligible = list.filter((e) => e.level >= minLv && e.level <= maxLv);
+
+  // Optional per-monster difficulty pruning. Both the allow-list and
+  // the lookup must be present for the filter to engage — see the
+  // option doc for the rationale.
+  const allow = opts.allowedDifficulties;
+  const lookup = opts.monsterDifficulty;
+  if (allow && lookup) {
+    const pruned: EncounterTemplate[] = [];
+    for (const e of eligible) {
+      const survivors = e.monsters.filter((name) => {
+        const d = lookup(name);
+        return d != null && allow.has(d);
+      });
+      if (survivors.length === 0) continue; // entire roster filtered out
+      // Keep the original lead when it survived; otherwise promote the
+      // first survivor so `monsterPartyTile` always names a monster
+      // that's actually in the fight.
+      const lead = survivors.includes(e.monsterPartyTile)
+        ? e.monsterPartyTile
+        : survivors[0];
+      pruned.push({ ...e, monsters: survivors, monsterPartyTile: lead });
+    }
+    eligible = pruned;
+  }
+
   if (eligible.length === 0) return null;
   const total = eligible.reduce((s, e) => s + e.weight, 0);
   if (total <= 0) return null;

@@ -4,9 +4,9 @@
     "description": "A reeking warren of tunnels gouged into the cliffs north of Plainstown. Goblin scavengers have moved in from the deeper west, bolder now that the wards are weak.",
     "mode": "procedural",
     "dungeon_style": "cave",
-    "num_levels": 2,
+    "num_levels": 3,
     "difficulty": "easy",
-    "level_size": "small",
+    "level_size": "medium",
     "torch_density": "none",
     "locked_doors": "off",
     "levels": [
@@ -26,10 +26,10 @@
     "description": "Salt-warped trees grow inland from the western shore, their roots fed on something that should have stayed buried. The wood remembers, and pulls at travellers who come too close.",
     "mode": "procedural",
     "dungeon_style": "forest",
-    "num_levels": 6,
-    "difficulty": "normal",
-    "level_size": "large",
-    "torch_density": "moderate",
+    "num_levels": 1,
+    "difficulty": "easy",
+    "level_size": "small",
+    "torch_density": "abundant",
     "locked_doors": "off",
     "levels": [
       {
