@@ -42,10 +42,12 @@ import {
 import {
   loadClass,
   loadRaces,
+  raceAbilities,
   type ClassTemplate,
   type RaceInfo,
 } from "../world/Classes";
 import { xpForNextLevel } from "../world/Leveling";
+import { combatStatsFor } from "../combat/CombatBridge";
 import {
   loadEffects,
   canEquip,
@@ -119,6 +121,17 @@ const FONT_HEAD  = (color: number = C.gold) => ({ fontFamily: "Georgia, serif", 
 const FONT_BODY  = (color: number = C.body) => ({ fontFamily: "Georgia, serif", fontSize: "14px", color: hex(color) });
 const FONT_MONO  = (color: number = C.dim)  => ({ fontFamily: "monospace",     fontSize: "12px", color: hex(color) });
 const FONT_HINT  = (color: number = C.dim)  => ({ fontFamily: "monospace",     fontSize: "12px", color: hex(color) });
+
+/**
+ * Format the bonus on a damage roll for display: "+4", "-1", or ""
+ * for zero. Used by the character sheet's Damage row to render
+ * "1d6 +4" rather than "1d6 + 4" or "1d6 +0". Skipping the zero
+ * bonus keeps unarmed / fists ("just 1") clean instead of "0d0 +1".
+ */
+function formatDamageBonus(bonus: number): string {
+  if (bonus === 0) return "";
+  return bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
+}
 
 interface PartySceneData {
   /** Scene key to resume on close. */
@@ -227,6 +240,15 @@ export class PartyScene extends Phaser.Scene {
    * personal inventory entries.
    */
   private detailCursor = 0;
+  /** Pixels the abilities region (Race / Class / Spells) is scrolled
+   *  by. Wheel + PgUp/PgDn move it; switching the displayed character
+   *  resets to 0 so each new sheet opens at the top. */
+  private detailScroll = 0;
+  /** Most recent maxScroll computed during render — used by the
+   *  wheel/key handlers to clamp scroll attempts without recomputing
+   *  the section heights. Stays in sync because every scroll change
+   *  triggers a re-render which rewrites this value. */
+  private detailScrollMax = 0;
 
   // Spell-list state
   private spellRows: SpellRow[] = [];
@@ -270,6 +292,8 @@ export class PartyScene extends Phaser.Scene {
     this.cursor = 0;
     this.detailIndex = 0;
     this.detailCursor = 0;
+    this.detailScroll = 0;
+    this.detailScrollMax = 0;
     this.spellRows = [];
     this.spellCursor = 0;
     this.pendingSpell = null;
@@ -397,6 +421,41 @@ export class PartyScene extends Phaser.Scene {
     k.on("keydown-E",     () => this.examineSelected());
     k.on("keydown-ESC",   () => this.escape());
     k.on("keydown-P",     () => this.close());
+    // Page Up / Down scroll the abilities region in detail mode.
+    // Up/Down arrows are already taken by the cursor walker, so
+    // dedicated keys keep the two scopes from fighting.
+    k.on("keydown-PAGE_UP",   () => this.scrollDetail(-90));
+    k.on("keydown-PAGE_DOWN", () => this.scrollDetail(90));
+
+    // Mouse wheel — only takes effect on the detail sheet so wheel
+    // input on the inventory list keeps doing nothing surprising.
+    this.input.on("wheel", (
+      _pointer: Phaser.Input.Pointer,
+      _objects: Phaser.GameObjects.GameObject[],
+      _dx: number,
+      dy: number,
+    ) => {
+      if (this.mode !== "detail") return;
+      this.scrollDetail(dy);
+    });
+  }
+
+  /**
+   * Adjust `detailScroll` by `delta` pixels (positive = down) and
+   * re-render so the band repositions. Clamps to [0, detailScrollMax],
+   * bails out when there's nothing to scroll. Re-renders only when
+   * the offset actually changed to keep the GameObject churn down.
+   */
+  private scrollDetail(delta: number): void {
+    if (this.mode !== "detail") return;
+    const before = this.detailScroll;
+    const next = Math.max(
+      0,
+      Math.min(this.detailScrollMax, this.detailScroll + delta),
+    );
+    if (next === before) return;
+    this.detailScroll = next;
+    this.render();
   }
 
   private move(delta: number): void {
@@ -891,6 +950,10 @@ export class PartyScene extends Phaser.Scene {
     // Default: open detail sheet (works from inventory, spell-list, detail).
     this.detailIndex = idx;
     this.detailCursor = 0;
+    // Reset the abilities-region scroll so each character opens at
+    // the top — surprising otherwise when the previous character had
+    // a long Spells list and we landed mid-scroll on the new one.
+    this.detailScroll = 0;
     this.mode = "detail";
     this.render();
   }
@@ -1718,7 +1781,27 @@ export class PartyScene extends Phaser.Scene {
 
     this.divider(x + padX, cy, w - padX * 2); cy += 14;
 
-    // Stats
+    // ── COMBAT — derived numbers from gear + attributes ─────────────
+    //
+    // Placed first (right under MP) because it's the answer to the
+    // most common question the player is asking when they open the
+    // sheet: "how hard does this character hit?"
+    this.text(x + padX, cy, "COMBAT", FONT_HEAD()); cy += 22;
+    const cs = combatStatsFor(m, this.items);
+    const dice = cs.damage.dice > 0
+      ? `${cs.damage.dice}d${cs.damage.sides}${formatDamageBonus(cs.damage.bonus)}`
+      : `${cs.damage.bonus}`;
+    this.text(x + padX,         cy, "AC",                  FONT_BODY(C.dim));
+    this.text(x + padX + 130,   cy, String(cs.ac),         FONT_BODY(C.body));
+    cy += 20;
+    this.text(x + padX,         cy, "Damage",              FONT_BODY(C.dim));
+    this.text(x + padX + 130,   cy, dice,                  FONT_BODY(C.body));
+    if (cs.weaponName) {
+      this.text(x + padX + 180, cy, `(${cs.weaponName})`,  FONT_BODY(C.dim));
+    }
+    cy += 26;
+
+    // ── ATTRIBUTES — raw ability scores + their D&D mods ────────────
     this.text(x + padX, cy, "ATTRIBUTES", FONT_HEAD()); cy += 22;
     // Constitution drives HP at level-up via its modifier, so the
     // detail panel needs to surface it alongside the other four
@@ -1741,6 +1824,185 @@ export class PartyScene extends Phaser.Scene {
       this.text(x + padX + 180,   cy, `(${modStr})`,          FONT_BODY(modColor));
       cy += 20;
     }
+
+    // ── Race / Class / Spells abilities (scrollable region) ─────────
+    //
+    // Three stacked sections so the player can see at a glance what
+    // their character can DO. Conventions across all three:
+    //
+    //   - currently usable  → body color
+    //   - level-locked     → faint with `(L<n>)` hint
+    //
+    // SPELLS is hidden entirely for non-casters; RACE for Humans;
+    // CLASS for plain classes that ship no level-gated abilities.
+    //
+    // The region scrolls when content exceeds the panel — wheel +
+    // PgUp/PgDn shift `detailScroll` and we re-render. Rows whose
+    // virtual y falls outside the visible band [scrollTop, bottomY]
+    // are skipped entirely, which is enough to clip cleanly without
+    // leaning on a Phaser mask. ▲/▼ indicators on the right edge
+    // hint that more content is in either direction.
+    cy += 10;
+    const scrollTop = cy;
+    const bottomY = y + h - 12;
+    let virtualCy = scrollTop - this.detailScroll;
+    virtualCy = this.renderRaceAbilitiesSection(m, x, virtualCy, w, scrollTop, bottomY);
+    virtualCy = this.renderClassAbilitiesSection(m, x, virtualCy, w, scrollTop, bottomY);
+    virtualCy = this.renderSpellsSection(m, x, virtualCy, w, scrollTop, bottomY);
+
+    // Now that the full virtual height is known, clamp scroll to
+    // [0, maxScroll] in case the user shrank a list (e.g. equipped a
+    // new item that no longer matters) and the saved offset is too
+    // deep. A second render isn't necessary — we already drew at the
+    // current offset; the clamp prevents future scroll commands from
+    // landing past the bottom.
+    const totalVirtualHeight = (virtualCy - (scrollTop - this.detailScroll));
+    const visibleHeight = bottomY - scrollTop;
+    const maxScroll = Math.max(0, totalVirtualHeight - visibleHeight);
+    if (this.detailScroll > maxScroll) {
+      this.detailScroll = maxScroll;
+    }
+    this.detailScrollMax = maxScroll;
+
+    // Scroll indicators — small ▲ at the top-right of the region when
+    // there's content above; ▼ at the bottom when there's content below.
+    if (this.detailScroll > 0) {
+      this.text(x + w - padX, scrollTop, "▲", FONT_MONO(C.dim), [1, 0]);
+    }
+    if (this.detailScroll < maxScroll) {
+      this.text(x + w - padX, bottomY - 14, "▼", FONT_MONO(C.dim), [1, 0]);
+    }
+  }
+
+  /**
+   * Helper for the three scrollable sections — render a single row's
+   * label/right-side pair only when the virtual y falls inside the
+   * scrollable band. Everything outside [scrollTop, bottomY] is
+   * skipped, which is what gives the scrolling its visual clip.
+   */
+  private drawScrollRow(
+    cy: number, scrollTop: number, bottomY: number,
+    drawFn: () => void,
+  ): void {
+    if (cy + 14 < scrollTop) return;     // row's bottom edge above visible band
+    if (cy > bottomY) return;            // row's top edge below visible band
+    drawFn();
+  }
+
+  /**
+   * Render the SPELLS heading and one row per spell whose
+   * `allowable_classes` includes the member's class. Castable rows
+   * are body-color; locked rows fall back to faint with a `(L<n>)`
+   * hint. Returns the next virtual `cy` so the caller can stack the
+   * next section. Rows outside [scrollTop, bottomY] are clipped.
+   */
+  private renderSpellsSection(
+    m: PartyMember, x: number, cy: number, w: number,
+    scrollTop: number, bottomY: number,
+  ): number {
+    const padX = 20;
+    const klassLower = m.class.toLowerCase();
+    // Filter the catalog once. Sort by required level (asc) so the
+    // castable spells cluster at the top.
+    const mySpells = this.spells
+      .filter((s) =>
+        s.allowable_classes.some((c) => c.toLowerCase() === klassLower)
+      )
+      .map((s) => ({ spell: s, gate: minLevelFor(s, m.class) }))
+      .sort((a, b) => a.gate - b.gate || a.spell.name.localeCompare(b.spell.name));
+    if (mySpells.length === 0) return cy;
+
+    const headerY = cy;
+    this.drawScrollRow(headerY, scrollTop, bottomY, () => {
+      this.text(x + padX, headerY, "SPELLS", FONT_HEAD());
+    });
+    cy += 22;
+    for (const { spell, gate } of mySpells) {
+      const usable = m.level >= gate;
+      const color = usable ? C.body : C.faint;
+      const rowY = cy;
+      this.drawScrollRow(rowY, scrollTop, bottomY, () => {
+        this.text(x + padX, rowY, spell.name, FONT_BODY(color));
+        const right = usable ? `${spell.mp_cost} MP` : `(L${gate})`;
+        this.text(x + w - padX, rowY, right, FONT_MONO(usable ? C.dim : C.faint), [1, 0]);
+      });
+      cy += 18;
+    }
+    cy += 6;
+    return cy;
+  }
+
+  /**
+   * Render the RACE ABILITIES heading. Race-gated abilities are
+   * always available (no level gate today), so every row is
+   * body-color. Hides the section when the race has no innate
+   * abilities (Humans). Rows outside the visible band are clipped.
+   */
+  private renderRaceAbilitiesSection(
+    m: PartyMember, x: number, cy: number, w: number,
+    scrollTop: number, bottomY: number,
+  ): number {
+    const padX = 20;
+    void w;
+    const abilities = raceAbilities(m.race);
+    if (abilities.length === 0) return cy;
+
+    const headerY = cy;
+    this.drawScrollRow(headerY, scrollTop, bottomY, () => {
+      this.text(x + padX, headerY, "RACE ABILITIES", FONT_HEAD());
+    });
+    cy += 22;
+    for (const a of abilities) {
+      const rowY = cy;
+      this.drawScrollRow(rowY, scrollTop, bottomY, () => {
+        this.text(x + padX, rowY, a.name, FONT_BODY(C.body));
+      });
+      cy += 18;
+    }
+    cy += 6;
+    return cy;
+  }
+
+  /**
+   * Render the CLASS ABILITIES heading. Class abilities load from
+   * the per-class JSON via ClassTemplate.classAbilities; each row is
+   * body-color when `member.level >= minLevel` and faint with a
+   * `(L<n>)` hint otherwise. Hides the section when the class has
+   * no abilities at all (Fighter, Thief, Wizard, Cleric ship empty).
+   */
+  private renderClassAbilitiesSection(
+    m: PartyMember, x: number, cy: number, w: number,
+    scrollTop: number, bottomY: number,
+  ): number {
+    const padX = 20;
+    const tpl = this.classTemplates.get(m.class.toLowerCase());
+    const list = tpl?.classAbilities ?? [];
+    if (list.length === 0) return cy;
+
+    const headerY = cy;
+    this.drawScrollRow(headerY, scrollTop, bottomY, () => {
+      this.text(x + padX, headerY, "CLASS ABILITIES", FONT_HEAD());
+    });
+    cy += 22;
+    // Sort by required level so unlocked abilities lead.
+    const sorted = [...list].sort(
+      (a, b) => a.minLevel - b.minLevel || a.name.localeCompare(b.name)
+    );
+    for (const a of sorted) {
+      const usable = m.level >= a.minLevel;
+      const color = usable ? C.body : C.faint;
+      const rowY = cy;
+      this.drawScrollRow(rowY, scrollTop, bottomY, () => {
+        this.text(x + padX, rowY, a.name, FONT_BODY(color));
+        const right = usable ? "" : `(L${a.minLevel})`;
+        if (right) {
+          this.text(x + w - padX, rowY, right, FONT_MONO(C.faint), [1, 0]);
+        }
+      });
+      cy += 18;
+    }
+    cy += 6;
+    return cy;
   }
 
   private renderDetailRight(

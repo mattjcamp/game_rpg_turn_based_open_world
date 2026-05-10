@@ -78,13 +78,65 @@ function damageForWeapon(member: PartyMember, weapon: Item | null): DamageRoll {
 }
 
 /**
- * Derive combat stats from a PartyMember + the catalog of items.
- * Mirrors `Member.get_ac()`, `Member.get_attack_bonus()`, and
- * `Member.get_damage_dice()` from `src/party.py`:
+ * Derived combat stats from a PartyMember's current gear — AC, the
+ * to-hit bonus, the damage roll, plus the equipped weapon name so
+ * the character sheet can show "Damage 1d6 +4 (Sword)" rather than
+ * a context-free "1d6 +4". Pure: depends only on the member + the
+ * items catalog.
  *
  *   AC          = 10 + DEX_mod + (armor_evasion - 50)/5 + Σ acBonus
  *   atk bonus   = STR_mod (melee) or DEX_mod (ranged/thrown)
  *   damage      = power-tier dice + STR_mod (or DEX_mod for ranged)
+ *
+ * Used by `combatantFromMember` when staging a fight, and by the
+ * Party screen so the player can see at a glance how their numbers
+ * change when they swap gear.
+ */
+export interface CombatStats {
+  ac: number;
+  attackBonus: number;
+  damage: DamageRoll;
+  /** Equipped weapon name, or `null` if both hands are empty. Surfaced
+   *  so the character sheet can render "1d6 +4 (Sword)". */
+  weaponName: string | null;
+  /** DEX modifier — handy for displaying alongside AC and as a
+   *  cheap shortcut for `mod(member.dexterity)` for callers that
+   *  already have the stats object. */
+  dexMod: number;
+}
+
+export function combatStatsFor(
+  member: PartyMember,
+  items: Map<string, Item>,
+): CombatStats {
+  const weapon = member.equipped.rightHand
+    ? items.get(member.equipped.rightHand) ?? null
+    : null;
+  const armor = member.equipped.body
+    ? items.get(member.equipped.body) ?? null
+    : null;
+  const dexMod = mod(member.dexterity);
+  const evasion = armor && typeof armor.evasion === "number" ? armor.evasion : 50;
+  const armorBonus = Math.floor((evasion - 50) / 5);
+  const ac = 10 + dexMod + armorBonus + totalAcBonus(member.equipped, items);
+  const isRanged = !!(weapon && weapon.ranged);
+  const attackBonus = isRanged ? dexMod : mod(member.strength);
+  const damage = damageForWeapon(member, weapon);
+  return {
+    ac,
+    attackBonus,
+    damage,
+    weaponName: weapon ? weapon.name : null,
+    dexMod,
+  };
+}
+
+/**
+ * Derive combat stats from a PartyMember + the catalog of items.
+ * Mirrors `Member.get_ac()`, `Member.get_attack_bonus()`, and
+ * `Member.get_damage_dice()` from `src/party.py`. Wraps
+ * `combatStatsFor` for the gear math and stamps in HP / sprite /
+ * ability scores / move range so the result is a full Combatant.
  *
  * The full ability block also rides along on the Combatant so spell
  * damage helpers can read INT (Magic Arrow) and WIS (Heal) without
@@ -101,19 +153,7 @@ export function combatantFromMember(
   items: Map<string, Item>,
   classes?: Map<string, ClassTemplate>,
 ): Combatant {
-  const weapon = member.equipped.rightHand
-    ? items.get(member.equipped.rightHand) ?? null
-    : null;
-  const armor = member.equipped.body
-    ? items.get(member.equipped.body) ?? null
-    : null;
-  const dexMod = mod(member.dexterity);
-  const evasion = armor && typeof armor.evasion === "number" ? armor.evasion : 50;
-  const armorBonus = Math.floor((evasion - 50) / 5);
-  const ac = 10 + dexMod + armorBonus + totalAcBonus(member.equipped, items);
-  const isRanged = !!(weapon && weapon.ranged);
-  const attackBonus = isRanged ? dexMod : mod(member.strength);
-  const damage = damageForWeapon(member, weapon);
+  const stats = combatStatsFor(member, items);
   const tpl = classes?.get(member.class.toLowerCase());
   const baseMoveRange = tpl ? tpl.range : DEFAULT_MOVE_RANGE;
   return {
@@ -122,10 +162,10 @@ export function combatantFromMember(
     side: "party",
     maxHp: member.maxHp,
     hp: member.hp,
-    ac,
-    attackBonus,
-    damage,
-    dexMod,
+    ac: stats.ac,
+    attackBonus: stats.attackBonus,
+    damage: stats.damage,
+    dexMod: stats.dexMod,
     strength: member.strength,
     dexterity: member.dexterity,
     constitution: member.constitution,

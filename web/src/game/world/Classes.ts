@@ -158,3 +158,45 @@ export function _clearClassCaches(): void {
   _classCache.clear();
   _racesCache = null;
 }
+
+/**
+ * Race-level innate abilities the character sheet surfaces under
+ * "Race Abilities". Hardcoded display data rather than derived from
+ * effects.json because some race traits (Pickpocket, Tinker) live as
+ * action helpers in PartyActions.ts rather than slottable effects —
+ * the table here gives the UI a single place to look.
+ *
+ * Humans intentionally return [] — their "edge" is faster XP gain
+ * (1125 vs 1500), which the level-up math already surfaces.
+ */
+const RACE_ABILITIES: Record<string, Array<{ name: string; description: string }>> = {
+  Human:    [],
+  Dwarf:    [{
+    name: "Infravision",
+    description: "Dwarven eyes pierce darkness — the party sees a wider radius in unlit areas.",
+  }],
+  Halfling: [{
+    name: "Pickpocket",
+    description: "From the inventory screen, lift coins or a small item from any nearby NPC. Once per NPC per game.",
+  }],
+  Elf:      [{
+    name: "Galadriel's Light",
+    description: "Channel a soft elven starlight that lights the party's path for ~200 steps.",
+  }],
+  Gnome:    [{
+    name: "Tinker",
+    description: "Once per in-game day, fashion any single item normally found in a general store.",
+  }],
+};
+
+/**
+ * Lookup the innate abilities for a given race. Case-insensitive on
+ * the race name. Unknown races return an empty list rather than
+ * throw — the character sheet just shows nothing under Race Abilities.
+ */
+export function raceAbilities(
+  race: string,
+): Array<{ name: string; description: string }> {
+  const key = race.charAt(0).toUpperCase() + race.slice(1).toLowerCase();
+  return RACE_ABILITIES[key] ?? [];
+}

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   combatantFromMember,
   combatantsFromParty,
+  combatStatsFor,
   refreshCombatantGear,
   syncCombatHpBack,
 } from "./CombatBridge";
@@ -242,6 +243,61 @@ describe("syncCombatHpBack", () => {
     cs[0].hp = 30;
     syncCombatHpBack(p, cs);
     expect(p.roster[0].hp).toBe(30);
+  });
+});
+
+describe("combatStatsFor", () => {
+  // The helper that powers both `combatantFromMember` (in-engine) and
+  // PartyScene's "AC 14 / Damage 1d6 +4 (Sword)" rows. Parity with
+  // combatantFromMember is the key invariant — both should agree on
+  // the four shipped fields.
+  it("returns the same ac / attackBonus / damage as combatantFromMember", () => {
+    const fighter = memberFromRaw({
+      name: "Gimli", class: "Fighter", race: "Dwarf",
+      level: 5, hp: 50, strength: 18, dexterity: 14, constitution: 14,
+      equipped: { right_hand: "Sword", left_hand: null, body: "Chain", head: null },
+    });
+    const cat = items();
+    const stats = combatStatsFor(fighter, cat);
+    const combatant = combatantFromMember(fighter, cat);
+    expect(stats.ac).toBe(combatant.ac);
+    expect(stats.attackBonus).toBe(combatant.attackBonus);
+    expect(stats.damage).toEqual(combatant.damage);
+    expect(stats.dexMod).toBe(combatant.dexMod);
+  });
+
+  it("surfaces the equipped weapon's name for the character sheet", () => {
+    const fighter = memberFromRaw({
+      name: "X", class: "Fighter", race: "Human", level: 1, hp: 10,
+      strength: 16, dexterity: 12,
+      equipped: { right_hand: "Sword", left_hand: null, body: null, head: null },
+    });
+    expect(combatStatsFor(fighter, items()).weaponName).toBe("Sword");
+  });
+
+  it("returns null for weaponName when both hands are empty", () => {
+    const fighter = memberFromRaw({
+      name: "X", class: "Fighter", race: "Human", level: 1, hp: 10,
+      strength: 16, dexterity: 12,
+      equipped: { right_hand: null, left_hand: null, body: null, head: null },
+    });
+    expect(combatStatsFor(fighter, items()).weaponName).toBeNull();
+  });
+
+  it("uses DEX-mod for ranged weapons and STR-mod for melee", () => {
+    const ranger = memberFromRaw({
+      name: "Legolas", class: "Ranger", race: "Elf", level: 5, hp: 30,
+      strength: 10, dexterity: 18,
+      equipped: { right_hand: "Crossbow", left_hand: null, body: null, head: null },
+    });
+    expect(combatStatsFor(ranger, items()).attackBonus).toBe(4); // DEX +4
+
+    const fighter = memberFromRaw({
+      name: "Gimli", class: "Fighter", race: "Dwarf", level: 5, hp: 50,
+      strength: 18, dexterity: 10,
+      equipped: { right_hand: "Sword", left_hand: null, body: null, head: null },
+    });
+    expect(combatStatsFor(fighter, items()).attackBonus).toBe(4); // STR +4
   });
 });
 
