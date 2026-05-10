@@ -11,14 +11,14 @@ python3 main.py
 
 ## Polish
 
-
+- Switch Herbalism from Ranger to Druid
 - Need to work on the forest dungeon portal system, it's too hard to see the portals and they should say "go deeper into the woods" not "descend the stairs"
 
 - Double check that class abilities have been ported
-"Thief Shadow Step doesn't exist in Python either. No Shadow Step, no Backstab, no Sneak ability anywhere in the source data or code. Thieves have lockpicking ungated from level 1 in Python, and that's the extent of their class abilities. So if you want Shadow Step, that's a content-design request, not a porting one — separate scope from the dialog."
+"Thief Shadow Step doesn't exist in Python either. No Shadow Step, no Backstab ability anywhere in the source data or code. Thieves have lockpicking ungated from level 1 in Python, and that's the extent of their class abilities. So if you want Shadow Step, that's a content-design request, not a porting one — separate scope from the dialog."
 - Port the alchemist Brew Potion effect
 
-- Implement Herbalism for Rangers and Alchemists. This should be a passive ability that effectively yields a 5%-10% chance of finding a regent while walking in the overworld. This should be based on an intelligence savings throw. When a regent is found, a text message should float up from near the party (similar to the way signs do this).
+
 
 ## V2 Features
 - Polish the various "light effects". Make sure they are consistant and behave as expected. Infravision should act more like normal vision, just with all tiles displayed with a red tint, the range of infravision should match the other lighting effects

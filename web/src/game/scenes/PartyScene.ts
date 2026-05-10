@@ -75,7 +75,6 @@ import {
   unequipSlot,
   hasClass,
   hasRace,
-  brewPotion,
   pickpocket,
   tinker,
   canTinker,
@@ -90,6 +89,12 @@ import {
   type EquipSlot,
 } from "../world/Items";
 import { loadCounters } from "../world/Counters";
+import {
+  loadPotions,
+  recipeAvailability,
+  attemptBrew,
+  type Recipe,
+} from "../world/Potions";
 import { dayIndex } from "../world/GameTime";
 import { assetUrl } from "../world/Module";
 import { preloadPartyMemberSprites } from "../data/fighters";
@@ -167,7 +172,12 @@ type Mode =
   /** Gnome racial ability: shows a list of every general-store item
    *  and lets the player pick one to tinker into the stash. Open via
    *  the TINKER row; closes on Enter (commit) or ESC (cancel). */
-  | "tinker-picker";
+  | "tinker-picker"
+  /** Alchemist crafting: shows every loaded potion recipe with its
+   *  reagent costs and DC; affordable recipes are highlighted, the
+   *  rest are dimmed. Enter commits a brew (consuming reagents +
+   *  rolling INT vs DC); ESC cancels. */
+  | "brew-picker";
 
 /**
  * One entry in the left-side list. Effects, the CAST SPELL row, and
@@ -216,6 +226,13 @@ export class PartyScene extends Phaser.Scene {
    * it stays stable if counters somehow reload mid-pick).
    */
   private tinkerPickerCursor = 0;
+  /**
+   * Alchemist brew picker state. Loaded once on scene create() and
+   * reused across picker opens — the JSON is static for the
+   * session. `brewRecipeCursor` tracks the highlighted row.
+   */
+  private potionRecipes: Recipe[] = [];
+  private brewRecipeCursor = 0;
   /** Class templates keyed by lowercase class name. Loaded once in
    *  create() so the XP-to-next-level lookup stays synchronous. */
   private classTemplates = new Map<string, ClassTemplate>();
@@ -328,6 +345,11 @@ export class PartyScene extends Phaser.Scene {
       this.effects = await loadEffects();
       this.spells = await loadSpells();
       this.items = await loadItems();
+      // Potion recipes back the Alchemist's BREW row. Loaded once
+      // per scene boot; the recipe picker re-queries availability
+      // against the live stash on each open. A missing/empty file
+      // collapses the picker to "No recipes known" feedback.
+      try { this.potionRecipes = await loadPotions(); } catch { /* keep empty */ }
       // Counters back the Tinker picker — a Gnome can produce any
       // item that normally appears in the General Store. We load
       // and dedupe the stock once so the picker UI has a stable
@@ -488,6 +510,13 @@ export class PartyScene extends Phaser.Scene {
       this.render();
       return;
     }
+    if (this.mode === "brew-picker") {
+      const total = this.potionRecipes.length;
+      if (total === 0) return;
+      this.brewRecipeCursor = (this.brewRecipeCursor + delta + total) % total;
+      this.render();
+      return;
+    }
     // Other modes (target / give) have no list to scroll.
   }
 
@@ -536,6 +565,7 @@ export class PartyScene extends Phaser.Scene {
     if (this.mode === "spell-list") return this.activateSpellRow();
     if (this.mode === "detail") return this.activateDetailRow();
     if (this.mode === "tinker-picker") return this.activateTinkerPick();
+    if (this.mode === "brew-picker") return this.activateBrewPick();
     // Target prompts and give-item prompts are answered with 1-4,
     // not Enter — Enter is a no-op there.
   }
@@ -560,6 +590,38 @@ export class PartyScene extends Phaser.Scene {
     const today = dayIndex(gameState.clock);
     const r = tinker(this.party, members, itemName, today, this.generalStockSet, this.items);
     if (r.ok) Sfx.play("chirp");
+    this.feedback = r.message;
+    this.mode = "inventory";
+    this.buildRows();
+    this.render();
+  }
+
+  /**
+   * Commit the current brew picker selection: hand off to
+   * `attemptBrew`, surface its message, and close the picker.
+   * Refuses (with a feedback line, not a crash) when the recipe is
+   * unaffordable — the picker dims those rows but a player who
+   * mashes Enter on a dim row deserves a clear "missing X, Y" hint
+   * rather than silent consumption of reagents that don't exist.
+   */
+  private activateBrewPick(): void {
+    if (!this.party) return;
+    const recipe = this.potionRecipes[this.brewRecipeCursor];
+    if (!recipe) {
+      this.mode = "inventory";
+      this.render();
+      return;
+    }
+    const members = activeMembers(this.party);
+    const avail = recipeAvailability(this.party, recipe);
+    if (!avail.affordable) {
+      this.feedback = `Missing reagents: ${avail.missing.join(", ")}.`;
+      this.render();
+      return;
+    }
+    const r = attemptBrew(this.party, members, recipe);
+    if (r.success) Sfx.play("heal");
+    else if (r.success === false) Sfx.play("miss");
     this.feedback = r.message;
     this.mode = "inventory";
     this.buildRows();
@@ -763,9 +825,22 @@ export class PartyScene extends Phaser.Scene {
     }
 
     if (row.kind === "brew") {
-      const r = brewPotion(this.party, members);
-      this.feedback = r.message;
-      this.buildRows();
+      // Alchemist's BREW POTIONS row → recipe picker. Refuses early
+      // when no Alchemist is in the party or no recipes loaded so
+      // the player isn't dropped into an empty modal.
+      if (!hasClass(members, "Alchemist")) {
+        this.feedback = "No Alchemist in the party.";
+        this.render();
+        return;
+      }
+      if (this.potionRecipes.length === 0) {
+        this.feedback = "No recipes known.";
+        this.render();
+        return;
+      }
+      this.brewRecipeCursor = 0;
+      this.mode = "brew-picker";
+      this.feedback = "";
       this.render();
       return;
     }
@@ -1029,6 +1104,12 @@ export class PartyScene extends Phaser.Scene {
       this.render();
       return;
     }
+    if (this.mode === "brew-picker") {
+      this.mode = "inventory";
+      this.feedback = "";
+      this.render();
+      return;
+    }
     this.close();
   }
 
@@ -1120,6 +1201,11 @@ export class PartyScene extends Phaser.Scene {
       this.renderTinkerPicker();
       return;
     }
+    if (this.mode === "brew-picker") {
+      this.renderInventory();
+      this.renderBrewPicker();
+      return;
+    }
     this.renderInventory();
   }
 
@@ -1186,6 +1272,94 @@ export class PartyScene extends Phaser.Scene {
       "[↑↓] select   [Enter] tinker   [ESC] cancel",
       FONT_HINT(),
     ));
+  }
+
+  /**
+   * Modal picker for the Alchemist's BREW POTIONS row. Each row
+   * shows the recipe name, DC, and reagent costs. Affordable
+   * recipes render in body colour; the rest are dimmed with a
+   * "missing X" hint so the player can see what to forage next.
+   * Enter commits a brew (consuming reagents + rolling INT vs DC);
+   * ESC cancels.
+   */
+  private renderBrewPicker(): void {
+    if (!this.party) return;
+    const W_BOX = 480;
+    const H_BOX = 380;
+    const X = (W - W_BOX) / 2;
+    const Y = (H - H_BOX) / 2;
+    this.track(
+      this.add.rectangle(X, Y, W_BOX, H_BOX, 0x161629, 0.97).setOrigin(0)
+        .setStrokeStyle(2, C.gold),
+    );
+    this.text(X + 16, Y + 12, "BREW POTIONS", FONT_HEAD(C.gold));
+    this.text(
+      X + 16, Y + 36,
+      "Pick a recipe to brew. Reagents are consumed; an INT check decides success.",
+      FONT_BODY(C.dim),
+    );
+
+    const recipes = this.potionRecipes;
+    const ROW_H = 36;
+    const VISIBLE = 7;
+    const cursor = this.brewRecipeCursor;
+    let scroll = Math.max(0, cursor - Math.floor(VISIBLE / 2));
+    scroll = Math.min(scroll, Math.max(0, recipes.length - VISIBLE));
+    const top = Y + 70;
+
+    for (let i = 0; i < Math.min(VISIBLE, recipes.length); i++) {
+      const idx = scroll + i;
+      const recipe = recipes[idx];
+      if (!recipe) break;
+      const avail = recipeAvailability(this.party, recipe);
+      const isCursor = idx === cursor;
+      const rowY = top + i * ROW_H;
+      if (isCursor) {
+        this.track(
+          this.add.rectangle(X + 8, rowY - 2, W_BOX - 16, ROW_H, C.selectBg, 1)
+            .setOrigin(0),
+        );
+      }
+      const prefix = isCursor ? "> " : "  ";
+      // Recipe name on the left, DC right-aligned. Body colour when
+      // affordable, faint when missing reagents.
+      this.text(
+        X + 16, rowY,
+        `${prefix}${recipe.name}`,
+        FONT_BODY(avail.affordable ? C.body : C.faint),
+      );
+      this.text(
+        X + W_BOX - 16, rowY,
+        `DC ${recipe.dc}`,
+        FONT_MONO(avail.affordable ? C.gold : C.faint),
+        [1, 0],
+      );
+      // Reagent breakdown — "Moonpetal x1 · Spring Water x1" or
+      // "missing: Moonpetal" when short.
+      const reagentText = Object.entries(recipe.reagents)
+        .map(([name, qty]) => `${name} x${qty}`)
+        .join("  ·  ");
+      this.text(
+        X + 32, rowY + 16,
+        avail.affordable
+          ? reagentText
+          : `missing: ${avail.missing.join(", ")}`,
+        FONT_MONO(avail.affordable ? C.dim : C.faint),
+      );
+    }
+
+    if (scroll > 0) {
+      this.text(X + W_BOX - 24, top - 18, "▲", FONT_MONO(C.gold));
+    }
+    if (scroll + VISIBLE < recipes.length) {
+      this.text(X + W_BOX - 24, top + VISIBLE * ROW_H + 4, "▼", FONT_MONO(C.gold));
+    }
+    // Footer hint.
+    this.text(
+      X + 16, Y + H_BOX - 24,
+      "[↑↓] select   [Enter] brew   [ESC] cancel",
+      FONT_HINT(),
+    );
   }
 
   /**
@@ -1305,10 +1479,12 @@ export class PartyScene extends Phaser.Scene {
 
   private titleForMode(): string {
     switch (this.mode) {
-      case "spell-list":   return "PARTY  ·  CAST SPELL";
-      case "spell-target": return `PARTY  ·  ${this.pendingSpell?.name ?? "Cast"}  —  pick a target`;
-      case "give-item":    return "PARTY  ·  Give item — pick a recipient";
-      default:             return "PARTY";
+      case "spell-list":    return "PARTY  ·  CAST SPELL";
+      case "spell-target":  return `PARTY  ·  ${this.pendingSpell?.name ?? "Cast"}  —  pick a target`;
+      case "give-item":     return "PARTY  ·  Give item — pick a recipient";
+      case "tinker-picker": return "PARTY  ·  TINKER";
+      case "brew-picker":   return "PARTY  ·  BREW POTIONS";
+      default:              return "PARTY";
     }
   }
 

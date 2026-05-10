@@ -874,31 +874,13 @@ export function pickpocket(
   };
 }
 
-/** Small set of recipes an Alchemist can brew on the fly. */
-const BREW_RECIPES: ReadonlyArray<readonly [number, string]> = [
-  [40, "Healing Potion"],
-  [25, "Mana Potion"],
-  [15, "Antidote"],
-  [10, "Elixir of Strength"],
-  [10, "Elixir of Warding"],
-];
-
-/**
- * An Alchemist brews a random potion. Drops it in the shared stash.
- */
-export function brewPotion(
-  party: Party,
-  members: PartyMember[],
-  rng: () => number = Math.random,
-): ActionResult {
-  const alchemist = findClass(members, "Alchemist");
-  if (!alchemist) {
-    return { ok: false, message: "No Alchemist in the party." };
-  }
-  const item = pickWeighted(BREW_RECIPES, rng);
-  party.inventory.push({ item });
-  return { ok: true, message: `${alchemist.name} brews a ${item}.` };
-}
+// The old "Alchemist brews a random potion" helper retired here —
+// the live system now goes through `Potions.attemptBrew` against a
+// recipe the player picks from a list. Recipes carry reagent costs,
+// DC, and the success roll; see `web/src/game/world/Potions.ts` for
+// the runtime and `PartyScene` for the picker UI. Keeping the
+// `pickWeighted` utility around since other ability helpers still
+// use it (pickpocket loot tables, future tinker variants).
 
 /**
  * A Gnome tinkers up an item the player picked from the general

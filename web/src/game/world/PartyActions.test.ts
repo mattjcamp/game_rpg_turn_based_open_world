@@ -20,7 +20,6 @@ import {
   hasRace,
   findClass,
   findRace,
-  brewPotion,
   pickpocket,
   tinker,
   partyHasEffect,
@@ -921,24 +920,9 @@ describe("party-comp helpers", () => {
   });
 });
 
-describe("brewPotion / pickpocket / tinker", () => {
-  it("brewPotion adds a potion to the stash when an Alchemist is present", () => {
-    const p = makeParty();
-    const members = activeMembers(p);
-    members[0].class = "Alchemist"; // make Gimli an Alchemist for the test
-    const before = p.inventory.length;
-    // rng = 0 always picks the first weighted entry → Healing Potion
-    const r = brewPotion(p, members, () => 0);
-    expect(r.ok).toBe(true);
-    expect(r.message).toContain("Healing Potion");
-    expect(p.inventory.length).toBe(before + 1);
-  });
-
-  it("brewPotion refuses when no Alchemist is present", () => {
-    const p = makeParty();
-    const r = brewPotion(p, activeMembers(p), () => 0);
-    expect(r.ok).toBe(false);
-  });
+describe("pickpocket / tinker", () => {
+  // The standalone `brewPotion` helper retired here — Alchemy is now
+  // a recipe-based system in `Potions.ts` with its own test file.
 
   it("pickpocket either drops gold or pushes an item, depending on the roll", () => {
     const p = makeParty(); // Merry the Halfling is already in the active party
