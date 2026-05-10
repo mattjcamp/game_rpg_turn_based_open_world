@@ -130,24 +130,159 @@ export function partyHasEffect(party: Party, effectId: string): boolean {
   return false;
 }
 
+// ── Active-effects readout (HUD strip) ────────────────────────────
+//
+// Surfaces the player-facing list of currently-active effects for
+// the bottom log strip. Combines three data sources:
+//
+//   1. Slotted `partyEffects` entries — Detect Traps, Infravision,
+//      Galadriel's Light. Names + charge data come from the loaded
+//      effects.json; we keep a tiny fallback table here so the
+//      readout still works in scenes that haven't loaded the file.
+//   2. The `torchSteps` counter — physical torches from the stash.
+//      Not a partyEffects slot, but the player thinks of it as
+//      "Torch is on" — surfacing it here keeps the mental model
+//      consistent.
+//   3. The `magicLightSteps` counter — the Light spell's conjured
+//      orb. Deliberately tracked separate from `torchSteps`: a
+//      torch is a consumable item, Light is a spell, and the
+//      player wants to see both counts side-by-side rather than
+//      a single "Torch 250" tally that confusingly stacks them.
+//
+// Lighting effects are sorted to the front so the player can find
+// their light source without scanning. Charge counts ride along on
+// effects that have them (Torch / Magic Light / Galadriel's Light)
+// so the reader knows how many steps of light remain.
+
+export interface ActiveEffectReadout {
+  /** Stable id — empty for the synthetic Torch / Magic Light entries. */
+  id: string;
+  /** Display name suitable for the HUD strip. */
+  name: string;
+  /** True for light sources — Torch, Magic Light, Galadriel's Light,
+   *  Infravision — so the renderer can flag them with a warm tint. */
+  isLight: boolean;
+  /** Remaining steps for time-limited effects. Undefined for
+   *  permanent effects (Detect Traps, Infravision). */
+  charges?: number;
+}
+
+/** Effect ids the game treats as a light source. Mirrors
+ *  `partyLightRadius`/`partyLightTint` — the readout flags exactly
+ *  the effects those helpers boost the lighting overlay for. */
+const LIGHT_EFFECT_IDS: ReadonlySet<string> = new Set([
+  "infravision",
+  "galadriels_light",
+]);
+
+/** Display-name fallback for the handful of partyEffects ids the
+ *  game ships with. Matches `data/effects.json` so a scene that
+ *  doesn't load effects.json still gets pretty names in the strip.
+ *  When `effects` is supplied to `summariseActiveEffects`, the
+ *  loaded def's name wins over the fallback. */
+const FALLBACK_EFFECT_NAMES: Record<string, string> = {
+  detect_traps: "Detect Traps",
+  infravision: "Infravision",
+  galadriels_light: "Galadriel's Light",
+  sun_sword_aura: "Sun Sword Aura",
+};
+
+/**
+ * Build the ordered list of active effects to render in the bottom
+ * log strip. Lighting effects come first (Torch, then Galadriel's
+ * Light, then Infravision); permanent non-light effects (Detect
+ * Traps) come after. Effects with charge counters carry the
+ * remaining-step value so the renderer can display "Torch 78".
+ *
+ * `effects` is optional — when provided, names come from the loaded
+ * `effects.json`; otherwise the helper uses a built-in fallback
+ * table. Missing party returns an empty list.
+ */
+export function summariseActiveEffects(
+  party: Party | null | undefined,
+  effects: readonly Effect[] = [],
+): ActiveEffectReadout[] {
+  if (!party) return [];
+  const byId = new Map(effects.map((e) => [e.id, e] as const));
+  const nameFor = (id: string): string =>
+    byId.get(id)?.name ?? FALLBACK_EFFECT_NAMES[id] ?? id;
+
+  const out: ActiveEffectReadout[] = [];
+
+  // Torch counter — synthetic entry. Show whenever there are steps
+  // remaining, even in lit scenes (the player wants to know their
+  // light inventory before stepping into a dark area).
+  if (party.torchSteps > 0) {
+    out.push({
+      id: "",
+      name: "Torch",
+      isLight: true,
+      charges: party.torchSteps,
+    });
+  }
+  // Light spell counter — separate from Torch so the player can see
+  // a magical light source and a physical one running in parallel.
+  if (party.magicLightSteps > 0) {
+    out.push({
+      id: "",
+      name: "Magic Light",
+      isLight: true,
+      charges: party.magicLightSteps,
+    });
+  }
+
+  // Slotted partyEffects. Walk `effect_1`..`effect_N` in id order so
+  // the readout is stable across saves.
+  for (const slot of Object.keys(party.partyEffects).sort()) {
+    const id = party.partyEffects[slot];
+    if (!id) continue;
+    const isLight = LIGHT_EFFECT_IDS.has(id);
+    let charges: number | undefined;
+    // Only Galadriel's Light burns down today. Other effects either
+    // tick on their own clock (Detect Traps is permanent) or aren't
+    // wired into the HUD yet.
+    if (id === "galadriels_light" && party.galadrielsLightSteps > 0) {
+      charges = party.galadrielsLightSteps;
+    }
+    out.push({ id, name: nameFor(id), isLight, charges });
+  }
+
+  // Sort: lights first, then alpha by name. Inside the lights group,
+  // Torch (synthetic, id "") tends to come before lettered ids in
+  // localeCompare, which matches the desired reading order.
+  out.sort((a, b) => {
+    if (a.isLight !== b.isLight) return a.isLight ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return out;
+}
+
 /**
  * The party's effective light radius (in tiles) for the lighting
  * overlay. Mirrors the Python game's "party has light" predicate
- * (`interior_lighting.party_has_light`) — Infravision and
- * Galadriel's Light each act as a light source carried by the
- * party. Returns the larger of the boost and the supplied default.
+ * (`interior_lighting.party_has_light`) — Infravision, Galadriel's
+ * Light, the Light spell, and a lit torch each act as a light
+ * source. Returns the larger of the boost and the supplied default.
  *
  * Numbers picked to match the pygame version:
  *   - Infravision: 8 tiles (effectively floods a small interior)
  *   - Galadriel's Light: 5 tiles (warm, more local pool)
- *   - Lit torch: 4 tiles (matches Python PARTY_LIT_RADIUS in
- *                          interior_lighting.py — burns down with steps)
+ *   - Light spell / lit torch: 4 tiles (matches Python
+ *                                       PARTY_LIT_RADIUS in
+ *                                       interior_lighting.py —
+ *                                       burns down with steps)
  *   - default: whatever the caller passed in
  */
 export function partyLightRadius(party: Party, defaultRadius: number): number {
   if (partyHasEffect(party, "infravision")) return Math.max(defaultRadius, 8);
   if (partyHasEffect(party, "galadriels_light")) return Math.max(defaultRadius, 5);
-  if (party.torchSteps > 0) return Math.max(defaultRadius, 4);
+  // Light spell and physical torch are the same radius — both are
+  // close-range warm orbs. Either being active is enough; their
+  // counters tick independently in the dark-scene move handlers.
+  if (party.magicLightSteps > 0 || party.torchSteps > 0) {
+    return Math.max(defaultRadius, 4);
+  }
   return defaultRadius;
 }
 
@@ -174,9 +309,12 @@ export function partyLightTint(party: Party): PartyTint | null {
   if (partyHasEffect(party, "galadriels_light")) {
     return { color: 0x9bb6e0, alphaScale: 0.45 };
   }
-  if (party.torchSteps > 0) {
+  if (party.magicLightSteps > 0 || party.torchSteps > 0) {
     // Warm orange flicker — much smaller alpha than Galadriel's so it
-    // reads as a candle pool, not a magical glow.
+    // reads as a candle pool, not a magical glow. Light spell and
+    // torch share the tint since both are "an illumination orb";
+    // the readout strip is what tells the player which (or both) is
+    // burning.
     return { color: 0xff9a3c, alphaScale: 0.30 };
   }
   return null;
@@ -977,18 +1115,24 @@ export function castMassHeal(
 const MAGIC_LIGHT_DEFAULT_STEPS = 100;
 
 /**
- * Cast Light — a magic-torch spell that adds light-steps to the
- * party's torch counter. The same counter physical Torches feed
- * (`party.torchSteps`), so the lighting overlay (warm tint, 4-tile
- * radius) renders identically — semantically a magical version of a
- * lit torch.
+ * Cast Light — a magic-torch spell that feeds the party's
+ * `magicLightSteps` counter. Deliberately kept SEPARATE from the
+ * physical-torch counter (`torchSteps`) so the HUD readout strip
+ * can show "Magic Light 100" and "Torch 78" as two distinct
+ * entries: torches are a stash consumable, the spell is MP-driven,
+ * and conflating their tallies hides which resource is burning
+ * down. The lighting overlay still treats both as the same kind of
+ * warm-orb illumination (4-tile radius, warm tint) — the
+ * gameplay distinction is purely the source / counter.
  *
- * Mirrors the Python game's `_on_spell_magic_light` flow: pick the
- * best caster, deduct MP, set `torch_active = True; torch_steps =
- * steps`. Stacks with an already-burning torch by topping the
- * counter rather than starting fresh — same behaviour as
- * `consumeTorch`, so a player who lights a real torch and then
- * casts Light gets the sum, not min/max.
+ * Mirrors the Python game's `_on_spell_magic_light` flow with one
+ * intentional departure: Python feeds Light into the torch counter
+ * directly. The web port splits them per design feedback to make
+ * each light source individually legible in the HUD.
+ *
+ * Multiple Light casts stack on each other (top up the counter)
+ * but never on top of an active physical torch, which keeps its
+ * own count.
  */
 export function castMagicLight(
   party: Party,
@@ -1016,10 +1160,10 @@ export function castMagicLight(
     typeof rawSteps === "number" && Number.isFinite(rawSteps) && rawSteps > 0
       ? Math.floor(rawSteps)
       : MAGIC_LIGHT_DEFAULT_STEPS;
-  // Stack with any active torch / previous Light cast, same as
-  // `consumeTorch`. Math.max guards against a corrupt save with a
-  // negative torchSteps.
-  party.torchSteps = Math.max(party.torchSteps, 0) + steps;
+  // Top up the magic-light counter only — torches keep their own
+  // count. Math.max guards against a corrupt save with a negative
+  // value.
+  party.magicLightSteps = Math.max(party.magicLightSteps, 0) + steps;
   return {
     ok: true,
     message: `${caster.name} casts ${spell.name}! A radiant orb illuminates the way.`,

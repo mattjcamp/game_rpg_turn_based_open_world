@@ -639,7 +639,9 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   private refreshHud(): void {
-    if (this.sceneLog) refreshSceneLog(this.sceneLog, gameState.clock);
+    if (this.sceneLog) {
+      refreshSceneLog(this.sceneLog, gameState.clock, gameState.partyData);
+    }
   }
 
   // ── Input ────────────────────────────────────────────────────────

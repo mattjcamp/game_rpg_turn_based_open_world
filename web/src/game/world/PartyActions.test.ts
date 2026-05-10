@@ -8,6 +8,7 @@ import {
   castMassHeal,
   castMagicLight,
   classifyMenuCast,
+  summariseActiveEffects,
   rollDice,
   statMod,
   equipItemFromInventory,
@@ -267,24 +268,36 @@ describe("castMassHeal", () => {
 });
 
 describe("castMagicLight (Light)", () => {
-  it("adds the spell's steps to torchSteps and spends MP", () => {
+  it("adds the spell's steps to magicLightSteps and spends MP", () => {
     const p = makeParty();
     const members = activeMembers(p);
-    expect(p.torchSteps).toBe(0);
+    expect(p.magicLightSteps).toBe(0);
     const beforeMp = members[3].mp ?? 0;
     const r = castMagicLight(p, members, lightSpell);
     expect(r.ok).toBe(true);
-    expect(p.torchSteps).toBe(100);
+    expect(p.magicLightSteps).toBe(100);
     expect(members[3].mp).toBe(beforeMp - lightSpell.mp_cost);
     expect(r.message).toContain("Light");
     expect(r.message).toContain("Selina"); // Cleric is the eligible caster
   });
 
-  it("stacks on top of an already-burning torch", () => {
+  it("does NOT stack on top of an active physical torch", () => {
+    // Casting Light should leave torchSteps alone — the two counters
+    // are tracked separately so the HUD readout can show them as
+    // distinct entries.
     const p = makeParty();
     p.torchSteps = 40; // simulate a half-burnt torch
     castMagicLight(p, activeMembers(p), lightSpell);
-    expect(p.torchSteps).toBe(140);
+    expect(p.torchSteps).toBe(40);
+    expect(p.magicLightSteps).toBe(100);
+  });
+
+  it("stacks with prior Light casts on the magic counter only", () => {
+    const p = makeParty();
+    p.magicLightSteps = 50; // a prior Light still burning
+    castMagicLight(p, activeMembers(p), lightSpell);
+    expect(p.magicLightSteps).toBe(150);
+    expect(p.torchSteps).toBe(0);
   });
 
   it("falls back to 100 steps when effect_value.steps is missing", () => {
@@ -298,7 +311,7 @@ describe("castMagicLight (Light)", () => {
       usable_in: ["dungeon"],
     });
     castMagicLight(p, activeMembers(p), noSteps);
-    expect(p.torchSteps).toBe(100);
+    expect(p.magicLightSteps).toBe(100);
   });
 
   it("prefers the highest-level caster (then most MP)", () => {
@@ -322,10 +335,10 @@ describe("castMagicLight (Light)", () => {
     const p = makeParty();
     const members = activeMembers(p);
     members[3].mp = 0;  // drain Selina, the only Cleric
-    const before = p.torchSteps;
+    const before = p.magicLightSteps;
     const r = castMagicLight(p, members, lightSpell);
     expect(r.ok).toBe(false);
-    expect(p.torchSteps).toBe(before);
+    expect(p.magicLightSteps).toBe(before);
   });
 });
 
@@ -1314,5 +1327,129 @@ describe("consumeTorch", () => {
     p.torchSteps = 0;
     consumeTorch(p);
     expect(p.torchSteps).toBe(40);
+  });
+});
+
+describe("summariseActiveEffects", () => {
+  it("returns an empty list when no party", () => {
+    expect(summariseActiveEffects(null)).toEqual([]);
+    expect(summariseActiveEffects(undefined)).toEqual([]);
+  });
+
+  it("reports the torch counter as a synthetic 'Torch' lighting entry", () => {
+    const p = makeParty();
+    p.torchSteps = 87;
+    const items = summariseActiveEffects(p);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toEqual({
+      id: "",
+      name: "Torch",
+      isLight: true,
+      charges: 87,
+    });
+  });
+
+  it("omits the torch entry when steps are 0", () => {
+    const p = makeParty();
+    p.torchSteps = 0;
+    expect(summariseActiveEffects(p)).toEqual([]);
+  });
+
+  it("reports the Light spell as its own 'Magic Light' lighting entry", () => {
+    const p = makeParty();
+    p.magicLightSteps = 73;
+    const items = summariseActiveEffects(p);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toEqual({
+      id: "",
+      name: "Magic Light",
+      isLight: true,
+      charges: 73,
+    });
+  });
+
+  it("surfaces Torch and Magic Light side-by-side when both are active", () => {
+    const p = makeParty();
+    p.torchSteps = 40;
+    p.magicLightSteps = 100;
+    const items = summariseActiveEffects(p);
+    // Both are light entries; sort is alpha within the lights group,
+    // so "Magic Light" comes before "Torch".
+    expect(items.map((i) => i.name)).toEqual(["Magic Light", "Torch"]);
+    expect(items.every((i) => i.isLight)).toBe(true);
+    expect(items[0].charges).toBe(100);
+    expect(items[1].charges).toBe(40);
+  });
+
+  it("includes slotted partyEffects with the fallback display names", () => {
+    const p = makeParty();
+    p.partyEffects.effect_1 = "detect_traps";
+    p.partyEffects.effect_2 = "infravision";
+    const items = summariseActiveEffects(p);
+    // Infravision is a light; Detect Traps is permanent non-light.
+    // Lights sort first.
+    expect(items.map((i) => i.name)).toEqual(["Infravision", "Detect Traps"]);
+    expect(items[0].isLight).toBe(true);
+    expect(items[1].isLight).toBe(false);
+    // Permanent effects carry no charges.
+    expect(items[0].charges).toBeUndefined();
+    expect(items[1].charges).toBeUndefined();
+  });
+
+  it("attaches the step counter to Galadriel's Light when active", () => {
+    const p = makeParty();
+    p.partyEffects.effect_1 = "galadriels_light";
+    p.galadrielsLightSteps = 153;
+    const items = summariseActiveEffects(p);
+    expect(items[0]).toMatchObject({
+      id: "galadriels_light",
+      name: "Galadriel's Light",
+      isLight: true,
+      charges: 153,
+    });
+  });
+
+  it("omits Galadriel's Light charge when its counter is 0", () => {
+    const p = makeParty();
+    p.partyEffects.effect_1 = "galadriels_light";
+    p.galadrielsLightSteps = 0;
+    const items = summariseActiveEffects(p);
+    expect(items[0].charges).toBeUndefined();
+  });
+
+  it("orders lights first, then alphabetical, in mixed cases", () => {
+    const p = makeParty();
+    p.torchSteps = 50;
+    p.partyEffects.effect_1 = "detect_traps";
+    p.partyEffects.effect_2 = "galadriels_light";
+    p.galadrielsLightSteps = 120;
+    const items = summariseActiveEffects(p);
+    expect(items.map((i) => i.name)).toEqual([
+      "Galadriel's Light",  // light, G < T
+      "Torch",              // light
+      "Detect Traps",       // non-light
+    ]);
+    expect(items.filter((i) => i.isLight)).toHaveLength(2);
+  });
+
+  it("prefers the loaded effects.json names over the built-in fallback", () => {
+    const p = makeParty();
+    p.partyEffects.effect_1 = "detect_traps";
+    const customEffect: Effect = {
+      id: "detect_traps",
+      name: "Trap Sense",  // custom override (e.g. a localised module)
+      description: "",
+      duration: "permanent",
+    };
+    const items = summariseActiveEffects(p, [customEffect]);
+    expect(items[0].name).toBe("Trap Sense");
+  });
+
+  it("uses the raw id when neither effects.json nor fallback knows the effect", () => {
+    const p = makeParty();
+    p.partyEffects.effect_1 = "future_effect_xyz";
+    const items = summariseActiveEffects(p);
+    expect(items[0].name).toBe("future_effect_xyz");
+    expect(items[0].isLight).toBe(false);
   });
 });

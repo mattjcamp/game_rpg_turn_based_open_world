@@ -1047,7 +1047,9 @@ export class TownScene extends Phaser.Scene {
   }
 
   private refreshHud(): void {
-    if (this.sceneLog) refreshSceneLog(this.sceneLog, gameState.clock);
+    if (this.sceneLog) {
+      refreshSceneLog(this.sceneLog, gameState.clock, gameState.partyData);
+    }
   }
 
   private installCamera(): void {
@@ -1279,15 +1281,20 @@ export class TownScene extends Phaser.Scene {
       onComplete: () => {
         this.busy = false;
         advanceClock(gameState.clock);
-        // Burn down a torch step in dark scenes so a 150-step Torch
-        // actually expires after 150 movements. We don't tick in lit
-        // areas — the player shouldn't be punished for using a torch
-        // in a lit overworld town.
-        if (this.dark && gameState.partyData && gameState.partyData.torchSteps > 0) {
-          gameState.partyData.torchSteps -= 1;
-          if (gameState.partyData.torchSteps === 0) {
-            // Light just went out — the next refreshDarkness call below
-            // sees torchSteps === 0 and snaps the pool away.
+        // Burn down each warm-orb light step in dark scenes so a
+        // 150-step Torch or a 100-step Light spell actually expires
+        // after that many movements. We don't tick in lit areas —
+        // the player shouldn't be punished for carrying light into
+        // a sunlit overworld town. Torch and Magic Light tick on
+        // independent counters so the HUD readout can show both.
+        if (this.dark && gameState.partyData) {
+          if (gameState.partyData.torchSteps > 0) {
+            gameState.partyData.torchSteps -= 1;
+            // Light just went out — the next refreshDarkness call
+            // below sees torchSteps === 0 and snaps the pool away.
+          }
+          if (gameState.partyData.magicLightSteps > 0) {
+            gameState.partyData.magicLightSteps -= 1;
           }
         }
         if (gameState.partyData) {
@@ -1312,15 +1319,20 @@ export class TownScene extends Phaser.Scene {
 
   /**
    * Skip the player's turn — wandering NPCs still get to step, the
-   * Galadriel counter still ticks, and torch steps still burn (only
-   * in dark scenes, matching tryStep's rule). Used by the Space-bar
-   * shortcut when no dialog/shop/temple is open.
+   * Galadriel counter still ticks, and both warm-orb light counters
+   * still burn (only in dark scenes, matching tryStep's rule). Used
+   * by the Space-bar shortcut when no dialog/shop/temple is open.
    */
   private skipTurn(): void {
     if (this.busy || this.dialog || this.shop || this.temple) return;
     advanceClock(gameState.clock);
-    if (this.dark && gameState.partyData && gameState.partyData.torchSteps > 0) {
-      gameState.partyData.torchSteps -= 1;
+    if (this.dark && gameState.partyData) {
+      if (gameState.partyData.torchSteps > 0) {
+        gameState.partyData.torchSteps -= 1;
+      }
+      if (gameState.partyData.magicLightSteps > 0) {
+        gameState.partyData.magicLightSteps -= 1;
+      }
     }
     if (gameState.partyData) {
       tickGaladrielsLight(gameState.partyData);

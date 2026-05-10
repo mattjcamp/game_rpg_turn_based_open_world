@@ -33,6 +33,9 @@ import {
   type GameClock,
 } from "./GameTime";
 import { paintMoonPhase, MOON_HUD_SIZE } from "./MoonIcon";
+import type { Party } from "./Party";
+import type { Effect } from "./Effects";
+import { summariseActiveEffects } from "./PartyActions";
 
 /** Pixel height of the log strip. Pinned to viewport bottom. */
 export const LOG_HEIGHT = 32;
@@ -51,6 +54,13 @@ const VIEW_HEIGHT = 720;
 const BAR_FILL = 0x161629;
 const BAR_BORDER = 0x2a2a3a;
 const TEXT_COLOR = "#dcdcc8";
+/** Warm torch tone for active light effects — picked to read as a
+ *  candle/torch glow against the dark navy strip without crashing
+ *  into the moon-icon's bright lit colour (#dcdcc8). */
+const LIGHT_FLAG_COLOR = "#ffba60";
+/** Right-edge / inter-effect spacing for the active-effect readout. */
+const EFFECT_PAD_X = 12;
+const EFFECT_GAP_X = 12;
 
 export interface SceneLogHandle {
   bar: Phaser.GameObjects.Rectangle;
@@ -60,6 +70,15 @@ export interface SceneLogHandle {
    *  `refreshSceneLog` skip the expensive shape repaint when the
    *  phase hasn't rolled over (one of eight per 28-day cycle). */
   lastPhase: number;
+  /** The scene that owns this handle — used to spawn fresh Text
+   *  objects for the active-effect readout on each refresh. The
+   *  effect list is small (≤ 4 partyEffects + 1 torch counter) so we
+   *  rebuild it from scratch every tick rather than diffing. */
+  scene: Phaser.Scene;
+  /** Per-refresh Text nodes for the active-effects readout. Cleared
+   *  and rebuilt every `refreshSceneLog` call so the right-aligned
+   *  layout stays correct as effects activate / expire / tick down. */
+  effectTexts: Phaser.GameObjects.Text[];
 }
 
 /**
@@ -101,18 +120,32 @@ export function installSceneLog(scene: Phaser.Scene): SceneLogHandle {
     .setScrollFactor(0)
     .setDepth(51);
 
-  return { bar, clockText, moonIcon, lastPhase: -1 };
+  return {
+    bar,
+    clockText,
+    moonIcon,
+    lastPhase: -1,
+    scene,
+    effectTexts: [],
+  };
 }
 
 /**
- * Repaint the date/time + moon to match `clock`. Idempotent — safe to
- * call every move tick. The Graphics shape is only redrawn when the
- * lunar phase index changes; the text is updated unconditionally
- * since the time string ticks every step.
+ * Repaint the date/time + moon + active-effects readout. Idempotent
+ * — safe to call every move tick. The moon Graphics shape is only
+ * redrawn when the lunar phase index changes; the text is updated
+ * unconditionally since the time string ticks every step. Active
+ * effects are torn down and rebuilt from scratch on each call so
+ * the right-aligned layout stays correct as charges tick down.
+ *
+ * `party` and `effects` are optional — when omitted the readout is
+ * empty (useful for scenes that haven't loaded party data yet).
  */
 export function refreshSceneLog(
   handle: SceneLogHandle,
   clock: GameClock,
+  party?: Party | null,
+  effects: readonly Effect[] = [],
 ): void {
   const text = `${dateStr(clock)} ${timeStr(clock)} · ${lunarPhaseName(clock)}`;
   handle.clockText.setText(text);
@@ -131,10 +164,51 @@ export function refreshSceneLog(
   if (phase !== handle.lastPhase) {
     paintMoonPhase(handle.moonIcon, moonCx, moonCy, r, phase);
     handle.lastPhase = phase;
-  } else {
-    // Reposition without repainting — paintMoonPhase doesn't move the
-    // Graphics, it draws shapes at absolute coords, so the Graphics
-    // object always stays at world (0, 0). Nothing to do.
+  }
+
+  refreshActiveEffectsReadout(handle, party, effects, moonCy);
+}
+
+/**
+ * Tear down the previous effect Text nodes and lay out a fresh set
+ * right-aligned on the strip. Iterating in reverse means each
+ * subsequent (leftward) entry is placed using the running rightmost
+ * x cursor; the final visual reads left-to-right in the order
+ * `summariseActiveEffects` returned (lights first → permanents).
+ */
+function refreshActiveEffectsReadout(
+  handle: SceneLogHandle,
+  party: Party | null | undefined,
+  effects: readonly Effect[],
+  cy: number,
+): void {
+  for (const t of handle.effectTexts) t.destroy();
+  handle.effectTexts = [];
+
+  const items = summariseActiveEffects(party, effects);
+  if (items.length === 0) return;
+
+  let rightEdge = VIEW_WIDTH - EFFECT_PAD_X;
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
+    const label =
+      item.charges !== undefined ? `${item.name} ${item.charges}` : item.name;
+    const color = item.isLight ? LIGHT_FLAG_COLOR : TEXT_COLOR;
+    const t = handle.scene.add
+      .text(rightEdge, cy, label, {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color,
+      })
+      .setOrigin(1, 0.5)
+      .setScrollFactor(0)
+      .setDepth(51);
+    handle.effectTexts.push(t);
+    // Origin (1, 0.5) means `t.x` IS the right edge; the entry's
+    // left edge sits at `t.x - t.width`. Stepping rightEdge to that
+    // minus a gap parks the next (leftward) entry adjacent to it
+    // with `EFFECT_GAP_X` whitespace between them.
+    rightEdge = t.x - t.width - EFFECT_GAP_X;
   }
 }
 
@@ -149,4 +223,6 @@ export function destroySceneLog(handle: SceneLogHandle | undefined): void {
   handle.bar.destroy();
   handle.clockText.destroy();
   handle.moonIcon.destroy();
+  for (const t of handle.effectTexts) t.destroy();
+  handle.effectTexts = [];
 }

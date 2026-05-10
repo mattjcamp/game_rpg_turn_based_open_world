@@ -479,12 +479,16 @@ export class DungeonScene extends Phaser.Scene {
    * Attempt to auto-light a torch from the party's stash on dungeon
    * entry. Returns a short status string for the entry-message line.
    * Skipped when the party already has Galadriel's Light, Infravision,
-   * or an active torch — no point burning a fresh torch on top of a
-   * working light source.
+   * an active Light spell, or a burning torch — no point burning a
+   * fresh torch on top of a working light source.
    */
   private tryAutoLightTorch(): string {
     if (!this.partyData) return "";
     if (this.partyData.torchSteps > 0) return "Torch lit.";
+    // Magic Light from the spell counts as an active light source
+    // too — same radius / tint as a torch, so the stash torch
+    // should sit idle instead of doubling up.
+    if (this.partyData.magicLightSteps > 0) return "";
     // partyHasEffect imports are heavy; use the same fields
     // partyLightRadius would peek at via a cheap check.
     const radius = partyLightRadius(this.partyData, 0);
@@ -696,7 +700,9 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private refreshHud(): void {
-    if (this.sceneLog) refreshSceneLog(this.sceneLog, gameState.clock);
+    if (this.sceneLog) {
+      refreshSceneLog(this.sceneLog, gameState.clock, gameState.partyData);
+    }
   }
 
   /**
@@ -848,14 +854,22 @@ export class DungeonScene extends Phaser.Scene {
     dp.row = nr;
     this.markExplored(nc, nr);
     advanceClock(gameState.clock);
-    // Burn down a torch step — dungeons are always dark, so unlike the
-    // overworld/town we tick unconditionally. When the counter hits
-    // zero the next refreshDarkness sees torchSteps === 0 and snaps
-    // the party-light pool away, making the dungeon go dark again.
+    // Burn down each active warm-orb light source — dungeons are
+    // always dark, so unlike the overworld/town we tick
+    // unconditionally. Torch and Magic Light are tracked on separate
+    // counters so the HUD readout can show them as distinct entries;
+    // both decrement here whenever they're active, and either hitting
+    // zero pops a tailored fade message.
     if (this.partyData && this.partyData.torchSteps > 0) {
       this.partyData.torchSteps -= 1;
       if (this.partyData.torchSteps === 0) {
         this.showMessage("Your torch burns out.", 1800);
+      }
+    }
+    if (this.partyData && this.partyData.magicLightSteps > 0) {
+      this.partyData.magicLightSteps -= 1;
+      if (this.partyData.magicLightSteps === 0) {
+        this.showMessage("The Light spell fades.", 1800);
       }
     }
     if (this.partyData) tickGaladrielsLight(this.partyData);

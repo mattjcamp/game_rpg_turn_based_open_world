@@ -92,6 +92,15 @@ export interface Party {
    *  Python game's `DungeonState.torch_steps` but kept on the party so
    *  it survives transitions in this port. */
   torchSteps: number;
+  /** Remaining steps for the Light spell's conjured radiant orb.
+   *  Deliberately kept SEPARATE from `torchSteps` even though both
+   *  are warm-orb-style light sources — the player thinks of them as
+   *  distinct (one is a consumable from the stash, the other is
+   *  magical and costs MP), and the HUD readout shows them as two
+   *  separate entries so the player can see each counter burn down
+   *  independently. Added by `castMagicLight`; ticks once per move
+   *  in dark scenes alongside `torchSteps`. */
+  magicLightSteps: number;
   /** Remaining steps before Galadriel's Light burns out. Set when the
    *  effect is equipped (from effects.json `duration`) and decremented
    *  once per move in any scene. When it hits zero, the effect is
@@ -142,6 +151,7 @@ interface RawParty {
   party_effects?: Record<string, string | null>;
   inventory?: InventoryItem[];
   torch_steps?: number;
+  magic_light_steps?: number;
   galadriels_light_steps?: number;
   last_tinker_day?: number;
 }
@@ -310,6 +320,7 @@ export function partyFromRaw(raw: RawParty): Party {
     },
     inventory: normalizeInventory(raw.inventory),
     torchSteps: raw.torch_steps ?? 0,
+    magicLightSteps: raw.magic_light_steps ?? 0,
     galadrielsLightSteps: raw.galadriels_light_steps ?? 0,
     lastTinkerDay: raw.last_tinker_day,
   };
@@ -352,6 +363,7 @@ export function partyToRaw(p: Party): RawParty {
     party_effects: p.partyEffects,
     inventory: p.inventory,
     torch_steps: p.torchSteps,
+    magic_light_steps: p.magicLightSteps,
     galadriels_light_steps: p.galadrielsLightSteps,
     last_tinker_day: p.lastTinkerDay,
   };

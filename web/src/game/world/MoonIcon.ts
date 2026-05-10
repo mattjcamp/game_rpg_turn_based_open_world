@@ -2,21 +2,28 @@
  * Procedural lunar-phase icon renderer.
  *
  * Mirrors `Renderer._get_moon_surfaces` in `src/renderer.py` —
- * 8 phases drawn as a small bright disc with a shadow ellipse
- * occluding the dim side. Phase 0 is a dark disc; phase 4 is a
- * full bright disc.
+ * 8 phases drawn as a bright disc with a shadow ellipse occluding
+ * the dim side. Phase 0 is a dark outlined disc; phase 4 is a full
+ * bright disc.
  *
- * The shadow ellipse extends slightly past the moon's circle on
- * the dark side; that overflow blends into the dark HUD bar
- * (#161629), which is close enough to the shadow tint that it
- * reads as part of the icon.
+ * Colour choices vs the Python pygame version:
+ *   - `MOON_SHADOW` is intentionally lifted off the log-strip fill
+ *     (#161629) so the dim side of a crescent/gibbous moon doesn't
+ *     visually merge with the bar and lose its shape. The Python
+ *     game had the same hazard but used a different bar tint that
+ *     read more like night sky; on the web port the dark navy bar
+ *     ate the moon's shadow at the previous tint, hiding phases.
+ *   - Every phase is rimmed with a faint outline (not just the new
+ *     moon) so the moon's circumference is always crisp against the
+ *     bar — a partial moon used to look like just a sliver of light
+ *     floating in the strip.
  */
 
 import type Phaser from "phaser";
 
-const MOON_LIT = 0xdcdcc8;     // (220, 220, 200)
-const MOON_SHADOW = 0x141428;  // (20, 20, 40)
-const MOON_OUTLINE = 0x3c3c50; // (60, 60, 80) — only used for the new moon
+const MOON_LIT = 0xf2ecc8;     // warm parchment (slightly lifted from the strip text colour)
+const MOON_SHADOW = 0x4a4560;  // muted purple-grey — reads as "shadow" against the dark bar
+const MOON_OUTLINE = 0x5c5c70; // soft grey-violet rim for crispness
 
 /**
  * Paint a moon-phase icon into a fresh Graphics object centred on
@@ -43,9 +50,13 @@ export function paintMoonPhase(
     return;
   }
   if (pi === 4) {
-    // Full moon: bright disc.
+    // Full moon: bright disc with the same crisp outline so it lines
+    // up with the rim used in partial phases (no visual "growing"
+    // effect when the moon rolls from waxing gibbous to full).
     g.fillStyle(MOON_LIT, 1);
     g.fillCircle(cx, cy, r);
+    g.lineStyle(1, MOON_OUTLINE, 1);
+    g.strokeCircle(cx, cy, r);
     return;
   }
 
@@ -76,7 +87,17 @@ export function paintMoonPhase(
   const ex = leftEdge + shadowW / 2;
   g.fillStyle(MOON_SHADOW, 1);
   g.fillEllipse(ex, cy, shadowW, r * 2);
+
+  // Final crisp rim — drawn last so it sits over both the lit disc
+  // and the shadow ellipse. Without this the shadow ellipse spills
+  // past the lit circle's edge on partial phases (the ellipse width
+  // exceeds the radius for crescents) and the moon looks lopsided.
+  g.lineStyle(1, MOON_OUTLINE, 1);
+  g.strokeCircle(cx, cy, r);
 }
 
-/** Diameter (px) used for the HUD moon icon. */
-export const MOON_HUD_SIZE = 14;
+/** Diameter (px) used for the HUD moon icon. Sized to fit comfortably
+ *  inside the 32px log strip with room above and below — large enough
+ *  that the player can read the phase at a glance without needing to
+ *  rely on the "New Moon" / "Waxing Gibbous" text label. */
+export const MOON_HUD_SIZE = 22;

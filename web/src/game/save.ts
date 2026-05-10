@@ -179,6 +179,17 @@ function toRaw(s: GameState): RawSave {
 
 function fromRaw(raw: RawSave, target: GameState): void {
   target.partyData = raw.party ?? null;
+  // Backward-compat: saves written before the Light spell got its
+  // own counter (separate from torchSteps) won't carry
+  // `magicLightSteps`. Default to 0 so the lighting tick handlers
+  // and HUD readout don't trip on undefined. Other counters added
+  // mid-development get the same defensive coercion if they ever
+  // appear here.
+  if (target.partyData) {
+    if (typeof target.partyData.magicLightSteps !== "number") {
+      target.partyData.magicLightSteps = 0;
+    }
+  }
   // Keep the Party module's cache in sync with the hydrated live
   // state — otherwise a later loadParty() call would hand back a
   // stale party (or, worse, fall through to seed party.json) and
