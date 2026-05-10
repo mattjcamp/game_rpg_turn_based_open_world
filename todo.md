@@ -5,8 +5,9 @@ python3 main.py
 
 ## Polish
 
-ç- In the battle screen, characters should be able to use their turn to equip an item in their personal inventory.
-- Do a full QA on party creation attributes, combat, etc. Do a few playthroughs.
+- When a character equips an item in combat, the item that was in the slot previous should be returned to the personal inventory
+- For now, we only need slots in for body (armor) and hands (weapons). In the future, we will have more detailed ways to equip items but since we don't support that yet having extra slots will confuse players.
+- When a character levels up, a dialog should appear with the detailed calculations of how much their HP and MP increased and what new spells and abilities are unlocked
 
 ## V2 Features
 - Infravision should act more like normal vision, just with all tiles displayed with a red tint, the range of infravision should match the other lighting effects

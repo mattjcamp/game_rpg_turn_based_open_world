@@ -58,7 +58,7 @@ import {
   loadedMonsterSprites,
   type MonsterSpec,
 } from "../data/monsters";
-import { TILE_GRASS, TILE_WATER, TILE_BOAT } from "../world/Tiles";
+import { TILE_GRASS, TILE_PATH, TILE_WATER, TILE_BOAT } from "../world/Tiles";
 import { classifyBoatMove } from "../world/Boats";
 import { dataPath } from "../world/Module";
 import { defaultRng } from "../rng";
@@ -1008,7 +1008,14 @@ export class OverworldScene extends Phaser.Scene {
     // victory. Other trigger tiles fall back to the random sample
     // encounter we've used since the demo combat route.
     const sp = this.spawnPoints.get(id);
-    const terrainTileId = this.sampleNeighborTerrain(col, row);
+    // Outdoor encounters use a flat path-tile background so the
+    // characters and monsters stay readable. The previous behaviour
+    // sampled the dominant nearby terrain, which produced busy
+    // tree-checkered or mountain-checkered arenas (notably for forest
+    // / mountain triggers) where sprites blended into the floor.
+    // Future work can theme combat backdrops more carefully; for
+    // now the simple path fill matches what the user can clearly read.
+    const terrainTileId = TILE_PATH;
     this.cameras.main.fadeOut(220, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", () => {
       this.scene.start("CombatScene", {
@@ -1187,7 +1194,9 @@ export class OverworldScene extends Phaser.Scene {
 
   /** Hand off to combat against a single roaming monster instance. */
   private engageRoamer(m: RoamingMonster): void {
-    const terrainTileId = this.sampleNeighborTerrain(m.col, m.row);
+    // Same rationale as `checkEncounter` — a single flat path-tile
+    // arena reads cleaner than the sampled-terrain mosaic.
+    const terrainTileId = TILE_PATH;
     this.cameras.main.fadeOut(220, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", () => {
       this.scene.start("CombatScene", {
@@ -1199,31 +1208,6 @@ export class OverworldScene extends Phaser.Scene {
         roamerId: m.id,
       });
     });
-  }
-
-  /**
-   * Pick the most common walkable, non-trigger tile id in the 8
-   * tiles surrounding (col, row). Falls back to the trigger tile's
-   * own id when nothing useful is around (very rare — most map tiles
-   * are surrounded by terrain).
-   */
-  private sampleNeighborTerrain(col: number, row: number): number {
-    const counts = new Map<number, number>();
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -1; dc <= 1; dc++) {
-        if (dc === 0 && dr === 0) continue;
-        const t = this.tileMap.getTile(col + dc, row + dr);
-        if (t < 0 || isEncounterTrigger(t)) continue;
-        counts.set(t, (counts.get(t) ?? 0) + 1);
-      }
-    }
-    if (counts.size === 0) return this.tileMap.getTile(col, row);
-    let best = -1;
-    let bestN = -1;
-    for (const [t, n] of counts) {
-      if (n > bestN) { best = t; bestN = n; }
-    }
-    return best;
   }
 
   private openParty(): void {

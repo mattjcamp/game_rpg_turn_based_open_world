@@ -79,8 +79,8 @@ import {
 } from "../combat/CombatActions";
 import { isCombatUsable } from "../world/Items";
 import type { Buff } from "../combat/Buffs";
-import { combatantsFromParty, syncCombatHpBack, abilityMod } from "../combat/CombatBridge";
-import { useEquippedDurability } from "../world/PartyActions";
+import { combatantsFromParty, syncCombatHpBack, abilityMod, refreshCombatantGear } from "../combat/CombatBridge";
+import { useEquippedDurability, equipItemFromInventory } from "../world/PartyActions";
 import {
   flashTarget,
   castGlow,
@@ -215,7 +215,7 @@ const FONT_MONO  = (color: number = C.dim)  => ({ fontFamily: "monospace",     f
 /** Action menu — what the active party member can do this turn.
  *  No "Flee" — once battle is joined, the party fights to win or
  *  loses (matches the Python game's combat loop). */
-type ActionId = "attack" | "range" | "throw" | "cast" | "use" | "end";
+type ActionId = "attack" | "range" | "throw" | "cast" | "use" | "equip" | "end";
 
 interface ActionEntry {
   id: ActionId;
@@ -232,6 +232,12 @@ const PARTY_ACTIONS: ActionEntry[] = [
   // items (Torch, Camping Supplies, Lockpick) are filtered out by
   // `isCombatUsable` so they never appear in this picker.
   { id: "use",    label: "Use Item"        },
+  // "Equip" lets the active member swap weapons / armor mid-fight
+  // out of their personal inventory (the shared stash isn't reachable
+  // from combat — that mirrors how Throw and Use already work for
+  // *equippable* items: shared stash items show up only for
+  // throwables / consumables, not for gear). Consumes the turn.
+  { id: "equip",  label: "Equip Item"      },
   { id: "end",    label: "End Turn  [SPACE]" },
 ];
 
@@ -244,7 +250,7 @@ const PARTY_ACTIONS: ActionEntry[] = [
  *                     action (numbered 1..N on the arena)
  */
 type SceneMode =
-  | "default" | "pick-throw" | "pick-spell" | "pick-use"
+  | "default" | "pick-throw" | "pick-spell" | "pick-use" | "pick-equip"
   | "pick-target" | "pick-tile"
   /** Magic Dart-style spells: player presses an arrow key to fire
    *  along that cardinal direction up to the spell's range. */
@@ -337,6 +343,13 @@ export class CombatScene extends Phaser.Scene {
    * either list.
    */
   private useOptions: Array<{ item: Item; source: "personal" | "stash"; index: number }> = [];
+  /**
+   * Equippable items in the active member's PERSONAL inventory.
+   * Personal-only because the shared stash isn't carried into combat
+   * by anyone — that's the same boundary Throw / Use draw for non-
+   * consumable gear. `index` is into `member.inventory`.
+   */
+  private equipOptions: Array<{ item: Item; index: number }> = [];
   private spellOptions: Spell[] = [];
   /** Shared cursor for the scrollable pickers (pick-throw / pick-spell).
    *  Index into the corresponding options array. */
@@ -435,6 +448,7 @@ export class CombatScene extends Phaser.Scene {
     this.pendingAction = null;
     this.throwOptions = [];
     this.useOptions = [];
+    this.equipOptions = [];
     this.spellOptions = [];
     this.pickerCursor = 0;
     // Picker / targeting / tile-cursor overlays are also
@@ -989,6 +1003,7 @@ export class CombatScene extends Phaser.Scene {
     this.pendingAction = null;
     this.throwOptions = [];
     this.useOptions = [];
+    this.equipOptions = [];
     this.spellOptions = [];
     this.pickerCursor = 0;
     this.clearPicker();
@@ -1006,10 +1021,12 @@ export class CombatScene extends Phaser.Scene {
    * what the player sees on screen.
    */
   private onDigit(n: number): void {
-    if (this.mode === "pick-throw" || this.mode === "pick-spell" || this.mode === "pick-use") {
+    if (this.mode === "pick-throw" || this.mode === "pick-spell"
+        || this.mode === "pick-use" || this.mode === "pick-equip") {
       const total =
         this.mode === "pick-throw" ? this.throwOptions.length :
         this.mode === "pick-use"   ? this.useOptions.length :
+        this.mode === "pick-equip" ? this.equipOptions.length :
         this.spellOptions.length;
       if (total === 0) return;
       const visibleMax = 12;
@@ -1047,7 +1064,8 @@ export class CombatScene extends Phaser.Scene {
     if (!this.canTakePlayerInput()) return;
     // In a scrollable picker UP/DOWN walks the picker cursor — not
     // the avatar.
-    if (this.mode === "pick-throw" || this.mode === "pick-spell" || this.mode === "pick-use") {
+    if (this.mode === "pick-throw" || this.mode === "pick-spell"
+        || this.mode === "pick-use" || this.mode === "pick-equip") {
       if (key === "UP")   return this.movePickerCursor(-1);
       if (key === "DOWN") return this.movePickerCursor(1);
       return; // ignore left/right in pickers
@@ -1082,12 +1100,14 @@ export class CombatScene extends Phaser.Scene {
     const total =
       this.mode === "pick-throw" ? this.throwOptions.length :
       this.mode === "pick-spell" ? this.spellOptions.length :
-      this.mode === "pick-use"   ? this.useOptions.length : 0;
+      this.mode === "pick-use"   ? this.useOptions.length :
+      this.mode === "pick-equip" ? this.equipOptions.length : 0;
     if (total === 0) return;
     this.pickerCursor = (this.pickerCursor + delta + total) % total;
     if (this.mode === "pick-throw") this.refreshThrowPicker();
     else if (this.mode === "pick-spell") this.refreshSpellPicker();
     else if (this.mode === "pick-use") this.refreshUsePicker();
+    else if (this.mode === "pick-equip") this.refreshEquipPicker();
   }
 
   private moveActionCursor(delta: number): void {
@@ -1108,12 +1128,14 @@ export class CombatScene extends Phaser.Scene {
         : null;
     const canRange = !!equippedWeapon && isRanged(equippedWeapon);
     const canUse = !!member && this.partyHasCombatUsable();
+    const canEquip = !!member && this.memberHasEquippableItem(member);
     const enabledIdx = PARTY_ACTIONS
       .map((a, i) => {
         if (a.id === "range" && !canRange) return -1;
         if (a.id === "throw" && !canThrow) return -1;
         if (a.id === "cast"  && !canCast)  return -1;
         if (a.id === "use"   && !canUse)   return -1;
+        if (a.id === "equip" && !canEquip) return -1;
         return i;
       })
       .filter((i) => i >= 0);
@@ -1163,6 +1185,12 @@ export class CombatScene extends Phaser.Scene {
       this.applyUseItem(opt);
       return;
     }
+    if (this.mode === "pick-equip") {
+      const opt = this.equipOptions[this.pickerCursor];
+      if (!opt) return;
+      this.applyEquipItem(opt);
+      return;
+    }
     if (this.mode === "pick-tile") {
       void this.resolveTileSpell();
       return;
@@ -1192,6 +1220,7 @@ export class CombatScene extends Phaser.Scene {
     if (a.id === "throw") return this.openThrowPicker();
     if (a.id === "cast")  return this.openSpellPicker();
     if (a.id === "use")   return this.openUsePicker();
+    if (a.id === "equip") return this.openEquipPicker();
     if (a.id === "end")   return this.onEndTurnClicked();
   }
 
@@ -1495,6 +1524,87 @@ export class CombatScene extends Phaser.Scene {
     else this.refreshActionMenu();
   }
 
+  /**
+   * Build the Equip-Item picker — equippable items in the active
+   * member's PERSONAL inventory only. Shared stash is excluded; that
+   * matches the design intent that combat-time gear swaps come from
+   * "what's on your belt", not from the wagon.
+   */
+  private openEquipPicker(): void {
+    const member = this.memberForCurrent();
+    if (!member) return;
+    const opts: typeof this.equipOptions = [];
+    member.inventory.forEach((it, idx) => {
+      const def = this.items.get(it.item);
+      if (def && def.characterCanEquip && def.slots.length > 0) {
+        opts.push({ item: def, index: idx });
+      }
+    });
+    if (opts.length === 0) {
+      this.combat.log.push(`${this.combat.current.name} has nothing to equip.`);
+      this.refreshLog();
+      return;
+    }
+    this.equipOptions = opts;
+    this.pickerCursor = 0;
+    this.mode = "pick-equip";
+    this.refreshEquipPicker();
+  }
+
+  /** Rebuild the equip picker so the cursor + scroll window update. */
+  private refreshEquipPicker(): void {
+    const lines = this.equipOptions.map((o) => {
+      const slot = o.item.slots[0];
+      const tag =
+        slot === "right_hand" ? "weapon" :
+        slot === "left_hand"  ? "offhand" :
+        slot === "body"       ? "body" :
+        slot === "head"       ? "helmet" :
+        "—";
+      return `${o.item.name.padEnd(18, " ")} ${tag}`;
+    });
+    this.renderPicker("EQUIP ITEM", lines, this.pickerCursor);
+  }
+
+  /**
+   * Resolve a picked Equip option: hand off to the pure
+   * `equipItemFromInventory` helper, refresh the Combatant's gear-
+   * derived stats so the next swing reflects the new weapon/armor,
+   * log, and end the turn. The pure helper handles the swap-into-
+   * occupied-slot case (displaced item slides back into inventory at
+   * the same index) so we don't have to track that here.
+   */
+  private applyEquipItem(opt: typeof this.equipOptions[number]): void {
+    const me = this.combat.current;
+    const member = this.memberForCurrent();
+    if (!member) {
+      this.cancelSubMode();
+      return;
+    }
+    const r = equipItemFromInventory(member, opt.index, this.items);
+    if (!r.ok) {
+      // Refusal — log and bounce back to the action menu without
+      // ending the turn.
+      this.combat.log.push(r.message);
+      this.refreshLog();
+      this.mode = "default";
+      this.clearPicker();
+      this.refreshActionMenu();
+      return;
+    }
+    // Re-derive ac / attackBonus / damage on the live Combatant so
+    // the new weapon's hit chance and damage land on the very next
+    // attack. Position, HP, buffs, sprite, etc. are intentionally
+    // left untouched.
+    refreshCombatantGear(me, member, this.items);
+    this.combat.log.push(r.message);
+    this.refreshLog();
+    this.mode = "default";
+    this.clearPicker();
+    Sfx.play("defend");
+    if (this.combat.isOver) return this.endEncounter();
+    this.endActorTurn();
+  }
 
   /**
    * Spell-pick → action dispatch. Classifies the spell, and either
@@ -3085,12 +3195,14 @@ export class CombatScene extends Phaser.Scene {
     })();
     const canRange = !!equippedWeapon && isRanged(equippedWeapon) && ammoOk;
     const canUse = !!member && this.partyHasCombatUsable();
+    const canEquip = !!member && this.memberHasEquippableItem(member);
     const isEnabled = (id: ActionId): boolean => {
       if (!playerTurn) return false;
       if (id === "range") return canRange;
       if (id === "throw") return canThrow;
       if (id === "cast")  return canCast;
       if (id === "use")   return canUse;
+      if (id === "equip") return canEquip;
       return true;
     };
     for (let i = 0; i < PARTY_ACTIONS.length; i++) {
@@ -3146,6 +3258,20 @@ export class CombatScene extends Phaser.Scene {
     if (member && member.inventory.some((it) => check(it.item))) return true;
     if (party && party.inventory.some((it) => check(it.item))) return true;
     return false;
+  }
+
+  /**
+   * True when this member has at least one item in their PERSONAL
+   * inventory whose catalog entry says `characterCanEquip`. Drives
+   * the Equip Item row's enable state — combat-time equip is
+   * deliberately limited to personal inventory (the shared stash is
+   * back at the wagon, not on the fighter's belt).
+   */
+  private memberHasEquippableItem(member: PartyMember): boolean {
+    return member.inventory.some((it) => {
+      const def = this.items.get(it.item);
+      return !!def && def.characterCanEquip && def.slots.length > 0;
+    });
   }
 
   private refreshHp(c: Combatant): void {

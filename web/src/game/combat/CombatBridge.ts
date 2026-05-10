@@ -151,6 +151,38 @@ export function combatantsFromParty(
 }
 
 /**
+ * Recompute the gear-derived fields on an existing Combatant — `ac`,
+ * `attackBonus`, `damage` — using the live `member.equipped` and the
+ * items catalog. Used when a party member equips or unequips a slot
+ * mid-combat so their next attack uses the new weapon/armor stats.
+ *
+ * Deliberately narrow: HP, position, sprite, buffs, summons, undead
+ * flag, and every other non-gear field are left untouched. Stamping
+ * the result onto the existing Combatant via Object.assign would
+ * stomp those — this helper writes only the four gear fields.
+ */
+export function refreshCombatantGear(
+  c: Combatant,
+  member: PartyMember,
+  items: Map<string, Item>,
+): void {
+  const weapon = member.equipped.rightHand
+    ? items.get(member.equipped.rightHand) ?? null
+    : null;
+  const armor = member.equipped.body
+    ? items.get(member.equipped.body) ?? null
+    : null;
+  const dexMod = mod(member.dexterity);
+  const evasion = armor && typeof armor.evasion === "number" ? armor.evasion : 50;
+  const armorBonus = Math.floor((evasion - 50) / 5);
+  c.ac = 10 + dexMod + armorBonus + totalAcBonus(member.equipped, items);
+  const isRanged = !!(weapon && weapon.ranged);
+  c.attackBonus = isRanged ? dexMod : mod(member.strength);
+  c.dexMod = dexMod;
+  c.damage = damageForWeapon(member, weapon);
+}
+
+/**
  * Write combat HP back into the party data after the encounter
  * resolves. The combat layer mutates Combatant.hp during the fight;
  * this propagates the result so HP carries across the overworld.

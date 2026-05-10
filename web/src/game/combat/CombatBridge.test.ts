@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { combatantFromMember, combatantsFromParty, syncCombatHpBack } from "./CombatBridge";
+import {
+  combatantFromMember,
+  combatantsFromParty,
+  refreshCombatantGear,
+  syncCombatHpBack,
+} from "./CombatBridge";
 import { partyFromRaw, memberFromRaw } from "../world/Party";
 import type { Item } from "../world/Items";
 import type { ClassTemplate } from "../world/Classes";
@@ -231,5 +236,87 @@ describe("syncCombatHpBack", () => {
     cs[0].hp = 30;
     syncCombatHpBack(p, cs);
     expect(p.roster[0].hp).toBe(30);
+  });
+});
+
+describe("refreshCombatantGear", () => {
+  it("recomputes ac/attackBonus/damage when the weapon swaps mid-combat", () => {
+    const fighter = memberFromRaw({
+      name: "Gimli", class: "Fighter", race: "Dwarf",
+      level: 10, hp: 60, strength: 18, dexterity: 14, intelligence: 9, wisdom: 9,
+      equipped: { right_hand: "Sword", left_hand: null, body: "Chain", head: null },
+    });
+    const cat = items();
+    const c = combatantFromMember(fighter, cat);
+    // Sword: power 5 → 1d6 + STR(+4); AC 10 + DEX 2 + (50-50)/5 = 12.
+    expect(c.attackBonus).toBe(4);
+    expect(c.damage).toEqual({ dice: 1, sides: 6, bonus: 4 });
+    expect(c.ac).toBe(12);
+
+    // Mid-combat: swap Sword → Crossbow. Ranged → DEX-based attack and
+    // damage; AC unchanged because the body slot didn't change.
+    fighter.equipped.rightHand = "Crossbow";
+    refreshCombatantGear(c, fighter, cat);
+    // Crossbow: power 7 → 1d8 + DEX(+2). attackBonus drops to DEX +2.
+    expect(c.attackBonus).toBe(2);
+    expect(c.damage).toEqual({ dice: 1, sides: 8, bonus: 2 });
+    expect(c.ac).toBe(12);
+  });
+
+  it("rolls AC to reflect a body-armor swap", () => {
+    const m = memberFromRaw({
+      name: "X", class: "Fighter", race: "Human", level: 1, hp: 10,
+      strength: 10, dexterity: 14,
+      equipped: { right_hand: null, left_hand: null, body: "Cloth", head: null },
+    });
+    const cat = items();
+    const c = combatantFromMember(m, cat);
+    // Cloth evasion 0 → armorBonus = (0-50)/5 = -10; AC = 10 + 2 - 10 = 2.
+    expect(c.ac).toBe(2);
+    m.equipped.body = "Chain";
+    refreshCombatantGear(c, m, cat);
+    // Chain evasion 50 → armorBonus 0; AC = 10 + 2 + 0 = 12.
+    expect(c.ac).toBe(12);
+  });
+
+  it("leaves hp / position / sprite / id alone (gear-only refresh)", () => {
+    const m = memberFromRaw({
+      name: "Gimli", class: "Fighter", race: "Dwarf",
+      level: 10, hp: 60, strength: 18, dexterity: 14,
+      equipped: { right_hand: "Sword", left_hand: null, body: "Chain", head: null },
+    });
+    const cat = items();
+    const c = combatantFromMember(m, cat);
+    // Pretend combat has started: HP took some damage, the actor moved.
+    c.hp = 22;
+    c.position = { col: 4, row: 5 };
+    const beforeSprite = c.sprite;
+    const beforeId = c.id;
+
+    m.equipped.rightHand = "Crossbow";
+    refreshCombatantGear(c, m, cat);
+
+    // Gear math updated …
+    expect(c.attackBonus).toBe(2);
+    // … but combat-state fields stayed put.
+    expect(c.hp).toBe(22);
+    expect(c.position).toEqual({ col: 4, row: 5 });
+    expect(c.sprite).toBe(beforeSprite);
+    expect(c.id).toBe(beforeId);
+  });
+
+  it("falls back to bare-hands stats when the weapon slot is cleared", () => {
+    const m = memberFromRaw({
+      name: "X", class: "Fighter", race: "Human", level: 1, hp: 10,
+      strength: 14, dexterity: 10,
+      equipped: { right_hand: "Sword", left_hand: null, body: null, head: null },
+    });
+    const cat = items();
+    const c = combatantFromMember(m, cat);
+    expect(c.damage).toEqual({ dice: 1, sides: 6, bonus: 2 });
+    m.equipped.rightHand = null;
+    refreshCombatantGear(c, m, cat);
+    // No weapon → flat 1 damage path.
+    expect(c.damage).toEqual({ dice: 0, sides: 0, bonus: 1 });
   });
 });

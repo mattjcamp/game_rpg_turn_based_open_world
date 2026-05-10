@@ -108,6 +108,7 @@ import {
   spriteManifest,
   tileSpriteKey,
   populateRuntimeDefs,
+  TILE_PATH,
 } from "../world/Tiles";
 import {
   collectLightSources,
@@ -1009,6 +1010,11 @@ export class TownScene extends Phaser.Scene {
     this.cameras.main.once("camerafadeoutcomplete", () => {
       this.scene.start("CombatScene", {
         fromWorld: true,
+        // Town interior fights ride on the same flat path-tile arena
+        // that outdoor encounters use — keeps the visual language
+        // consistent and stops a busy interior backdrop (rugs, stone,
+        // wood) from competing with the sprites for attention.
+        terrainTileId: TILE_PATH,
         monsterNames: m.encounterNames,
         interiorMonsterId: m.id,
         interiorPath: this.townName,
