@@ -77,6 +77,11 @@ import {
   type QuestDef,
 } from "../world/Quests";
 import {
+  reachableFrom,
+  snapToWalkable,
+  tileMapWalk,
+} from "../world/InteriorSpawn";
+import {
   openQuestDialog as buildQuestDialog,
   closeQuestDialog as destroyQuestDialog,
   flashQuestMessage,
@@ -1466,7 +1471,31 @@ export class OverworldScene extends Phaser.Scene {
       // the wander tick last left them at.
       let pos = this.questGiverPositions.get(def.name);
       if (!pos) {
-        pos = { col: def.giverCol, row: def.giverRow, homeCol: def.giverCol, homeRow: def.giverRow };
+        // Snap unwalkable / unreachable authored coords to the nearest
+        // tile the player can actually reach. Without this, an author
+        // typo (giver placed on a Water tile, or inside a walled-off
+        // shrine) leaves the NPC clipping through scenery and the
+        // bump-to-talk flow can't engage them.
+        const reachable = reachableFrom(
+          tileMapWalk(this.tileMap),
+          gameState.playerPos.col,
+          gameState.playerPos.row,
+        );
+        const snapped = snapToWalkable(
+          tileMapWalk(this.tileMap),
+          def.giverCol,
+          def.giverRow,
+          {
+            reachable,
+            occupied: [...this.questGiverPositions.values()].map(
+              (p) => [p.col, p.row] as const,
+            ),
+          },
+        );
+        pos = {
+          col: snapped.col, row: snapped.row,
+          homeCol: snapped.col, homeRow: snapped.row,
+        };
         this.questGiverPositions.set(def.name, pos);
       }
       const path = normalizeSpritePath(def.giverSprite);

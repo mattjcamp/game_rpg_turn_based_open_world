@@ -49,8 +49,9 @@ import {
   markTurnedIn,
   findQuest,
   activeKillStepsForLocation,
-  rosterFor,
+  activeCollectStepsForLocation,
   creditKills,
+  creditCollect,
   summariseUnlocks,
   type AppliedUnlock,
   type QuestDef,
@@ -60,6 +61,14 @@ import {
   loadEncounters,
   type EncounterTemplate,
 } from "../world/Encounters";
+import {
+  placeQuestInteriorMonsters,
+  placeQuestInteriorItems,
+  reachableFrom,
+  snapToWalkable,
+  tileMapWalk,
+  type QuestKillRow,
+} from "../world/InteriorSpawn";
 import {
   loadMonsters,
   loadedMonsterSprites,
@@ -79,6 +88,7 @@ import {
 import {
   attachPulsingGlow,
   QUEST_GIVER_COLOR,
+  QUEST_ITEM_COLOR,
   QUEST_MONSTER_COLOR,
   type PulsingGlowHandle,
 } from "../world/GlowEffect";
@@ -147,6 +157,13 @@ import { rememberScene, save as saveGame } from "../save";
 
 const TILE = 32;
 
+/** Phaser texture key + path for the quest collect artifact sprite —
+ *  shared with DungeonScene (`assets/dungeon/artifact.png`) so the
+ *  scroll dropped in a building space looks like the same kind of
+ *  object the dungeon's TILE_ARTIFACT cells render. */
+const QUEST_ITEM_SPRITE_KEY = "town:quest-item-artifact";
+const QUEST_ITEM_SPRITE_PATH = withBase("/assets/dungeon/artifact.png");
+
 interface TownSceneData {
   townName: string;
   entryCol: number;
@@ -166,13 +183,33 @@ export class TownScene extends Phaser.Scene {
    *  Loaded from `gameState.interiorMonsters` keyed by `townName` so
    *  re-entries see the remaining set rather than re-rolling spawns. */
   private interiorMonsterSprites: Map<string, Phaser.GameObjects.GameObject> = new Map();
+  /** On-map sprites for quest collect items (one per `interiorItems`
+   *  entry). Tracked so the pickup handler can destroy the right
+   *  graphic when the player walks onto the tile. */
+  private interiorItemSprites: Map<string, Phaser.GameObjects.GameObject> = new Map();
+  /** Per-item glow handles, keyed by interior-item id. Tracked
+   *  separately from `questOverlayHandles` (the flat scene-wide list)
+   *  so the pickup handler can destroy the cyan halo for the picked
+   *  item without leaving a stale circle pulsing in mid-air. */
+  private interiorItemGlows: Map<string, PulsingGlowHandle> = new Map();
   private monsterCatalog: Map<string, MonsterSpec> = new Map();
   private encounterTable: Record<string, EncounterTemplate[]> | null = null;
-  /** True when this scene is rendering a town INTERIOR (sub-Town
-   *  reached via "Plainstown/<InteriorName>") rather than the
-   *  top-level town. Used to gate quest-monster spawning + the
-   *  combat-location stamp. */
+  /** True when this scene is rendering a map that hosts quest combat
+   *  spawns — town INTERIORs (sub-Town reached via
+   *  "Plainstown/<InteriorName>") and standalone building spaces
+   *  ("building:Foo:Bar"). Top-level towns stay false. Used to gate
+   *  the quest-monster + quest-item spawn passes and the per-step
+   *  movement tick. */
   private isInterior = false;
+  /** Combat-location string for the currently-loaded map. Mirrors the
+   *  values `creditKills` accepts:
+   *    - top-level town       → "town:<name>"
+   *    - town interior        → "interior:<town>/<interior>"
+   *    - building space       → "space:<building>/<space>"
+   *  Set in create() once `this.town` is loaded so quest-spawn passes
+   *  use the right matcher and combat stamps the right location for
+   *  later kill-credit. Empty until create() resolves the map. */
+  private mapLocation = "";
   /** Step-completion callouts queued by `applyPendingKillCredit()` and
    *  drained at the end of `create()`. We credit kills before the
    *  interior-monster spawn pass (so the spawn sees up-to-date kill
@@ -303,12 +340,32 @@ export class TownScene extends Phaser.Scene {
     for (const e of this.questGiverOverlays.values()) e.glow.destroy();
     this.questGiverOverlays = new Map();
     this.interiorMonsterSprites = new Map();
+    this.interiorItemSprites = new Map();
+    for (const h of this.interiorItemGlows.values()) h.destroy();
+    this.interiorItemGlows = new Map();
     this.pendingStepCallouts = [];
     this.darkness = new Map();
     this.tintRects = new Map();
     this.tileSprites = new Map();
     this.mapLights = [];
     this.dark = false;
+  }
+
+  /**
+   * Start Phaser's loader for any files queued post-preload (e.g.
+   * monster sprites added inside create() once `loadMonsters()`
+   * resolves) and resolve once the batch is done. Without this the
+   * scene's draw pass races the loader and renders fallback rectangles
+   * for monsters whose textures hadn't finished decoding yet — which
+   * is exactly the regression the user reported when entering the
+   * Abandoned Building's basement: the Cursed Battalion appeared as
+   * red rectangles instead of skeleton sprites.
+   */
+  private startLoaderAndWait(): Promise<void> {
+    return new Promise((resolve) => {
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => resolve());
+      this.load.start();
+    });
   }
 
   preload(): void {
@@ -352,6 +409,23 @@ export class TownScene extends Phaser.Scene {
     for (const path of NPC_SPRITE_MANIFEST) {
       this.load.image(path, path);
     }
+
+    // Monster sprites — building spaces and town interiors that host
+    // quest combat (e.g. the Cursed Battalion guarding the Veyron
+    // scroll) need the same on-map glyph DungeonScene preloads. Without
+    // this pre-pass `drawInteriorMonsters` ran before
+    // `loadMonsters() → load.start()` had finished, so the texture
+    // didn't yet exist and every monster fell back to a red rectangle.
+    // The BUILTIN set covers Skeleton / Goblin / Rat / Orc — the post-
+    // loadMonsters() pass in create() picks up the long tail.
+    for (const path of loadedMonsterSprites()) {
+      this.load.image(`monster:${path}`, path);
+    }
+
+    // Quest collect artifact — same sprite the dungeon uses, so the
+    // scroll dropped in a building space reads as "this is something
+    // to pick up" instead of a yellow placeholder diamond.
+    this.load.image(QUEST_ITEM_SPRITE_KEY, QUEST_ITEM_SPRITE_PATH);
   }
 
   async create(): Promise<void> {
@@ -368,6 +442,20 @@ export class TownScene extends Phaser.Scene {
       // building the map so isWalkable() resolves correctly for
       // town-only tile ids.
       await loadTileDefs();
+      // Top up Phaser's texture cache with any tile sprite the runtime
+      // defs introduced (interior wall variants, brick floors, stairs,
+      // etc.) that the preload-time `spriteManifest()` couldn't see
+      // because the JSON hadn't decoded yet. Phaser dedupes by key so
+      // sprites already preloaded are no-ops; the await guarantees the
+      // fresh ones land before drawMap reads them.
+      let queuedTiles = 0;
+      for (const { key, path } of spriteManifest()) {
+        if (!this.textures.exists(key)) {
+          this.load.image(key, path);
+          queuedTiles += 1;
+        }
+      }
+      if (queuedTiles > 0) await this.startLoaderAndWait();
       // Three accepted path forms, dispatched in this order:
       //   "building:<name>[:<space>]" → buildings.json
       //   "<town>/<interior>"          → towns.json (interior)
@@ -447,11 +535,35 @@ export class TownScene extends Phaser.Scene {
       this.questDefs = [];
     }
 
-    // Detect interior maps. Top-level towns have a bare name; interiors
-    // arrive with a "Town/Interior" path. Building paths use a
-    // `building:` prefix and skip this branch — those are the
-    // shop/inn floors which don't host quest combat for v1.
-    this.isInterior = !this.townName.startsWith("building:") && this.townName.includes("/");
+    // Detect maps that host quest combat / collect items. Top-level
+    // towns have a bare name (no quest spawns there in v1). Town
+    // interiors arrive with a "Town/Interior" path. Building paths
+    // use a "building:" prefix and now also count: the Veyron Heirloom
+    // quest pins its scroll to "space:Abandoned Building/Basement",
+    // which only TownScene loads.
+    const buildingRef = parseBuildingPath(this.townName);
+    this.isInterior =
+      buildingRef !== null || this.townName.includes("/");
+
+    // Stamp the combat-location string for this map. The shape mirrors
+    // what `creditKills` / `activeCollectStepsForLocation` accept
+    // (`town:`, `interior:`, `space:`) and is reused by every spawn
+    // pass below + by `engageInteriorMonster` when combat starts here.
+    if (buildingRef) {
+      // The space name comes from the resolved Town (building paths
+      // without an explicit space resolve to the building's first
+      // space — `getBuildingSpace`'s contract). Fall back to the
+      // building name alone if the space name is empty for some
+      // reason; `locationMatches` will just fail to credit, no crash.
+      const spaceName = this.town.name || buildingRef.space || "";
+      this.mapLocation = spaceName
+        ? `space:${buildingRef.building}/${spaceName}`
+        : `building:${buildingRef.building}`;
+    } else if (this.townName.includes("/")) {
+      this.mapLocation = `interior:${this.townName}`;
+    } else {
+      this.mapLocation = `town:${this.townName}`;
+    }
 
     // Interior quest monsters — load the encounter table + monster
     // catalog so we can spawn rosters for active kill steps that
@@ -471,7 +583,7 @@ export class TownScene extends Phaser.Scene {
             queued += 1;
           }
         }
-        if (queued > 0) this.load.start();
+        if (queued > 0) await this.startLoaderAndWait();
         // CRITICAL: credit kills BEFORE spawning. Otherwise on a return
         // from combat the spawn pass sees stale `stepKills` (the rat we
         // just killed hasn't been credited yet) and re-spawns the
@@ -480,6 +592,7 @@ export class TownScene extends Phaser.Scene {
         // honours by skipping the step entirely.
         this.applyPendingKillCredit();
         this.spawnInteriorMonstersIfNeeded();
+        this.spawnInteriorQuestItemsIfNeeded();
       } catch {
         /* keep empty */
       }
@@ -492,8 +605,17 @@ export class TownScene extends Phaser.Scene {
     // wall sconce in the town renders blank — there's no `effect`
     // field on those tiles, just the `item` attribute).
     installTileEffects(this, this.tileMap, TILE, 7, this.itemCatalog);
+    // Repair NPC positions before they render. Module data sometimes
+    // pins an NPC to a non-walkable cell (Calla in Shanty Town,
+    // Laird Marrowen in Seat of the Realm) — the bump-to-talk flow
+    // can't engage an NPC standing on a wall, and the player would
+    // see them clipping through bricks. Snap each to the nearest
+    // walkable + reachable cell. Quest givers injected above go
+    // through the same pass.
+    this.snapNpcsToWalkable();
     this.drawNpcs();
     this.drawInteriorMonsters();
+    this.drawInteriorQuestItems();
     this.drawPlayer();
     this.drawHud();
     // When the Party screen is opened on top, this scene is paused.
@@ -706,6 +828,49 @@ export class TownScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Walk every NPC on the map and, if their authored position lands
+   * on a non-walkable cell or a region cut off from the player's
+   * entry, snap them to the nearest walkable + reachable tile. Updates
+   * `homeCol`/`homeRow` too so the wander tick keeps them anchored to
+   * the new spot rather than drifting back toward the wall they
+   * started on.
+   *
+   * Two real cases this caught:
+   *   - Calla in Shanty Town authored on (4, 15), a wall tile.
+   *   - Laird Marrowen (Sun Sword giver) in Seat of the Realm on
+   *     (8, 12), a wall tile — would have left the player unable to
+   *     pick up the chained quest line.
+   */
+  private snapNpcsToWalkable(): void {
+    const reachable = reachableFrom(
+      tileMapWalk(this.tileMap),
+      this.entryCol,
+      this.entryRow,
+    );
+    const occupied = new Set<string>();
+    occupied.add(`${this.entryCol},${this.entryRow}`);
+    const walk = tileMapWalk(this.tileMap);
+    for (const npc of this.town.npcs) {
+      const snapped = snapToWalkable(walk, npc.col, npc.row, {
+        reachable,
+        occupied: [...occupied].map((k) => {
+          const [c, r] = k.split(",").map((s) => parseInt(s, 10));
+          return [c, r] as const;
+        }),
+      });
+      if (snapped.col !== npc.col || snapped.row !== npc.row) {
+        npc.col = snapped.col;
+        npc.row = snapped.row;
+        // Re-anchor the wander home so the NPC doesn't drift back
+        // toward the wall on every step.
+        npc.homeCol = snapped.col;
+        npc.homeRow = snapped.row;
+      }
+      occupied.add(`${npc.col},${npc.row}`);
+    }
+  }
+
   private drawNpcs(): void {
     for (const npc of this.town.npcs) {
       const x = this.tileX(npc.col);
@@ -792,17 +957,32 @@ export class TownScene extends Phaser.Scene {
     // Drop interior monsters belonging to any step that's now done —
     // a target-1 step with one rat alive on the floor and one in the
     // pending list would otherwise leave the surviving rat behind
-    // glowing.
+    // glowing. Same rule sweeps stale collect items: a scroll whose
+    // step somehow flipped complete elsewhere shouldn't keep glowing
+    // here.
     const list = gameState.interiorMonsters.get(this.townName);
-    if (!list || list.length === 0) return;
-    const stillActive = (m: import("../state").InteriorMonster): boolean => {
-      const state = gameState.moduleQuestStates.get(m.questName);
-      if (!state) return true;
-      return !state.stepProgress[m.stepIdx];
-    };
-    const filtered = list.filter(stillActive);
-    if (filtered.length !== list.length) {
-      gameState.interiorMonsters.set(this.townName, filtered);
+    if (list && list.length > 0) {
+      const stillActive = (m: import("../state").InteriorMonster): boolean => {
+        const state = gameState.moduleQuestStates.get(m.questName);
+        if (!state) return true;
+        return !state.stepProgress[m.stepIdx];
+      };
+      const filtered = list.filter(stillActive);
+      if (filtered.length !== list.length) {
+        gameState.interiorMonsters.set(this.townName, filtered);
+      }
+    }
+    const items = gameState.interiorItems.get(this.townName);
+    if (items && items.length > 0) {
+      const stillActive = (it: import("../state").InteriorQuestItem): boolean => {
+        const state = gameState.moduleQuestStates.get(it.questName);
+        if (!state) return true;
+        return !state.stepProgress[it.stepIdx];
+      };
+      const filtered = items.filter(stillActive);
+      if (filtered.length !== items.length) {
+        gameState.interiorItems.set(this.townName, filtered);
+      }
     }
   }
 
@@ -816,64 +996,118 @@ export class TownScene extends Phaser.Scene {
    *  spawned. */
   private spawnInteriorMonstersIfNeeded(): void {
     if (!this.isInterior) return;
+    if (!this.encounterTable) return;
 
-    const target = `interior:${this.townName}`;
-    const steps = activeKillStepsForLocation(
+    const killSteps = activeKillStepsForLocation(
       this.questDefs,
       gameState.moduleQuestStates,
-      target,
+      this.mapLocation,
     );
+    // Collect-step guardians count too: a step like Veyron Heirloom is
+    // a `collect` (the scroll) but carries `has_guardian: yes` with a
+    // guardian encounter that should patrol the same room. Without
+    // this branch the player would walk into an empty Basement.
+    const collectSteps = activeCollectStepsForLocation(
+      this.questDefs,
+      gameState.moduleQuestStates,
+      this.mapLocation,
+    );
+
+    const rows: QuestKillRow[] = [];
+    for (const k of killSteps) {
+      rows.push({
+        questName: k.questName,
+        stepIdx: k.stepIdx,
+        encounter: k.step.encounter,
+        remaining: k.remaining,
+      });
+    }
+    for (const c of collectSteps) {
+      if (!c.step.hasGuardian || !c.step.guardianEncounter) continue;
+      // Skip guardians the player has already defeated. Without this
+      // check, returning to the Abandoned Building after killing the
+      // Cursed Battalion would spawn a fresh Battalion every visit
+      // until the scroll was finally picked up — an endless-encounter
+      // loop the player can't escape without solving the step.
+      const qstate = gameState.moduleQuestStates.get(c.questName);
+      if (qstate?.guardianDefeated[c.stepIdx]) continue;
+      rows.push({
+        questName: c.questName,
+        stepIdx: c.stepIdx,
+        encounter: c.step.guardianEncounter,
+        remaining: 1,
+        isGuardian: true,
+      });
+    }
+
     const existing = gameState.interiorMonsters.get(this.townName) ?? [];
-    if (steps.length === 0 && existing.length === 0) {
+    if (rows.length === 0 && existing.length === 0) {
       gameState.interiorMonsters.set(this.townName, []);
       return;
     }
 
-    // Build the walkable pool, excluding the entry tile, every NPC
-    // tile, and every cell already occupied by a surviving monster
-    // from a prior visit.
-    const occupied = new Set<string>();
-    occupied.add(`${this.entryCol},${this.entryRow}`);
-    for (const npc of this.town.npcs) occupied.add(`${npc.col},${npc.row}`);
-    for (const m of existing) occupied.add(`${m.col},${m.row}`);
-    const walkable: Array<[number, number]> = [];
-    for (let r = 0; r < this.tileMap.height; r++) {
-      for (let c = 0; c < this.tileMap.width; c++) {
-        if (!this.tileMap.isWalkable(c, r)) continue;
-        if (occupied.has(`${c},${r}`)) continue;
-        walkable.push([c, r]);
-      }
+    const reserved: Array<readonly [number, number]> = [
+      [this.entryCol, this.entryRow] as const,
+      ...this.town.npcs.map((n) => [n.col, n.row] as const),
+    ];
+    const placed = placeQuestInteriorMonsters(rows, {
+      walk: tileMapWalk(this.tileMap),
+      reserved,
+      existing,
+      encounters: this.encounterTable,
+      entryCol: this.entryCol,
+      entryRow: this.entryRow,
+    });
+    gameState.interiorMonsters.set(this.townName, placed);
+  }
+
+  /**
+   * Place quest collect items (the artifacts a `collect` step asks
+   * the player to pick up) on the floor of the current interior /
+   * building space. Mirrors the kill-spawn pass:
+   *   - re-entrant: tops up missing rows on every entry, leaves
+   *     surviving items where they were
+   *   - honours `spawn_col` / `spawn_row` overrides on the step;
+   *     falls back to a random walkable tile when those are unset
+   *     or aren't actually walkable
+   *   - excludes the entry tile, every NPC tile, every cell already
+   *     occupied by an interior monster, and every cell already
+   *     holding another quest item
+   * Without this pass the Veyron Heirloom quest's scroll never
+   * appeared in the Abandoned Building's basement and the step was
+   * unsolvable.
+   */
+  private spawnInteriorQuestItemsIfNeeded(): void {
+    if (!this.isInterior) return;
+
+    const collectSteps = activeCollectStepsForLocation(
+      this.questDefs,
+      gameState.moduleQuestStates,
+      this.mapLocation,
+    );
+    const existing = gameState.interiorItems.get(this.townName) ?? [];
+    if (collectSteps.length === 0 && existing.length === 0) {
+      gameState.interiorItems.set(this.townName, []);
+      return;
     }
 
-    const placed: import("../state").InteriorMonster[] = [...existing];
-    let nextId = placed.length;
-    for (const { questName, stepIdx, step, remaining } of steps) {
-      const tmpl = this.encounterTable
-        ? rosterFor(this.encounterTable, step.encounter)
-        : null;
-      if (!tmpl || tmpl.monsters.length === 0) continue;
-      // How many entries does this step already have on the floor?
-      const have = existing.filter(
-        (m) => m.questName === questName && m.stepIdx === stepIdx,
-      ).length;
-      const needed = remaining - have;
-      for (let n = 0; n < needed; n++) {
-        if (walkable.length === 0) break;
-        const idx = Math.floor(Math.random() * walkable.length);
-        const [c, r] = walkable.splice(idx, 1)[0];
-        placed.push({
-          id: `q-${questName}-${stepIdx}-${nextId++}`,
-          col: c,
-          row: r,
-          name: tmpl.monsterPartyTile,
-          encounterNames: [...tmpl.monsters],
-          encounterName: tmpl.name,
-          questName,
-          stepIdx,
-        });
-      }
-    }
-    gameState.interiorMonsters.set(this.townName, placed);
+    const reserved: Array<readonly [number, number]> = [
+      [this.entryCol, this.entryRow] as const,
+      ...this.town.npcs.map((n) => [n.col, n.row] as const),
+    ];
+    const monsterCells = (
+      gameState.interiorMonsters.get(this.townName) ?? []
+    ).map((m) => [m.col, m.row] as const);
+
+    const placed = placeQuestInteriorItems(collectSteps, {
+      walk: tileMapWalk(this.tileMap),
+      reserved,
+      existing,
+      monsterCells,
+      entryCol: this.entryCol,
+      entryRow: this.entryRow,
+    });
+    gameState.interiorItems.set(this.townName, placed);
   }
 
   private drawInteriorMonsters(): void {
@@ -906,6 +1140,42 @@ export class TownScene extends Phaser.Scene {
           { color: QUEST_MONSTER_COLOR, intensity: 0.5, depth: 7 },
         ),
       );
+    }
+  }
+
+  /**
+   * Draw the quest collect artifact for every item placed on this
+   * map, with a cyan halo to match the dungeon's artifact glow. We
+   * use the same `assets/dungeon/artifact.png` sprite the dungeon
+   * uses; if Phaser hasn't finished loading it yet (cold-boot race),
+   * fall back to a yellow diamond so the player still sees something
+   * to walk into.
+   */
+  private drawInteriorQuestItems(): void {
+    if (!this.isInterior) return;
+    const list = gameState.interiorItems.get(this.townName) ?? [];
+    for (const it of list) {
+      const x = this.tileX(it.col);
+      const y = this.tileY(it.row);
+      let obj: Phaser.GameObjects.GameObject;
+      if (this.textures.exists(QUEST_ITEM_SPRITE_KEY)) {
+        obj = this.add.image(x, y, QUEST_ITEM_SPRITE_KEY).setDepth(8);
+      } else {
+        obj = this.add
+          .rectangle(x, y, TILE - 12, TILE - 12, 0xffd84a, 1)
+          .setStrokeStyle(2, 0x1a1a2e)
+          .setAngle(45)
+          .setDepth(8);
+      }
+      this.interiorItemSprites.set(it.id, obj);
+      const sprite = obj as Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
+      const glow = attachPulsingGlow(
+        this,
+        () => sprite.x,
+        () => sprite.y,
+        { color: QUEST_ITEM_COLOR, intensity: 0.55, depth: 7 },
+      );
+      this.interiorItemGlows.set(it.id, glow);
     }
   }
 
@@ -980,6 +1250,58 @@ export class TownScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * If the party just stepped onto a quest collect item, pick it up.
+   * Credits the step (calling `creditCollect`), removes the on-map
+   * sprite, drops the artifact into shared inventory, and surfaces the
+   * step-complete banner. No-op when (col, row) holds nothing
+   * collectable. Safe to call on every step — this is the cheapest
+   * way to keep the pickup handler co-located with movement.
+   */
+  private tryPickUpInteriorQuestItem(col: number, row: number): void {
+    if (!this.isInterior) return;
+    const list = gameState.interiorItems.get(this.townName) ?? [];
+    if (list.length === 0) return;
+    const idx = list.findIndex((it) => it.col === col && it.row === row);
+    if (idx < 0) return;
+    const it = list[idx];
+
+    const result = creditCollect(
+      this.questDefs,
+      gameState.moduleQuestStates,
+      it.questName,
+      it.stepIdx,
+      it.itemName,
+    );
+    if (gameState.partyData) {
+      gameState.partyData.inventory.push({ item: it.itemName });
+    }
+
+    // Strip the entry from shared state, drop the sprite + glow.
+    const next = list.filter((_, i) => i !== idx);
+    gameState.interiorItems.set(this.townName, next);
+    const sprite = this.interiorItemSprites.get(it.id);
+    if (sprite) {
+      sprite.destroy();
+      this.interiorItemSprites.delete(it.id);
+    }
+    const glow = this.interiorItemGlows.get(it.id);
+    if (glow) {
+      glow.destroy();
+      this.interiorItemGlows.delete(it.id);
+    }
+
+    if (result.callout) {
+      showStepCompleteCallout(this, {
+        questName: result.callout.questName,
+        description: result.callout.description,
+        questComplete: result.callout.questComplete,
+      });
+    } else {
+      flashQuestMessage(this, result.message);
+    }
+  }
+
   /** Look up the monster (if any) at (col, row) in the current
    *  interior. Returns null on a top-level town or empty cell. */
   private interiorMonsterAt(col: number, row: number): import("../state").InteriorMonster | null {
@@ -1006,7 +1328,7 @@ export class TownScene extends Phaser.Scene {
    *  but routes the return back to TownScene with this interior's
    *  init data so creditKills can run on the way back. */
   private engageInteriorMonster(m: import("../state").InteriorMonster): void {
-    gameState.combatLocation = `interior:${this.townName}`;
+    gameState.combatLocation = this.mapLocation;
     this.cameras.main.fadeOut(220, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", () => {
       this.scene.start("CombatScene", {
@@ -1280,6 +1602,10 @@ export class TownScene extends Phaser.Scene {
       duration: 110,
       onComplete: () => {
         this.busy = false;
+        // Walking onto a quest collect item picks it up — credits the
+        // step, drops the artifact into shared inventory, and removes
+        // the on-map sprite. Mirrors DungeonScene.pickUpArtifact.
+        this.tryPickUpInteriorQuestItem(nc, nr);
         advanceClock(gameState.clock);
         // Burn down each warm-orb light step in dark scenes so a
         // 150-step Torch or a 100-step Light spell actually expires

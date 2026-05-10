@@ -3560,6 +3560,16 @@ export class CombatScene extends Phaser.Scene {
       if (this.interiorMonsterId && this.interiorPath) {
         const list = gameState.interiorMonsters.get(this.interiorPath);
         if (list) {
+          // Look up the engagement target before stripping it so we can
+          // mark guardian defeats on the QuestState. Without that mark,
+          // the spawn pass would re-place the guardian on the very next
+          // entry to the building space, putting the player in an
+          // endless-encounter loop until they picked up the artifact.
+          const engaged = list.find((m) => m.id === this.interiorMonsterId);
+          if (engaged?.isGuardian) {
+            const qstate = gameState.moduleQuestStates.get(engaged.questName);
+            if (qstate) qstate.guardianDefeated[engaged.stepIdx] = true;
+          }
           gameState.interiorMonsters.set(
             this.interiorPath,
             list.filter((m) => m.id !== this.interiorMonsterId),

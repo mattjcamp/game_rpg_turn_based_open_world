@@ -34,7 +34,7 @@
  * fresh, otherwise the loader sees null and the next scene-boot
  * will lazy-load from the roster cache.
  */
-import { gameState, resetGameState, type GameState, type InteriorMonster } from "./state";
+import { gameState, resetGameState, type GameState, type InteriorMonster, type InteriorQuestItem } from "./state";
 import type { DungeonLevel, DungeonMonster } from "./world/Dungeon";
 import type { QuestState } from "./world/Quests";
 import {
@@ -81,6 +81,7 @@ interface RawSave {
   combatLocation: string;
   pendingKilledMonsters: string[];
   interiorMonsters: Array<[string, InteriorMonster[]]>;
+  interiorItems: Array<[string, InteriorQuestItem[]]>;
   shopInventories: Array<[string, string[]]>;
   party_combat: Combatant[];
   lastScene: LastSceneSnapshot | null;
@@ -171,6 +172,7 @@ function toRaw(s: GameState): RawSave {
     combatLocation: s.combatLocation,
     pendingKilledMonsters: [...s.pendingKilledMonsters],
     interiorMonsters: [...s.interiorMonsters.entries()],
+    interiorItems: [...s.interiorItems.entries()],
     shopInventories: [...s.shopInventories.entries()],
     party_combat: s.party,
     lastScene: s.lastScene ?? null,
@@ -218,6 +220,7 @@ function fromRaw(raw: RawSave, target: GameState): void {
   target.combatLocation = raw.combatLocation ?? "";
   target.pendingKilledMonsters = raw.pendingKilledMonsters ?? [];
   target.interiorMonsters = new Map(raw.interiorMonsters ?? []);
+  target.interiorItems = new Map(raw.interiorItems ?? []);
   target.shopInventories = new Map(raw.shopInventories ?? []);
   target.party = raw.party_combat ?? [];
   target.lastScene = raw.lastScene ?? null;

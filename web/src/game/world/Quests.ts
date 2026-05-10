@@ -131,6 +131,14 @@ export interface QuestState {
   /** Per-kill-step counter so multi-target steps (e.g. "Wolves and
    *  Goblins ×3") report progress and complete on the right roll. */
   stepKills: Record<number, number>;
+  /** Per-collect-step flag — true once the guardian protecting a
+   *  collect step's artifact has been defeated. The interior /
+   *  building-space spawn pass reads this to avoid re-spawning the
+   *  guardian on every re-entry, which would otherwise leave the
+   *  player in an endless-encounter loop the moment they killed the
+   *  Cursed Battalion and walked back into the Abandoned Building.
+   *  Indices not in the map default to "guardian still alive". */
+  guardianDefeated: Record<number, boolean>;
 }
 
 interface RawQuestStep {
@@ -291,6 +299,7 @@ export function ensureQuestStates(
         status: "available",
         stepProgress: def.steps.map(() => false),
         stepKills: {},
+        guardianDefeated: {},
       };
       states.set(def.name, state);
       continue;
@@ -298,6 +307,10 @@ export function ensureQuestStates(
     while (state.stepProgress.length < def.steps.length) {
       state.stepProgress.push(false);
     }
+    // Saves written before the guardian-defeated tracking landed
+    // arrive without the field — patch it in so the spawn pass can
+    // read it without an undefined-property guard everywhere.
+    if (!state.guardianDefeated) state.guardianDefeated = {};
   }
 }
 
@@ -532,6 +545,36 @@ export function activeCollectStepFor(
     }
   }
   return null;
+}
+
+/**
+ * Every active collect step whose `spawn_location` resolves to the
+ * given `combatLocation` (per `locationMatches`). Companion to
+ * `activeKillStepsForLocation` — TownScene calls this when entering a
+ * building space (or interior) to figure out which artifacts to drop
+ * on the floor. A single space hosts at most one collect step in v1,
+ * but we return a list so a future module that pins two artifacts to
+ * the same room (e.g. the binding-rite + the keystone) doesn't lose
+ * one silently.
+ */
+export function activeCollectStepsForLocation(
+  defs: QuestDef[],
+  states: Map<string, QuestState>,
+  combatLocation: string,
+): Array<{ questName: string; stepIdx: number; step: QuestStep }> {
+  const out: Array<{ questName: string; stepIdx: number; step: QuestStep }> = [];
+  for (const def of defs) {
+    const state = states.get(def.name);
+    if (!state || state.status !== "active") continue;
+    for (let i = 0; i < def.steps.length; i++) {
+      const step = def.steps[i];
+      if (step.stepType !== "collect") continue;
+      if (state.stepProgress[i]) continue;
+      if (!locationMatches(step.spawnLocation, combatLocation)) continue;
+      out.push({ questName: def.name, stepIdx: i, step });
+    }
+  }
+  return out;
 }
 
 /**

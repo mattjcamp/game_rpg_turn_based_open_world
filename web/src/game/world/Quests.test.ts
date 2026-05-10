@@ -8,6 +8,7 @@ import {
   creditKills,
   creditCollect,
   activeCollectStepFor,
+  activeCollectStepsForLocation,
   locationHint,
   applyWorldUnlocks,
   applyTurnedInWorldUnlocks,
@@ -131,7 +132,12 @@ describe("Quests — state lifecycle", () => {
   });
 
   it("ensureQuestStates pads stepProgress when a quest grew steps", () => {
-    states.set("Q1", { status: "active", stepProgress: [], stepKills: {} });
+    states.set("Q1", {
+      status: "active",
+      stepProgress: [],
+      stepKills: {},
+      guardianDefeated: {},
+    });
     ensureQuestStates([quest("Q1", { steps: [killStep(), killStep()] })], states);
     expect(states.get("Q1")?.stepProgress).toEqual([false, false]);
   });
@@ -287,6 +293,94 @@ describe("Quests — activeCollectStepFor", () => {
     ensureQuestStates(defs, states);
     // Q1 still available, not active
     expect(activeCollectStepFor(defs, states, "dungeon:The Old Forest by the Sea")).toBeNull();
+  });
+});
+
+describe("Quests — guardianDefeated state", () => {
+  it("ensureQuestStates seeds guardianDefeated as an empty record", () => {
+    const defs = [quest("Q1", { steps: [collectStep()] })];
+    const states = new Map<string, QuestState>();
+    ensureQuestStates(defs, states);
+    expect(states.get("Q1")?.guardianDefeated).toEqual({});
+  });
+
+  it("ensureQuestStates patches guardianDefeated onto saves that lack it", () => {
+    // Simulate a save written before the guardianDefeated field
+    // existed by deleting it post-init. The patch path runs on the
+    // second ensureQuestStates call.
+    const defs = [quest("Q1", { steps: [collectStep()] })];
+    const states = new Map<string, QuestState>();
+    ensureQuestStates(defs, states);
+    delete (states.get("Q1") as Partial<QuestState>).guardianDefeated;
+    ensureQuestStates(defs, states);
+    expect(states.get("Q1")?.guardianDefeated).toEqual({});
+  });
+});
+
+describe("Quests — activeCollectStepsForLocation", () => {
+  it("returns every active collect step matching the location", () => {
+    // Two distinct quests both pinning a collect step to the same
+    // building space — the v1 modules don't ship one of these but
+    // the function shouldn't drop the second silently.
+    const defs = [
+      quest("Q1", { steps: [collectStep({
+        spawnLocation: "space:Abandoned Building/Basement",
+        collectItem: "scroll",
+      })] }),
+      quest("Q2", { steps: [collectStep({
+        spawnLocation: "space:Abandoned Building/Basement",
+        collectItem: "amulet",
+        hasGuardian: false,
+        guardianEncounter: "",
+      })] }),
+    ];
+    const states = new Map<string, QuestState>();
+    ensureQuestStates(defs, states);
+    acceptQuest(states, "Q1");
+    acceptQuest(states, "Q2");
+    const found = activeCollectStepsForLocation(
+      defs, states, "space:Abandoned Building/Basement",
+    );
+    expect(found.map((f) => f.questName).sort()).toEqual(["Q1", "Q2"]);
+  });
+
+  it("returns [] when no active collect targets the location", () => {
+    const defs = [quest("Q1", { steps: [collectStep({
+      spawnLocation: "space:Sea Shrine/Citadel 4",
+    })] })];
+    const states = new Map<string, QuestState>();
+    ensureQuestStates(defs, states);
+    acceptQuest(states, "Q1");
+    expect(activeCollectStepsForLocation(
+      defs, states, "space:Abandoned Building/Basement",
+    )).toEqual([]);
+  });
+
+  it("excludes available + completed steps", () => {
+    const defs = [quest("Q1", { steps: [collectStep({
+      spawnLocation: "space:Foo/Bar",
+    })] })];
+    const states = new Map<string, QuestState>();
+    ensureQuestStates(defs, states);
+    // Available — not yet accepted, no spawn.
+    expect(activeCollectStepsForLocation(defs, states, "space:Foo/Bar")).toEqual([]);
+    acceptQuest(states, "Q1");
+    expect(activeCollectStepsForLocation(defs, states, "space:Foo/Bar")).toHaveLength(1);
+    // Completed step — also no spawn.
+    states.get("Q1")!.stepProgress[0] = true;
+    expect(activeCollectStepsForLocation(defs, states, "space:Foo/Bar")).toEqual([]);
+  });
+
+  it("matches building:X step against any space:X/Y location", () => {
+    const defs = [quest("Q1", { steps: [collectStep({
+      spawnLocation: "building:Sea Shrine",
+    })] })];
+    const states = new Map<string, QuestState>();
+    ensureQuestStates(defs, states);
+    acceptQuest(states, "Q1");
+    expect(activeCollectStepsForLocation(
+      defs, states, "space:Sea Shrine/Citadel 2",
+    )).toHaveLength(1);
   });
 });
 

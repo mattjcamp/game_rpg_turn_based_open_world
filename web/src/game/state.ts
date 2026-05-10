@@ -140,6 +140,16 @@ export interface GameState {
    */
   interiorMonsters: Map<string, InteriorMonster[]>;
   /**
+   * Quest collect items placed in town interiors / building spaces,
+   * keyed by the same town path used by `interiorMonsters` (e.g.
+   * `"building:Abandoned Building:Basement"`). Populated lazily on
+   * first entry to a space whose active quests have collect steps
+   * targeting it. Mirrors the Python `quest_collect_items` dict —
+   * walking the party onto an entry credits the collect step and
+   * removes it from the list.
+   */
+  interiorItems: Map<string, InteriorQuestItem[]>;
+  /**
    * Per-shop-instance inventory, keyed by `${townName}|${shopType}`.
    * Each value is the list of item names currently in stock at that
    * counter. Seeded lazily from `counters.json` on first visit, then
@@ -211,6 +221,27 @@ export interface InteriorMonster {
    *  with `questName`, this is the per-step identity used to decide
    *  whether more monsters need spawning on re-entry. */
   stepIdx: number;
+  /** True for a guardian spawned to protect a collect step's artifact
+   *  (e.g. the Cursed Battalion guarding the Veyron scroll). The
+   *  fight isn't credited to a kill step — defeating the guardian
+   *  just clears the way to the artifact. The flag lets the
+   *  cleanup pass keep the guardian alive while the collect step
+   *  is still open, even though there's no kill step to anchor it. */
+  isGuardian?: boolean;
+}
+
+export interface InteriorQuestItem {
+  /** Stable id — useful for tests and so the renderer can attach a
+   *  per-item glow handle. */
+  id: string;
+  col: number;
+  row: number;
+  /** Display name of the artifact (`collect_item` from the quest). */
+  itemName: string;
+  /** Quest this item belongs to — together with `stepIdx` this is
+   *  the per-step identity passed to `creditCollect` on pickup. */
+  questName: string;
+  stepIdx: number;
 }
 
 function makeFreshState(): GameState {
@@ -238,6 +269,7 @@ function makeFreshState(): GameState {
     combatLocation: "",
     pendingKilledMonsters: [],
     interiorMonsters: new Map(),
+    interiorItems: new Map(),
     shopInventories: new Map(),
     pickpocketedNpcs: new Set(),
     lastScene: null,
@@ -273,6 +305,7 @@ export function resetGameState(): void {
   gameState.combatLocation = fresh.combatLocation;
   gameState.pendingKilledMonsters = fresh.pendingKilledMonsters;
   gameState.interiorMonsters = fresh.interiorMonsters;
+  gameState.interiorItems = fresh.interiorItems;
   gameState.shopInventories = fresh.shopInventories;
   gameState.pickpocketedNpcs = fresh.pickpocketedNpcs;
   gameState.lastScene = fresh.lastScene;
