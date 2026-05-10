@@ -72,6 +72,7 @@ import {
   dungeonSeed,
   styleFloorTile,
   placeQuestKillMonsters,
+  cleanupCompletedQuestMonsters,
   TILE_STAIRS,
   TILE_STAIRS_DOWN,
   TILE_CHEST,
@@ -1070,14 +1071,34 @@ export class DungeonScene extends Phaser.Scene {
    */
   private spawnQuestKillMonstersIfNeeded(): void {
     if (this.questDefs.length === 0) return;
-    if (!this.encounterTable) return;
     const target = `dungeon:${this.dungeonName}`;
     const steps = activeKillStepsForLocation(
       this.questDefs,
       gameState.moduleQuestStates,
       target,
     );
+    // Build the active-step set FIRST. This drives both the cleanup
+    // sweep below (which runs unconditionally) and the spawn pass
+    // (only if there are rows to place).
+    const activeStepKeys = new Set(
+      steps.map((s) => `${s.questName}|${s.stepIdx}`),
+    );
+    // ── Sweep stale quest monsters from completed/turned-in steps ──
+    //
+    // Runs even when `steps` is empty — that's the case where the
+    // player has completed every step of every quest targeting this
+    // dungeon, and any quest monsters still in the cached level are
+    // pure leftovers (a 4th wolf from an over-spawn, an orphaned boss
+    // from a different distribution rule, or just a stale spawn from
+    // a step that's now done). Without this sweep the player would
+    // walk back into the dungeon and see glowing encounters from
+    // quests that are already turned in.
+    cleanupCompletedQuestMonsters(this.levels, activeStepKeys);
+
+    // Nothing to place if nothing's active or the encounters file
+    // didn't load — but the cleanup above still fired.
     if (steps.length === 0) return;
+    if (!this.encounterTable) return;
     // Convert the quest-side rows into the placement helper's input
     // shape, looking up the encounter template for each step.
     const rows: import("../world/Dungeon").QuestKillSpawnRow[] = [];

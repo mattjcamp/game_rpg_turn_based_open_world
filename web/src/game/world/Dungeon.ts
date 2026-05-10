@@ -1089,6 +1089,37 @@ export interface QuestKillSpawnRow {
  * etc.). `entryByLevel` is the per-floor entry tile — we exclude it
  * so a quest monster can't spawn on top of where the player drops in.
  */
+/**
+ * Sweep every floor of `levels` and remove quest monsters whose
+ * `(questName, stepIdx)` isn't in `activeStepKeys`. Catches:
+ *
+ *   - Monsters from steps the player has already completed (a
+ *     stale 4th warband from older code that placed too many; a
+ *     boss spawn whose step is now complete because the player
+ *     killed enough warbands and the boss step never had a target).
+ *   - Monsters from quests that are now `turned_in` — the quest
+ *     is over, the dungeon shouldn't still glow with its targets.
+ *   - Monsters whose questName references a quest that no longer
+ *     exists in the data (a module rename / deletion edge case).
+ *
+ * Random (non-quest) monsters are untouched. Idempotent: calling
+ * twice with the same active set is a no-op the second time.
+ *
+ * Pass `activeStepKeys = new Set(steps.map(s => `${s.questName}|${s.stepIdx}`))`
+ * — same shape both this helper and the placement helper consume.
+ */
+export function cleanupCompletedQuestMonsters(
+  levels: DungeonLevel[],
+  activeStepKeys: ReadonlySet<string>,
+): void {
+  for (const lvl of levels) {
+    lvl.monsters = lvl.monsters.filter((m) => {
+      if (m.questName == null || typeof m.stepIdx !== "number") return true;
+      return activeStepKeys.has(`${m.questName}|${m.stepIdx}`);
+    });
+  }
+}
+
 export function placeQuestKillMonsters(
   levels: DungeonLevel[],
   rows: readonly QuestKillSpawnRow[],
@@ -1096,12 +1127,66 @@ export function placeQuestKillMonsters(
   rng: () => number = Math.random,
 ): void {
   if (levels.length === 0) return;
+  // Track which floors we've already stripped of random encounters
+  // this pass so two quest steps targeting the same floor don't
+  // run the filter twice (once is enough; the second `some` check
+  // would short-circuit anyway).
+  const stripped = new Set<number>();
   for (const row of rows) {
     if (row.remaining <= 0) continue;
     if (!row.template.monsters.length) continue;
     const floorIdx = Math.min(row.stepIdx, levels.length - 1);
     const lvl = levels[floorIdx];
-    // How many monsters for this step are already on the floor?
+    // **Strip random encounters from any floor that gets quest
+    // monsters.** The procedural generator's random pool would
+    // otherwise sit alongside the quest spawns — for a low-level
+    // dungeon like Goblin's Nest, the random table is dominated by
+    // Cellar Rats / Rat Nest (weight 60 of ~85 total), so the
+    // player saw their 4 quest-mandated wolves / goblins PLUS ~4
+    // random rat encounters. The quest steps are the dungeon's
+    // intended content; random rolls dilute the theme. Idempotent:
+    // the `.some()` guard means re-entries (where random monsters
+    // are already gone) don't cost the filter walk again.
+    if (!stripped.has(floorIdx) && lvl.monsters.some((m) => m.questName == null)) {
+      lvl.monsters = lvl.monsters.filter((m) => m.questName != null);
+    }
+    stripped.add(floorIdx);
+
+    // ── Cleanup pass for stale / over-spawned quest monsters ──
+    //
+    // Older versions of this helper distributed quest monsters
+    // differently (everything on floor 0 with no step-based
+    // clamping; or no `remaining` cap). A cached dungeon generated
+    // under that code carries stale state — misplaced step-N
+    // monsters on the wrong floor, or more than `target_count`
+    // copies on the right floor. Without cleanup, the player keeps
+    // seeing the legacy artifacts even though the new placement
+    // math is correct. Two-step heal:
+    //
+    //   1. Remove this step's monsters from every non-target floor.
+    //      They'll get re-spawned in the right place by the top-up
+    //      below if `remaining` says so.
+    for (let i = 0; i < levels.length; i++) {
+      if (i === floorIdx) continue;
+      levels[i].monsters = levels[i].monsters.filter(
+        (m) => !(m.questName === row.questName && m.stepIdx === row.stepIdx),
+      );
+    }
+    //   2. Cap this step's monsters on the target floor at
+    //      `remaining`. If a prior run over-spawned (e.g. 4 copies
+    //      when the quest only wanted 3), drop the excess so the
+    //      player doesn't fight more than the quest demands.
+    let kept = 0;
+    lvl.monsters = lvl.monsters.filter((m) => {
+      if (m.questName === row.questName && m.stepIdx === row.stepIdx) {
+        kept += 1;
+        return kept <= row.remaining;
+      }
+      return true;
+    });
+
+    // How many of this step's monsters are now on the target floor
+    // (post-cleanup, all step-N monsters live on the target floor).
     const have = lvl.monsters.filter(
       (m) => m.questName === row.questName && m.stepIdx === row.stepIdx,
     ).length;

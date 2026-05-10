@@ -6,6 +6,7 @@ import {
   dungeonSeed,
   styleFloorTile,
   placeQuestKillMonsters,
+  cleanupCompletedQuestMonsters,
   TILE_DWALL,
   TILE_STAIRS,
   TILE_STAIRS_DOWN,
@@ -444,5 +445,184 @@ describe("placeQuestKillMonsters", () => {
     // ID prefix follows the q-<questName>-<stepIdx>-<n> pattern so
     // it can't collide with the random `m-<seed>-<i>` ids.
     expect(m.id.startsWith("q-Goblins-0-")).toBe(true);
+  });
+
+  it("strips random encounters from floors that get quest monsters", () => {
+    const levels = blankDungeon(2);
+    // Pretend the dungeon generator already placed 3 random rat
+    // encounters on floor 0 (the dominant pool at low levels).
+    levels[0].monsters.push(
+      { id: "m-1-0", col: 1, row: 1, name: "Giant Rat", encounterNames: ["Giant Rat"], encounterName: "Cellar Rats" },
+      { id: "m-1-1", col: 2, row: 2, name: "Giant Rat", encounterNames: ["Giant Rat"], encounterName: "Rat Nest" },
+      { id: "m-1-2", col: 3, row: 3, name: "Giant Rat", encounterNames: ["Giant Rat"], encounterName: "Cellar Rats" },
+    );
+    // Floor 1 has random encounters too — they should NOT be cleared,
+    // because no quest step targets that floor in this test.
+    levels[1].monsters.push(
+      { id: "m-2-0", col: 1, row: 1, name: "Giant Rat", encounterNames: ["Giant Rat"], encounterName: "Cellar Rats" },
+    );
+    placeQuestKillMonsters(levels, [row("Q", 0, 3)], () => true);
+    // Floor 0: only the 3 quest monsters remain.
+    expect(levels[0].monsters.every((m) => m.questName === "Q")).toBe(true);
+    expect(levels[0].monsters).toHaveLength(3);
+    // Floor 1 untouched.
+    expect(levels[1].monsters).toHaveLength(1);
+    expect(levels[1].monsters[0].questName).toBeUndefined();
+  });
+
+  it("two steps targeting the same floor strip random monsters once", () => {
+    // 1-floor dungeon: both step 0 and step 1 land on floor 0 (clamp).
+    const levels = blankDungeon(1);
+    levels[0].monsters.push(
+      { id: "m-1-0", col: 1, row: 1, name: "Giant Rat", encounterNames: ["Giant Rat"], encounterName: "Cellar Rats" },
+    );
+    placeQuestKillMonsters(levels, [row("Q", 0, 2), row("Q", 1, 1, "Boss", ["Goblin"])], () => true);
+    // No random monsters; 2 + 1 = 3 quest monsters placed.
+    expect(levels[0].monsters.every((m) => m.questName === "Q")).toBe(true);
+    expect(levels[0].monsters).toHaveLength(3);
+  });
+
+  it("relocates stale quest monsters off the wrong floor onto their target floor", () => {
+    // Simulates a player whose dungeon was generated under an older
+    // version that placed step-1 monsters on floor 0 (everything on
+    // the entry floor). On re-entry under the new floor-distribution
+    // code, the helper should DELETE the misplaced monster from
+    // floor 0 and spawn a fresh copy on floor 1 — net total stays at
+    // `target_count` but the layout is now correct.
+    const levels = blankDungeon(2);
+    levels[0].monsters.push({
+      id: "q-Q-1-stale",
+      col: 1, row: 1,
+      name: "Goblin",
+      encounterNames: ["Goblin", "Goblin"],
+      encounterName: "Goblin Ambush",
+      questName: "Q",
+      stepIdx: 1,
+    });
+    placeQuestKillMonsters(levels, [row("Q", 1, 1, "Goblin Ambush", ["Goblin"])], () => true);
+    // Floor 0 has no step-1 monsters left.
+    expect(levels[0].monsters.filter(
+      (m) => m.questName === "Q" && m.stepIdx === 1,
+    )).toHaveLength(0);
+    // Floor 1 has exactly one — the relocation.
+    expect(levels[1].monsters.filter(
+      (m) => m.questName === "Q" && m.stepIdx === 1,
+    )).toHaveLength(1);
+    // Total = target_count, no duplicates.
+    const total = levels.flatMap((l) => l.monsters).filter(
+      (m) => m.questName === "Q" && m.stepIdx === 1,
+    ).length;
+    expect(total).toBe(1);
+  });
+
+  it("caps over-spawned quest monsters on the target floor at `remaining`", () => {
+    // Simulates a prior run that placed FOUR step-0 monsters when
+    // the quest only wants three (older code with no cap). Cleanup
+    // should drop the extra so the player doesn't fight an extra
+    // warband.
+    const levels = blankDungeon(1);
+    for (let i = 0; i < 4; i++) {
+      levels[0].monsters.push({
+        id: `q-Q-0-${i}`,
+        col: i, row: 0,
+        name: "Wolf",
+        encounterNames: ["Wolf"],
+        encounterName: "Wolves",
+        questName: "Q",
+        stepIdx: 0,
+      });
+    }
+    placeQuestKillMonsters(levels, [row("Q", 0, 3)], () => true);
+    expect(levels[0].monsters).toHaveLength(3);
+    expect(levels[0].monsters.every((m) => m.questName === "Q")).toBe(true);
+  });
+
+  it("re-entry doesn't re-strip or duplicate quest monsters", () => {
+    const levels = blankDungeon(1);
+    // First entry: 3 random + 0 quest.
+    levels[0].monsters.push(
+      { id: "m-1-0", col: 0, row: 1, name: "Giant Rat", encounterNames: ["Giant Rat"], encounterName: "Cellar Rats" },
+    );
+    placeQuestKillMonsters(levels, [row("Q", 0, 3)], () => true);
+    expect(levels[0].monsters).toHaveLength(3);
+    // Pretend the player killed one quest monster, then re-entered.
+    levels[0].monsters.pop();
+    expect(levels[0].monsters).toHaveLength(2);
+    placeQuestKillMonsters(levels, [row("Q", 0, 2)], () => true);
+    // Top-up math gives have=2, remaining=2, needed=0 — no new spawns.
+    expect(levels[0].monsters).toHaveLength(2);
+    // And the random monsters didn't come back either.
+    expect(levels[0].monsters.every((m) => m.questName === "Q")).toBe(true);
+  });
+});
+
+describe("cleanupCompletedQuestMonsters", () => {
+  function levelWithMonsters(...monsters: ReadonlyArray<{
+    id: string;
+    questName?: string;
+    stepIdx?: number;
+  }>): DungeonLevel {
+    return {
+      name: "L",
+      width: 4, height: 4,
+      tiles: [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],
+      decorations: {},
+      tileProperties: {},
+      entryCol: 0, entryRow: 0,
+      style: "default",
+      monsters: monsters.map((m, i) => ({
+        col: i, row: 0,
+        name: "Goblin",
+        encounterNames: ["Goblin"],
+        encounterName: "Whatever",
+        ...m,
+      })),
+      openedChests: new Set(), triggeredTraps: new Set(),
+      exploredTiles: new Set(), overworldExits: new Set(),
+      questArtifacts: {},
+    };
+  }
+
+  it("removes quest monsters whose step is no longer active", () => {
+    const lvl = levelWithMonsters(
+      { id: "live", questName: "Q", stepIdx: 0 },
+      { id: "stale", questName: "Q", stepIdx: 1 },     // step 1 just completed
+      { id: "ancient", questName: "Old Quest", stepIdx: 0 }, // turned-in quest
+    );
+    cleanupCompletedQuestMonsters([lvl], new Set(["Q|0"]));
+    expect(lvl.monsters.map((m) => m.id)).toEqual(["live"]);
+  });
+
+  it("preserves random (non-quest) monsters untouched", () => {
+    const lvl = levelWithMonsters(
+      { id: "rat-1" },                                  // random — keep
+      { id: "boss", questName: "Q", stepIdx: 0 },       // active — keep
+      { id: "stale", questName: "Q", stepIdx: 1 },      // stale — drop
+    );
+    cleanupCompletedQuestMonsters([lvl], new Set(["Q|0"]));
+    expect(lvl.monsters.map((m) => m.id)).toEqual(["rat-1", "boss"]);
+  });
+
+  it("sweeps every floor when called on a multi-level dungeon", () => {
+    const a = levelWithMonsters({ id: "stale-a", questName: "Q", stepIdx: 0 });
+    const b = levelWithMonsters({ id: "stale-b", questName: "Q", stepIdx: 0 });
+    cleanupCompletedQuestMonsters([a, b], new Set());
+    expect(a.monsters).toHaveLength(0);
+    expect(b.monsters).toHaveLength(0);
+  });
+
+  it("is a no-op for an empty levels array", () => {
+    expect(() => cleanupCompletedQuestMonsters([], new Set())).not.toThrow();
+  });
+
+  it("is idempotent — running twice with the same active set is a no-op", () => {
+    const lvl = levelWithMonsters(
+      { id: "live", questName: "Q", stepIdx: 0 },
+      { id: "stale", questName: "Q", stepIdx: 1 },
+    );
+    cleanupCompletedQuestMonsters([lvl], new Set(["Q|0"]));
+    const after = lvl.monsters.map((m) => m.id);
+    cleanupCompletedQuestMonsters([lvl], new Set(["Q|0"]));
+    expect(lvl.monsters.map((m) => m.id)).toEqual(after);
   });
 });
