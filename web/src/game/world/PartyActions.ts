@@ -30,8 +30,44 @@ const SLOT_TO_FIELD: Record<EquipSlot, keyof EquipmentSlots> = {
   head:       "head",
 };
 
+/**
+ * Equip slots the player UI currently surfaces. Two rows ship today:
+ *
+ *   - `right_hand` — drives the "Hands" row (the player's weapon).
+ *     The combat math reads attack/damage off this slot; offhand
+ *     content didn't actually move the dice, so we don't surface a
+ *     second hand row that promised a buff it couldn't deliver.
+ *   - `body`       — body armor, drives the "Body" row.
+ *
+ * `left_hand` and `head` stay in the EquipSlot type for forward
+ * compat (offhand weapons and helmets will return when the matching
+ * gameplay + UI lands), but every player-facing path filters through
+ * this list so empty rows the player can't fill don't show up as
+ * "broken".
+ */
+export const SUPPORTED_EQUIP_SLOTS: readonly EquipSlot[] = [
+  "right_hand", "body",
+];
+
+/**
+ * The slots an item can land in given the currently-supported set.
+ * Filters the catalog's `slots` list to entries the player can
+ * actually target. Returns `[]` for items whose only slots are
+ * unsupported — equip helpers treat that as "not equippable".
+ */
+export function equippableSlots(
+  item: Item,
+  supported: readonly EquipSlot[] = SUPPORTED_EQUIP_SLOTS,
+): EquipSlot[] {
+  if (!item.characterCanEquip) return [];
+  return item.slots.filter((s) => supported.includes(s));
+}
+
+// Slot labels used in feedback/log lines (e.g. "Gimli equips Sword as
+// hands."). The collapsed-UI model uses "hands" for the right-hand
+// slot since the player no longer thinks of it as primary-vs-offhand.
 const SLOT_LABEL: Record<EquipSlot, string> = {
-  right_hand: "weapon",
+  right_hand: "hands",
   left_hand:  "offhand",
   body:       "body armor",
   head:       "helmet",
@@ -440,19 +476,27 @@ export function equipItemFromInventory(
   if (!def) {
     return { ok: false, message: `Don't know how to equip ${inv.item}.` };
   }
-  if (!def.characterCanEquip || def.slots.length === 0) {
+  // Only consider slots the player UI currently surfaces — head/etc.
+  // are filtered out so a head-only item refuses cleanly until the
+  // matching UI lands.
+  const usable = equippableSlots(def);
+  if (!def.characterCanEquip || usable.length === 0) {
     return { ok: false, message: `${inv.item} cannot be equipped.` };
   }
 
   // First empty matching slot wins.
   let chosen: EquipSlot | null = null;
-  for (const s of def.slots) {
+  for (const s of usable) {
     if (readSlot(member, s) == null) { chosen = s; break; }
   }
 
   if (chosen == null) {
     // All matching slots full — swap with the FIRST listed slot.
-    chosen = def.slots[0];
+    // The displaced item moves back into personal inventory at the
+    // same index so the player's view stays stable. This is exactly
+    // what the user wants from a combat-time equip: gear in, gear out,
+    // nothing dropped on the floor.
+    chosen = usable[0];
     const previous = readSlot(member, chosen)!;
     // Move displaced item back into inventory at the same index so
     // the player's view stays stable. Carry its current durability
@@ -504,10 +548,14 @@ export function equipItemIntoSlot(
   if (!def) {
     return { ok: false, message: `Don't know how to equip ${inv.item}.` };
   }
-  if (!def.characterCanEquip || def.slots.length === 0) {
+  const usable = equippableSlots(def);
+  if (!def.characterCanEquip || usable.length === 0) {
     return { ok: false, message: `${inv.item} cannot be equipped.` };
   }
-  if (!def.slots.includes(slot)) {
+  // Reject explicit picks for slots the UI doesn't surface yet
+  // (head/etc.) — defends against stale callers that build their own
+  // slot prompt and forget to filter.
+  if (!usable.includes(slot)) {
     return {
       ok: false,
       message: `${inv.item} cannot be equipped as ${SLOT_LABEL[slot]}.`,

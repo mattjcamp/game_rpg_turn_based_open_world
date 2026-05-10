@@ -80,7 +80,11 @@ import {
 import { isCombatUsable } from "../world/Items";
 import type { Buff } from "../combat/Buffs";
 import { combatantsFromParty, syncCombatHpBack, abilityMod, refreshCombatantGear } from "../combat/CombatBridge";
-import { useEquippedDurability, equipItemFromInventory } from "../world/PartyActions";
+import {
+  useEquippedDurability,
+  equipItemFromInventory,
+  equippableSlots,
+} from "../world/PartyActions";
 import {
   flashTarget,
   castGlow,
@@ -1457,6 +1461,7 @@ export class CombatScene extends Phaser.Scene {
       hasBuffFromSource: (id: string, src: string): boolean =>
         this.combat.hasBuffFromSource(id, src),
     };
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- `useCombatItem` is a plain helper, not a React hook
     const result = useCombatItem(me, member, enemies, opt.item, defaultRng, buffHooks);
 
     // Refusal: log, hold the picker open so the player can re-choose.
@@ -1536,7 +1541,7 @@ export class CombatScene extends Phaser.Scene {
     const opts: typeof this.equipOptions = [];
     member.inventory.forEach((it, idx) => {
       const def = this.items.get(it.item);
-      if (def && def.characterCanEquip && def.slots.length > 0) {
+      if (def && equippableSlots(def).length > 0) {
         opts.push({ item: def, index: idx });
       }
     });
@@ -1554,12 +1559,14 @@ export class CombatScene extends Phaser.Scene {
   /** Rebuild the equip picker so the cursor + scroll window update. */
   private refreshEquipPicker(): void {
     const lines = this.equipOptions.map((o) => {
-      const slot = o.item.slots[0];
+      // Use the first UI-supported slot — `equippableSlots` already
+      // filtered out anything we can't surface, so this is always
+      // the "where will this go?" answer the player needs.
+      const fits = equippableSlots(o.item);
+      const slot = fits[0];
       const tag =
-        slot === "right_hand" ? "weapon" :
-        slot === "left_hand"  ? "offhand" :
+        slot === "right_hand" ? "hands" :
         slot === "body"       ? "body" :
-        slot === "head"       ? "helmet" :
         "—";
       return `${o.item.name.padEnd(18, " ")} ${tag}`;
     });
@@ -3262,15 +3269,17 @@ export class CombatScene extends Phaser.Scene {
 
   /**
    * True when this member has at least one item in their PERSONAL
-   * inventory whose catalog entry says `characterCanEquip`. Drives
-   * the Equip Item row's enable state — combat-time equip is
-   * deliberately limited to personal inventory (the shared stash is
-   * back at the wagon, not on the fighter's belt).
+   * inventory whose catalog entry resolves to a UI-supported equip
+   * slot. Drives the Equip Item row's enable state — combat-time
+   * equip is deliberately limited to personal inventory (the shared
+   * stash is back at the wagon, not on the fighter's belt). Items
+   * whose only slots are unsupported (head/etc.) are filtered out by
+   * `equippableSlots` so they don't read as equippable here.
    */
   private memberHasEquippableItem(member: PartyMember): boolean {
     return member.inventory.some((it) => {
       const def = this.items.get(it.item);
-      return !!def && def.characterCanEquip && def.slots.length > 0;
+      return !!def && equippableSlots(def).length > 0;
     });
   }
 

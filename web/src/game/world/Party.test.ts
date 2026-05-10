@@ -314,15 +314,22 @@ describe("findAmmoInStash / partyHasAmmo / consumeAmmoFromStash", () => {
 });
 
 describe("swapToMeleeIfOutOfAmmo", () => {
+  // The Hands/Body collapse migrated stale `left_hand` gear into
+  // personal inventory at load time, so to pin down the algorithm
+  // these tests stamp the offhand AFTER `partyFromRaw` runs — the
+  // function still has to work when offhand state appears via
+  // future content paths (or test fixtures), even if save loading
+  // can't introduce one anymore.
   it("swaps the offhand into the main hand when out of ammo", () => {
     const p = partyFromRaw({
       roster: [{
         name: "Legolas", class: "Thief", hp: 18,
-        equipped: { right_hand: "Long Bow", left_hand: "Sword", body: null, head: null },
+        equipped: { right_hand: "Long Bow", left_hand: null, body: null, head: null },
       }],
       inventory: [], // no Arrows
     });
     const m = p.roster[0];
+    m.equipped.leftHand = "Sword";
     const r = swapToMeleeIfOutOfAmmo(m, p, stackingItems());
     expect(r).toEqual({ from: "Long Bow", to: "Sword" });
     expect(m.equipped.rightHand).toBe("Sword");
@@ -333,11 +340,12 @@ describe("swapToMeleeIfOutOfAmmo", () => {
     const p = partyFromRaw({
       roster: [{
         name: "Legolas", class: "Thief", hp: 18,
-        equipped: { right_hand: "Long Bow", left_hand: "Sword", body: null, head: null },
+        equipped: { right_hand: "Long Bow", left_hand: null, body: null, head: null },
       }],
       inventory: [{ item: "Arrows", charges: 20 }],
     });
     const m = p.roster[0];
+    m.equipped.leftHand = "Sword";
     expect(swapToMeleeIfOutOfAmmo(m, p, stackingItems())).toBeNull();
     expect(m.equipped.rightHand).toBe("Long Bow");
   });
@@ -346,11 +354,12 @@ describe("swapToMeleeIfOutOfAmmo", () => {
     const p = partyFromRaw({
       roster: [{
         name: "Legolas", class: "Thief", hp: 18,
-        equipped: { right_hand: "Long Bow", left_hand: "Round Shield", body: null, head: null },
+        equipped: { right_hand: "Long Bow", left_hand: null, body: null, head: null },
       }],
       inventory: [],
     });
     const m = p.roster[0];
+    m.equipped.leftHand = "Round Shield";
     expect(swapToMeleeIfOutOfAmmo(m, p, stackingItems())).toBeNull();
     expect(m.equipped.rightHand).toBe("Long Bow");
   });
@@ -372,10 +381,60 @@ describe("swapToMeleeIfOutOfAmmo", () => {
     const p = partyFromRaw({
       roster: [{
         name: "Gimli", class: "Fighter", hp: 20,
-        equipped: { right_hand: "Sword", left_hand: "Sword", body: null, head: null },
+        equipped: { right_hand: "Sword", left_hand: null, body: null, head: null },
       }],
       inventory: [],
     });
     expect(swapToMeleeIfOutOfAmmo(p.roster[0], p, stackingItems())).toBeNull();
+  });
+});
+
+describe("migrateUnsupportedSlots (via partyFromRaw / memberFromRaw)", () => {
+  // Saves written before the Hands/Body collapse may still hold gear
+  // in left_hand / head — slots the player UI no longer surfaces.
+  // The load-time migration moves that gear back onto the personal
+  // belt so the equipment panel and the data agree on what exists.
+  it("moves a left_hand item into personal inventory on load", () => {
+    const m = memberFromRaw({
+      name: "Legolas", class: "Thief", race: "Elf", hp: 18,
+      equipped: { right_hand: "Long Bow", left_hand: "Sword", body: null, head: null },
+      inventory: [],
+    });
+    expect(m.equipped.leftHand).toBeNull();
+    expect(m.equipped.rightHand).toBe("Long Bow"); // primary weapon untouched
+    expect(m.inventory.map((i) => i.item)).toEqual(["Sword"]);
+  });
+
+  it("moves a head item into personal inventory on load", () => {
+    const m = memberFromRaw({
+      name: "Gimli", class: "Fighter", race: "Dwarf", hp: 20,
+      equipped: { right_hand: null, left_hand: null, body: null, head: "Helm" },
+      inventory: [],
+    });
+    expect(m.equipped.head).toBeNull();
+    expect(m.inventory.map((i) => i.item)).toEqual(["Helm"]);
+  });
+
+  it("migrates both stale slots in one load", () => {
+    const m = memberFromRaw({
+      name: "X", class: "Fighter", race: "Human", hp: 10,
+      equipped: { right_hand: null, left_hand: "Dagger", body: null, head: "Helm" },
+      inventory: [{ item: "Healing Herb" }],
+    });
+    expect(m.equipped.leftHand).toBeNull();
+    expect(m.equipped.head).toBeNull();
+    // Original belt entry preserved; migrated items appended.
+    expect(m.inventory.map((i) => i.item)).toEqual(["Healing Herb", "Dagger", "Helm"]);
+  });
+
+  it("is a no-op for a clean save (no double-migration)", () => {
+    const m = memberFromRaw({
+      name: "X", class: "Fighter", race: "Human", hp: 10,
+      equipped: { right_hand: "Sword", left_hand: null, body: "Chain", head: null },
+      inventory: [{ item: "Healing Herb" }],
+    });
+    expect(m.equipped.rightHand).toBe("Sword");
+    expect(m.equipped.body).toBe("Chain");
+    expect(m.inventory.map((i) => i.item)).toEqual(["Healing Herb"]);
   });
 });

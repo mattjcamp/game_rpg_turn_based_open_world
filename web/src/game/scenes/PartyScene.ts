@@ -68,6 +68,7 @@ import {
   classifyMenuCast,
   equipItemFromInventory,
   equipItemIntoSlot,
+  equippableSlots,
   unequipSlot,
   hasClass,
   hasRace,
@@ -438,15 +439,23 @@ export class PartyScene extends Phaser.Scene {
   }
 
   /**
-   * 0..3 → equip slot (right_hand, left_hand, body, head)
-   * 4..  → personal inventory index (cursor - 4)
+   * 0 → Hands (right_hand)
+   * 1 → Body
+   * 2..  → personal inventory index (cursor - 2)
+   *
+   * Offhand and head live in the EquipSlot type for forward compat
+   * but don't show up here: the offhand slot didn't actually move
+   * the dice in the current rules, so an empty "Offhand" row read
+   * as broken rather than "coming soon". When the matching gameplay
+   * lands, the rows + this index range grow back together.
    */
   private detailCursorKind(m: PartyMember): { kind: "slot"; slot: EquipSlot } | { kind: "item"; index: number } {
-    if (this.detailCursor < 4) {
-      const slot: EquipSlot = (["right_hand", "left_hand", "body", "head"] as const)[this.detailCursor];
+    void m;
+    if (this.detailCursor < 2) {
+      const slot: EquipSlot = (["right_hand", "body"] as const)[this.detailCursor];
       return { kind: "slot", slot };
     }
-    return { kind: "item", index: this.detailCursor - 4 };
+    return { kind: "item", index: this.detailCursor - 2 };
   }
 
   /**
@@ -522,7 +531,10 @@ export class PartyScene extends Phaser.Scene {
     const inv = m.inventory[sel.index];
     if (!inv) return;
     const def = this.items.get(inv.item);
-    const slots: EquipSlot[] = def?.characterCanEquip ? def.slots : [];
+    // Filter to UI-supported slots so a head-only item routes through
+    // the auto path (where equipItemFromInventory refuses politely)
+    // instead of opening a slot prompt for a slot the UI doesn't show.
+    const slots: EquipSlot[] = def ? equippableSlots(def) : [];
 
     if (slots.length >= 2) {
       // Multi-slot item — prompt for the destination.
@@ -1740,12 +1752,14 @@ export class PartyScene extends Phaser.Scene {
 
     this.text(x + padX, cy, "EQUIPPED", FONT_HEAD()); cy += 22;
 
-    // The four equipment slots map 1:1 to detail-cursor rows 0..3.
+    // Two rows: Hands (the player's weapon, drives attack/damage)
+    // and Body. Offhand + head will return when the matching
+    // gameplay + UI lands; surfacing them today promises a buff
+    // they can't deliver and an "Offhand" row that didn't actually
+    // move the dice.
     const slots: [string, EquipSlot, string | null][] = [
-      ["Weapon",  "right_hand", m.equipped.rightHand],
-      ["Offhand", "left_hand",  m.equipped.leftHand],
-      ["Body",    "body",       m.equipped.body],
-      ["Helmet",  "head",       m.equipped.head],
+      ["Hands",  "right_hand", m.equipped.rightHand],
+      ["Body",   "body",       m.equipped.body],
     ];
     const rowH = 22;
     // In equip-slot mode, each candidate slot in `pendingEquipSlots`
@@ -1789,17 +1803,21 @@ export class PartyScene extends Phaser.Scene {
     } else {
       for (let i = 0; i < m.inventory.length; i++) {
         const it = m.inventory[i];
-        const isCursor = this.detailCursor === 4 + i;
+        const isCursor = this.detailCursor === 2 + i;
         if (isCursor) {
           this.track(this.add.rectangle(x + 4, cy - 2, w - 8, rowH, C.selectBg, 1).setOrigin(0));
           this.track(this.add.rectangle(x + 4, cy - 2, 3, rowH, C.accent, 1).setOrigin(0));
         }
         const charges = it.charges != null ? `  (${it.charges})` : "";
         const def = this.items.get(it.item);
-        const equippable = !!(def?.characterCanEquip && def.slots.length > 0);
+        // Filter to the slots the UI currently supports so a head-
+        // only item reads as not-equippable rather than promising a
+        // row the player can't see.
+        const fits = def ? equippableSlots(def) : [];
+        const equippable = fits.length > 0;
         this.text(x + padX, cy, `· ${it.item}${charges}`, FONT_BODY(C.body));
         if (equippable) {
-          const slot = def!.slots[0];
+          const slot = fits[0];
           this.text(x + w - padX, cy,
                     `equip → ${SLOT_LABELS_DISPLAY[slot]}`,
                     FONT_MONO(C.gold), [1, 0]);
@@ -1840,20 +1858,19 @@ export class PartyScene extends Phaser.Scene {
   private detailRowActionHint(m: PartyMember): string {
     const sel = this.detailCursorKind(m);
     if (sel.kind === "slot") {
-      const cur = (
-        sel.slot === "right_hand" ? m.equipped.rightHand
-        : sel.slot === "left_hand"  ? m.equipped.leftHand
-        : sel.slot === "body"       ? m.equipped.body
-        : m.equipped.head
-      );
+      // detailCursorKind only returns currently-supported slots
+      // (right_hand → Hands, body), so the fallback chain stays
+      // narrow.
+      const cur = sel.slot === "right_hand" ? m.equipped.rightHand : m.equipped.body;
       if (cur == null) return "Empty slot — equip an item from below to fill it.";
       return `Enter unequips ${cur}.   R drops it back into the stash.`;
     }
     const it = m.inventory[sel.index];
     if (!it) return "";
     const def = this.items.get(it.item);
-    if (def?.characterCanEquip && def.slots.length > 0) {
-      return def.slots.length >= 2
+    const fits = def ? equippableSlots(def) : [];
+    if (fits.length > 0) {
+      return fits.length >= 2
         ? `Enter prompts where to equip ${it.item}.   R returns to stash.`
         : `Enter equips ${it.item}.   R returns it to the stash.`;
     }
@@ -1862,7 +1879,11 @@ export class PartyScene extends Phaser.Scene {
 }
 
 const SLOT_LABELS_DISPLAY: Record<EquipSlot, string> = {
-  right_hand: "weapon",
+  // Player-facing labels for slot pickers. The collapsed model uses
+  // "hands" for the right-hand (primary weapon) slot. Offhand /
+  // helmet labels stay defined for forward compat — they just don't
+  // get shown today since their slots aren't surfaced.
+  right_hand: "hands",
   left_hand:  "offhand",
   body:       "body",
   head:       "helmet",

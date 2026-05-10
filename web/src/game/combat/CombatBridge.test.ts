@@ -162,8 +162,14 @@ describe("combatantFromMember", () => {
     const m = memberFromRaw({
       name: "X", class: "Fighter", race: "Human", level: 1, hp: 10,
       strength: 10, dexterity: 10,
-      equipped: { right_hand: null, left_hand: null, body: "Bracers", head: "Ring" },
+      equipped: { right_hand: null, left_hand: null, body: "Bracers", head: null },
     });
+    // The load-time migration strips head/offhand on load; stamp the
+    // ring directly so this test still pins the sum-across-all-slots
+    // behaviour `totalAcBonus` is meant to verify. (When the helmet
+    // UI returns, the migration narrows back and the assignment can
+    // ride in via memberFromRaw again.)
+    m.equipped.head = "Ring";
     // AC = 10 + DEX 0 + (50-50)/5 + (2 + 1) magic = 13.
     expect(combatantFromMember(m, items_).ac).toBe(13);
   });

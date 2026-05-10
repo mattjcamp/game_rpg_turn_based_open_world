@@ -194,7 +194,7 @@ export function spriteForMember(rawSprite: string | undefined, klass: string): s
 export function memberFromRaw(raw: RawMember): PartyMember {
   const klass = raw.class ?? "Fighter";
   const hp = raw.hp ?? 0;
-  return {
+  const m: PartyMember = {
     name: raw.name ?? "?",
     class: klass,
     race: raw.race ?? "?",
@@ -229,6 +229,42 @@ export function memberFromRaw(raw: RawMember): PartyMember {
     inventory: normalizeInventory(raw.inventory),
     sprite: spriteForMember(raw.sprite, klass),
   };
+  migrateUnsupportedSlots(m);
+  return m;
+}
+
+/**
+ * Migrate gear out of slots the UI no longer surfaces. When the
+ * Hands/Body collapse landed, the `left_hand` and `head` slots
+ * stopped having a row in PartyScene — but a save written before
+ * that collapse may still hold an offhand dagger or helmet that the
+ * player can't see, can't unequip, and may still feed silent
+ * acBonus / damage math into combat.
+ *
+ * This helper runs once at load (called from `memberFromRaw`) and
+ * pushes any stale occupant of an unsupported slot back onto the
+ * fighter's belt so the equipment panel and the data agree on what
+ * exists. Durability rides along on the inventory entry just like a
+ * normal unequip, so wear isn't lost.
+ *
+ * Indempotent: rerunning on a clean member is a no-op.
+ */
+function migrateUnsupportedSlots(m: PartyMember): void {
+  const stale: Array<["leftHand" | "head", "left_hand" | "head"]> = [
+    ["leftHand", "left_hand"],
+    ["head",     "head"],
+  ];
+  for (const [field, key] of stale) {
+    const itemName = m.equipped[field];
+    if (!itemName) continue;
+    const dur = m.equippedDurability[key];
+    const entry = typeof dur === "number"
+      ? { item: itemName, durability: dur }
+      : { item: itemName };
+    m.inventory.push(entry);
+    m.equipped[field] = null;
+    m.equippedDurability[key] = null;
+  }
 }
 
 /**

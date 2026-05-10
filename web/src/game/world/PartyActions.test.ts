@@ -11,6 +11,8 @@ import {
   statMod,
   equipItemFromInventory,
   equipItemIntoSlot,
+  equippableSlots,
+  SUPPORTED_EQUIP_SLOTS,
   unequipSlot,
   hasClass,
   hasRace,
@@ -283,17 +285,38 @@ describe("equipItemFromInventory / unequipSlot", () => {
     return m;
   }
 
-  it("equips a weapon into the first empty matching slot", () => {
+  it("equips a weapon into the hands slot when it's empty", () => {
     const p = makeParty();
     const fighter = p.roster[0];
     fighter.inventory.push({ item: "Dagger" });
-    fighter.equipped.rightHand = "Fists";
-    // right_hand has Fists, left_hand is null → Dagger lands in left.
+    fighter.equipped.rightHand = null;
+    // The collapsed-UI model treats right_hand as "Hands" — a Dagger
+    // (whose data lists both hands) only targets right_hand, so an
+    // empty Hands slot is filled directly without a swap.
     const r = equipItemFromInventory(fighter, 0, items());
     expect(r.ok).toBe(true);
-    expect(fighter.equipped.leftHand).toBe("Dagger");
-    expect(fighter.equipped.rightHand).toBe("Fists");
+    expect(fighter.equipped.rightHand).toBe("Dagger");
+    // Offhand stays untouched and isn't auto-filled — it's no longer
+    // surfaced in the UI and `equippableSlots(Dagger)` returns just
+    // the right hand.
+    expect(fighter.equipped.leftHand).toBeNull();
     expect(fighter.inventory).toEqual([]);
+  });
+
+  it("a Dagger equipped while a Sword is in Hands swaps the Sword back to inventory", () => {
+    // The user's reported flow: Gimli starts combat with Sword
+    // in Hands, equips a Dagger from his belt. Result: Dagger in
+    // Hands, Sword on the belt — NOT Sword in Hands and Dagger in
+    // Offhand (the pre-collapse UI showed that confusing layout).
+    const p = makeParty();
+    const fighter = p.roster[0];
+    fighter.equipped.rightHand = "Sword";
+    fighter.inventory.push({ item: "Dagger" });
+    const r = equipItemFromInventory(fighter, 0, items());
+    expect(r.ok).toBe(true);
+    expect(fighter.equipped.rightHand).toBe("Dagger");
+    expect(fighter.equipped.leftHand).toBeNull();
+    expect(fighter.inventory.map((i) => i.item)).toEqual(["Sword"]);
   });
 
   it("auto-swaps when every accepting slot is already full", () => {
@@ -362,14 +385,25 @@ describe("equipItemFromInventory / unequipSlot", () => {
     const p = makeParty();
     const fighter = p.roster[0];
     fighter.equipped.rightHand = null;
-    fighter.equipped.leftHand = null;
     fighter.inventory.push({ item: "Dagger" });
-    // Dagger can go in either hand — pick left explicitly.
-    const r = equipItemIntoSlot(fighter, 0, "left_hand", items());
+    // The Hands slot is right_hand — pick it explicitly.
+    const r = equipItemIntoSlot(fighter, 0, "right_hand", items());
     expect(r.ok).toBe(true);
-    expect(fighter.equipped.leftHand).toBe("Dagger");
-    expect(fighter.equipped.rightHand).toBeNull();
+    expect(fighter.equipped.rightHand).toBe("Dagger");
     expect(fighter.inventory).toEqual([]);
+  });
+
+  it("equipItemIntoSlot refuses an explicit left_hand pick (offhand isn't surfaced)", () => {
+    const p = makeParty();
+    const fighter = p.roster[0];
+    fighter.inventory.push({ item: "Dagger" });
+    // The Dagger's catalog data still lists left_hand, but the UI
+    // doesn't surface it — direct picks for offhand should refuse so
+    // a stale caller can't re-introduce the confusing offhand layout.
+    const r = equipItemIntoSlot(fighter, 0, "left_hand", items());
+    expect(r.ok).toBe(false);
+    expect(fighter.equipped.leftHand).toBeNull();
+    expect(fighter.inventory).toHaveLength(1);
   });
 
   it("equipItemIntoSlot rejects a slot the item doesn't accept", () => {
@@ -400,6 +434,152 @@ describe("equipItemFromInventory / unequipSlot", () => {
     fighter.inventory.push({ item: "Healing Herb" });
     const r = equipItemIntoSlot(fighter, 0, "right_hand", items());
     expect(r.ok).toBe(false);
+  });
+
+  it("combat-context equip swap returns the previous slot occupant to personal inventory", () => {
+    // The user's spec for combat-time Equip Item: whatever was in the
+    // slot before the swap should land back on the fighter's belt
+    // rather than being dropped or destroyed. equipItemFromInventory
+    // is the helper the combat scene calls, so this is the canonical
+    // place to pin the contract.
+    const p = makeParty();
+    const fighter = p.roster[0];
+    // Sword's only slot is right_hand. Filling that slot forces the
+    // swap branch when we equip a fresh Sword from inventory.
+    fighter.equipped.rightHand = "Fists";
+    fighter.inventory.push({ item: "Sword" });
+    const r = equipItemFromInventory(fighter, 0, items());
+    expect(r.ok).toBe(true);
+    // New item is equipped …
+    expect(fighter.equipped.rightHand).toBe("Sword");
+    // … and the previous occupant is back on the belt at the same
+    // index the new item came from (the "stable view" rule).
+    expect(fighter.inventory.map((i) => i.item)).toEqual(["Fists"]);
+  });
+
+  it("equip preserves durability on the swapped-out item", () => {
+    // If the previous Sword had 7/20 durability remaining, that wear
+    // should ride along on the inventory entry it lands on so picking
+    // it back up doesn't reset to full.
+    const cat = items();
+    cat.set("Sword", {
+      name: "Sword", category: "weapons", description: "",
+      slots: ["right_hand"],
+      characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null, durability: 20,
+    });
+    cat.set("Battle Axe", {
+      name: "Battle Axe", category: "weapons", description: "",
+      slots: ["right_hand"],
+      characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null, durability: 20,
+    });
+    const p = makeParty();
+    const fighter = p.roster[0];
+    fighter.equipped.rightHand = "Sword";
+    fighter.equippedDurability.right_hand = 7;
+    fighter.inventory.push({ item: "Battle Axe" });
+    const r = equipItemFromInventory(fighter, 0, cat);
+    expect(r.ok).toBe(true);
+    // Battle Axe is now in right_hand with full durability seeded …
+    expect(fighter.equipped.rightHand).toBe("Battle Axe");
+    expect(fighter.equippedDurability.right_hand).toBe(20);
+    // … and the swapped-out Sword carries its wear back into the slot
+    // the Battle Axe came from.
+    expect(fighter.inventory).toEqual([{ item: "Sword", durability: 7 }]);
+  });
+
+  it("refuses a head-only item (head slot isn't surfaced in the UI yet)", () => {
+    const cat = items();
+    cat.set("Helm", {
+      name: "Helm", category: "armors", description: "",
+      slots: ["head"], characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null, evasion: 50,
+    });
+    const p = makeParty();
+    const fighter = p.roster[0];
+    fighter.inventory.push({ item: "Helm" });
+    const r = equipItemFromInventory(fighter, 0, cat);
+    expect(r.ok).toBe(false);
+    // Head-only items refuse cleanly and stay in inventory until the
+    // helmet UI lands.
+    expect(fighter.equipped.head).toBeNull();
+    expect(fighter.inventory).toEqual([{ item: "Helm" }]);
+  });
+
+  it("multi-slot items keep their non-head slots", () => {
+    // A hypothetical mixed item that lists both `right_hand` and
+    // `head` should still equip into the hand, ignoring the
+    // currently-unsupported head option.
+    const cat = items();
+    cat.set("Crowned Spear", {
+      name: "Crowned Spear", category: "weapons", description: "",
+      slots: ["right_hand", "head"],
+      characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null, power: 5,
+    });
+    const p = makeParty();
+    const fighter = p.roster[0];
+    fighter.equipped.rightHand = null;
+    fighter.inventory.push({ item: "Crowned Spear" });
+    const r = equipItemFromInventory(fighter, 0, cat);
+    expect(r.ok).toBe(true);
+    expect(fighter.equipped.rightHand).toBe("Crowned Spear");
+  });
+
+  it("equipItemIntoSlot refuses an explicit head pick (slot not yet surfaced)", () => {
+    const cat = items();
+    cat.set("Helm", {
+      name: "Helm", category: "armors", description: "",
+      slots: ["head"], characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null, evasion: 50,
+    });
+    const p = makeParty();
+    const fighter = p.roster[0];
+    fighter.inventory.push({ item: "Helm" });
+    const r = equipItemIntoSlot(fighter, 0, "head", cat);
+    expect(r.ok).toBe(false);
+    expect(fighter.equipped.head).toBeNull();
+  });
+});
+
+describe("equippableSlots / SUPPORTED_EQUIP_SLOTS", () => {
+  function mk(slots: ("right_hand" | "left_hand" | "body" | "head")[], over: Partial<Item> = {}): Item {
+    return {
+      name: "X", category: "general", description: "", slots,
+      characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null, ...over,
+    };
+  }
+
+  it("supports the two currently-shipped slots (Hands + Body)", () => {
+    expect([...SUPPORTED_EQUIP_SLOTS].sort())
+      .toEqual(["body", "right_hand"].sort());
+  });
+
+  it("filters head and left_hand out of an item's slot list", () => {
+    // Both head and offhand stay in the EquipSlot type for forward
+    // compat but neither is surfaced to the player; equippableSlots
+    // hides them so daggers (`right_hand` + `left_hand`) end up in
+    // the Hands slot only.
+    expect(equippableSlots(mk(["head"]))).toEqual([]);
+    expect(equippableSlots(mk(["left_hand"]))).toEqual([]);
+    expect(equippableSlots(mk(["right_hand", "left_hand"]))).toEqual(["right_hand"]);
+    expect(equippableSlots(mk(["right_hand", "head"]))).toEqual(["right_hand"]);
+    expect(equippableSlots(mk(["body", "head"]))).toEqual(["body"]);
+  });
+
+  it("preserves order for fully-supported items", () => {
+    // With only right_hand + body in the supported set the practical
+    // case is a single-slot item, but the filter keeps order if a
+    // future item lists both.
+    expect(equippableSlots(mk(["right_hand", "body"])))
+      .toEqual(["right_hand", "body"]);
+  });
+
+  it("returns [] for items the catalog says aren't character-equippable", () => {
+    expect(equippableSlots(mk(["right_hand"], { characterCanEquip: false })))
+      .toEqual([]);
   });
 });
 

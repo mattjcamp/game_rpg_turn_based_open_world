@@ -3,6 +3,15 @@ npm run dev
 
 python3 main.py
 
+## Bugs
+
+Deployed version:
+
+Failed to compile.
+
+./src/game/scenes/CombatScene.ts
+1460:20  Error: React Hook "useCombatItem" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.  react-hooks/rules-of-hooks
+
 ## Polish
 
 - When a character equips an item in combat, the item that was in the slot previous should be returned to the personal inventory
@@ -13,9 +22,7 @@ python3 main.py
 - Infravision should act more like normal vision, just with all tiles displayed with a red tint, the range of infravision should match the other lighting effects
 - In the character creation screen, add descriptions of races and classes with detailed lists of special abilities
 
-## Bugs
-- When the party received arrows from a quest giver, they arrows showed up as their own entry when they should have been added to the collection of arrows that was already there.
-- Keep an eye open for when the party did not have it's normal options appear on the right (range, cast, throw).
+
 
 ## Web V2 Refactor Items
 - rename and organize the tile graphics. create a branch as a reference so that we can transition better. Put all the originals into a backup. 
