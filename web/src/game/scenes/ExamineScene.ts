@@ -14,6 +14,7 @@ import Phaser from "phaser";
 import { gameState } from "../state";
 import { activeMembers } from "../world/Party";
 import { dataPath } from "../world/Module";
+import { loadItems } from "../world/Items";
 import {
   tileDef,
   tileSpriteKey,
@@ -121,7 +122,7 @@ export class ExamineScene extends Phaser.Scene {
     }
   }
 
-  create(): void {
+  async create(): Promise<void> {
     this.cameras.main.setBackgroundColor("#0a0a14");
     this.drawGrid();
     this.drawObstacles();
@@ -134,8 +135,15 @@ export class ExamineScene extends Phaser.Scene {
     if (this._firstVisit && gameState.partyData) {
       const members = activeMembers(gameState.partyData);
       if (hasHerbalist(members) && !this.layout.reagentsSearched) {
+        // Load the items catalog so a found reagent stacks onto an
+        // existing stash row (e.g. Moonpetal x3 instead of three
+        // separate Moonpetal rows). Failure is non-fatal — the
+        // herbalism helper falls back to a direct push so the
+        // discovery still lands, just unmerged.
+        let items: Map<string, import("../world/Items").Item> | undefined;
+        try { items = await loadItems(); } catch { /* fall through */ }
         const found = attemptHerbalistDiscovery(
-          gameState.partyData, members, Math.random,
+          gameState.partyData, members, Math.random, items,
         );
         this.layout.reagentsSearched = true;
         if (found.length > 0) {

@@ -619,7 +619,10 @@ export class PartyScene extends Phaser.Scene {
       this.render();
       return;
     }
-    const r = attemptBrew(this.party, members, recipe);
+    // Pass the items catalog so the brewed potion stacks onto an
+    // existing stash row instead of bloating the inventory with one
+    // entry per brew — same contract reagents follow.
+    const r = attemptBrew(this.party, members, recipe, Math.random, this.items);
     if (r.success) Sfx.play("heal");
     else if (r.success === false) Sfx.play("miss");
     this.feedback = r.message;

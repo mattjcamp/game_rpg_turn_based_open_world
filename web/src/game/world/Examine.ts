@@ -15,6 +15,8 @@
 import type { Party, PartyMember } from "./Party";
 import { TILE_GRASS, TILE_FOREST, TILE_SAND, TILE_PATH, TILE_MOUNTAIN } from "./Tiles";
 import { statMod } from "./PartyActions";
+import { addToStash } from "./TownActions";
+import type { Item } from "./Items";
 
 export const EXAMINE_COLS = 12;
 export const EXAMINE_ROWS = 14;
@@ -223,6 +225,7 @@ export function attemptHerbalistDiscovery(
   party: Party,
   members: PartyMember[],
   rng: () => number,
+  items?: Map<string, Item>,
 ): HerbalistDiscovery[] {
   const out: HerbalistDiscovery[] = [];
   for (const m of members) {
@@ -231,7 +234,7 @@ export function attemptHerbalistDiscovery(
     const roll = randInt(rng, 1, 20) + statMod(m.intelligence);
     if (roll < 13) continue;
     const reagent = FORAGE_REAGENTS[Math.floor(rng() * FORAGE_REAGENTS.length)];
-    party.inventory.push({ item: reagent });
+    stashReagent(party, reagent, items);
     out.push({ member: m.name, reagent });
   }
   return out;
@@ -303,6 +306,7 @@ export function attemptOverworldHerbalism(
   party: Party,
   members: PartyMember[],
   rng: () => number = Math.random,
+  items?: Map<string, Item>,
 ): HerbalistDiscovery[] {
   const out: HerbalistDiscovery[] = [];
   for (const m of members) {
@@ -311,10 +315,31 @@ export function attemptOverworldHerbalism(
     const roll = randInt(rng, 1, 20) + statMod(m.intelligence);
     if (roll < OVERWORLD_HERBALISM_DC) continue;
     const reagent = FORAGE_REAGENTS[Math.floor(rng() * FORAGE_REAGENTS.length)];
-    party.inventory.push({ item: reagent });
+    stashReagent(party, reagent, items);
     out.push({ member: m.name, reagent });
   }
   return out;
+}
+
+/**
+ * Drop one reagent into the shared stash, stacking onto an existing
+ * stack when the items catalog confirms the reagent is stackable.
+ * Without a catalog (test fixtures, scenes that haven't loaded
+ * items.json yet) we fall back to the legacy direct-push so behaviour
+ * stays safe — `Potions.consumeReagent` already counts across both
+ * shapes, so a missed stack costs storage rows, not gameplay
+ * correctness.
+ */
+function stashReagent(
+  party: Party,
+  reagent: string,
+  items: Map<string, Item> | undefined,
+): void {
+  if (items) {
+    addToStash(party, reagent, items);
+  } else {
+    party.inventory.push({ item: reagent });
+  }
 }
 
 /**

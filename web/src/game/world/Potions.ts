@@ -16,6 +16,8 @@
 import { dataPath } from "./Module";
 import type { Party, PartyMember } from "./Party";
 import { findClass, statMod } from "./PartyActions";
+import { addToStash } from "./TownActions";
+import type { Item } from "./Items";
 
 /** One brewable recipe. `reagents` is a map of reagent-name → qty. */
 export interface Recipe {
@@ -218,6 +220,7 @@ export function attemptBrew(
   members: PartyMember[],
   recipe: Recipe,
   rng: () => number = Math.random,
+  items?: Map<string, Item>,
 ): BrewResult {
   const alchemist = findClass(members, "Alchemist");
   if (!alchemist) {
@@ -240,8 +243,18 @@ export function attemptBrew(
   const total = roll + intMod;
   const success = total >= recipe.dc;
   if (success) {
+    // Honour the items-catalog stacking contract when we can — most
+    // brewable potions are flagged stackable in items.json so a
+    // second Healing Potion in the stash should merge into the
+    // existing row rather than create a duplicate entry. Without
+    // the catalog (legacy test fixtures), fall back to a direct
+    // push so behaviour is at least safe.
     for (let i = 0; i < recipe.resultCount; i++) {
-      party.inventory.push({ item: recipe.resultItem });
+      if (items) {
+        addToStash(party, recipe.resultItem, items);
+      } else {
+        party.inventory.push({ item: recipe.resultItem });
+      }
     }
     return {
       ok: true,

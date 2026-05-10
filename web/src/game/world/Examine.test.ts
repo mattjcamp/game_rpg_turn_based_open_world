@@ -348,3 +348,76 @@ describe("edgeTileFor", () => {
     expect(edgeTileFor(TILE_PATH)).toBe(TILE_FOREST);
   });
 });
+
+// ── Reagent stacking ─────────────────────────────────────────────
+
+describe("reagent stacking via addToStash", () => {
+  // Minimal items catalog with stackable reagents — mirrors items.json.
+  function makeReagentCatalog(): Map<string, import("./Items").Item> {
+    const items = new Map<string, import("./Items").Item>();
+    const reagent = (name: string): import("./Items").Item => ({
+      // `reagents` isn't a category in the Item enum (items.json puts
+      // them under "general" with item_type: "reagent"); the catalog
+      // type only narrows category, not item_type, so we use the
+      // top-level enum here.
+      name, category: "general", description: "",
+      slots: [], characterCanEquip: false, partyCanEquip: false,
+      usable: false, effect: null, stackable: true, charges: 1,
+    });
+    for (const r of ["Moonpetal", "Glowcap Mushroom", "Serpent Root", "Brimite Ore", "Spring Water"]) {
+      items.set(r, reagent(r));
+    }
+    return items;
+  }
+
+  it("stacks reagents into a single row when items catalog is provided", () => {
+    const p = makeParty();
+    const items = makeReagentCatalog();
+    // Use a single-herbalist party so the RNG sequence is predictable
+    // (avoids interleaving rolls from two herbalists).
+    p.roster[3].hp = 0; // drop Alchemist; only Brom (Druid, INT 14 → +2) rolls.
+    // Per call: d20 (rng pick 1) + reagent pick (rng pick 2).
+    //   d20 = floor(0.95 * 20) + 1 = 20 → 20 + 2 = 22 ≥ 13 → success
+    //   reagent = floor(0.0 * 5) = 0 → "Moonpetal"
+    // Looping the 2-step sequence with seqRng feeds each call cleanly.
+    const rng = seqRng([0.95, 0.0]);
+    for (let i = 0; i < 5; i++) {
+      attemptHerbalistDiscovery(p, activeMembers(p), rng, items);
+    }
+    const moonRows = p.inventory.filter((e) => e.item === "Moonpetal");
+    expect(moonRows).toHaveLength(1);
+    expect(moonRows[0].charges).toBe(5);
+  });
+
+  it("preserves legacy direct-push behaviour when items catalog is omitted", () => {
+    const p = makeParty();
+    p.roster[3].hp = 0; // single herbalist for a clean sequence
+    const rng = seqRng([0.95, 0.0]); // same success sequence as above
+    for (let i = 0; i < 3; i++) {
+      attemptHerbalistDiscovery(p, activeMembers(p), rng);
+    }
+    const moonRows = p.inventory.filter((e) => e.item === "Moonpetal");
+    // Without the catalog the helper falls back to one row per find —
+    // matches behaviour shipped before the stacking patch and keeps
+    // `countReagent` correct via its bare-row branch.
+    expect(moonRows).toHaveLength(3);
+  });
+
+  it("stacks across the two herbalism entry points (examine + overworld)", () => {
+    const p = makeParty();
+    p.roster[3].hp = 0; // single herbalist for a clean sequence
+    const items = makeReagentCatalog();
+    // Examine pass (DC 13). Brom at INT 14 → +2; nat 20 (rng 0.95) + 2 = 22 → success.
+    attemptHerbalistDiscovery(p, activeMembers(p), seqRng([0.95, 0.0]), items);
+    // Overworld pass (DC 20). Two successive calls — each rolls Brom only
+    // (Alchemist downed). Use seqRng so each call gets a fresh d20=20 +
+    // reagent=Moonpetal pair.
+    const oRng = seqRng([0.95, 0.0]);
+    attemptOverworldHerbalism(p, activeMembers(p), oRng, items);
+    attemptOverworldHerbalism(p, activeMembers(p), oRng, items);
+    const moonRows = p.inventory.filter((e) => e.item === "Moonpetal");
+    // All three finds (1 examine + 2 overworld) merge into one row.
+    expect(moonRows).toHaveLength(1);
+    expect(moonRows[0].charges).toBe(3);
+  });
+});

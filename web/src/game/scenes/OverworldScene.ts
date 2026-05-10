@@ -1126,6 +1126,7 @@ export class OverworldScene extends Phaser.Scene {
       gameState.partyData,
       members,
       defaultRng,
+      this.items,
     );
     if (finds.length === 0) return;
     const playerX = col * TILE + TILE / 2;
