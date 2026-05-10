@@ -20,6 +20,21 @@ export interface MpSource {
   mode?: "higher" | "average";
 }
 
+/**
+ * Non-spell class ability — Pick Locks, Detect Traps, Turn Undead
+ * (when wired as a class ability rather than a spell), Herbalism, etc.
+ *
+ * Mirrors the per-class JSON's `class_abilities` array. `minLevel`
+ * is the level the ability becomes available; absent or `1` means
+ * "available from character creation". Level-up dialogs diff this
+ * against the member's old/new level to surface fresh unlocks.
+ */
+export interface ClassAbility {
+  name: string;
+  description: string;
+  minLevel: number;
+}
+
 export interface ClassTemplate {
   name: string;
   hpPerLevel: number;
@@ -29,12 +44,25 @@ export interface ClassTemplate {
    *  Fighters 4, Thieves/Rangers 6 in the shipped data. */
   range: number;
   mpSource?: MpSource;
+  /** Non-spell abilities the class learns, with their level gates.
+   *  Empty for plain classes (Fighter, Thief, Wizard, Cleric); the
+   *  hybrid classes (Ranger, Paladin, Alchemist) carry one or more.
+   *  Optional so test fixtures and old loaders that don't set it
+   *  don't have to thread `[]` through every literal — consumers
+   *  treat undefined as the empty list. */
+  classAbilities?: ClassAbility[];
 }
 
 export interface RaceInfo {
   name: string;
   /** Optional XP override — Humans use 750 instead of the class default. */
   expPerLevel?: number;
+}
+
+interface RawClassAbility {
+  name?: string;
+  description?: string;
+  min_level?: number;
 }
 
 interface RawClass {
@@ -48,6 +76,7 @@ interface RawClass {
     abilities?: string[];
     mode?: string;
   } | null;
+  class_abilities?: RawClassAbility[];
 }
 
 interface RawRaces {
@@ -70,6 +99,17 @@ function classFromRaw(name: string, raw: RawClass): ClassTemplate {
       };
     }
   }
+  // Per-ability default min_level is 1 ("known from character creation"),
+  // matching the Python game's behaviour where an `abilities` entry
+  // without `min_level` is always available. Level-up unlocks key off
+  // an explicit min_level above 1.
+  const classAbilities: ClassAbility[] = (raw.class_abilities ?? [])
+    .map((a) => ({
+      name: a.name ?? "",
+      description: a.description ?? "",
+      minLevel: typeof a.min_level === "number" ? a.min_level : 1,
+    }))
+    .filter((a) => a.name.length > 0);
   return {
     name: raw.name ?? name,
     hpPerLevel:  raw.hp_per_level  ?? 6,
@@ -77,6 +117,7 @@ function classFromRaw(name: string, raw: RawClass): ClassTemplate {
     expPerLevel: raw.exp_per_level ?? 1000,
     range:       raw.range         ?? 4,
     mpSource,
+    classAbilities,
   };
 }
 

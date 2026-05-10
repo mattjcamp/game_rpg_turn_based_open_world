@@ -3531,7 +3531,11 @@ export class CombatScene extends Phaser.Scene {
             continue;
           }
           const race = races ? races.get(m.race) ?? null : null;
-          levelUps.push(...awardXp(m, totalXp, tpl, race));
+          // Pass the loaded spell catalog so the level-up events can
+          // populate `newSpells` for the dialog. Empty when spells
+          // haven't loaded — the diff just returns [] and the dialog
+          // omits the "New Spells" section.
+          levelUps.push(...awardXp(m, totalXp, tpl, race, this.spells));
         }
         // Refresh the HUD so HP/MP bars catch any gains.
         for (const c of this.combat.combatants) this.refreshHp(c);
@@ -3597,20 +3601,80 @@ export class CombatScene extends Phaser.Scene {
   }
 
   /**
-   * Modal "Level Up!" dialog — one row per LevelUpEvent. Plays the
-   * level-up SFX, fires a gold radial-burst behind the title for
-   * punch, and waits for Space / Enter (or a tap on the dialog) to
-   * dismiss. Resolves once the dialog is gone so the caller can
-   * trigger the post-combat fade.
+   * Modal "Level Up!" dialog — walks events one at a time so each
+   * level-up gets its own panel with room for the spell + ability
+   * unlock sections. Multiple level-ups (a single award can carry a
+   * member through several thresholds) queue cleanly: dismissing one
+   * advances to the next, then resolves once the queue is empty so
+   * the caller can trigger the post-combat fade.
    */
-  private showLevelUpDialog(events: LevelUpEvent[]): Promise<void> {
+  private async showLevelUpDialog(events: LevelUpEvent[]): Promise<void> {
+    for (let i = 0; i < events.length; i++) {
+      await this.showSingleLevelUp(events[i], i + 1, events.length);
+    }
+  }
+
+  /** Render and await dismissal of a single LevelUpEvent. */
+  private showSingleLevelUp(
+    ev: LevelUpEvent, idx: number, total: number,
+  ): Promise<void> {
     return new Promise((resolve) => {
       Sfx.play("level_up");
 
-      const W = 480;
-      const H = 100 + events.length * 28;
+      // Build the layout top-to-bottom so we can size the panel to the
+      // content. Each entry produces one Text object; descriptive
+      // lines wrap inside `wrapW` so a long description doesn't
+      // overflow the panel.
+      const W = 540;
+      const padX = 24;
+      const wrapW = W - padX * 2;
+      type Line =
+        | { kind: "header"; text: string }
+        | { kind: "headline"; text: string }
+        | { kind: "section"; text: string }
+        | { kind: "row"; text: string }
+        | { kind: "desc"; text: string };
+      const lines: Line[] = [];
+
+      lines.push({ kind: "header", text: `${ev.name}  —  Level ${ev.newLevel - 1} → ${ev.newLevel}` });
+      lines.push({ kind: "headline", text: ev.mpGain > 0
+        ? `+${ev.hpGain} HP    +${ev.mpGain} MP`
+        : `+${ev.hpGain} HP` });
+
+      if (ev.newSpells.length > 0) {
+        lines.push({ kind: "section", text: "NEW SPELLS" });
+        for (const s of ev.newSpells) {
+          lines.push({ kind: "row", text: `${s.name}   (${s.mpCost} MP)` });
+          if (s.description) lines.push({ kind: "desc", text: s.description });
+        }
+      }
+      if (ev.newAbilities.length > 0) {
+        lines.push({ kind: "section", text: "NEW ABILITIES" });
+        for (const a of ev.newAbilities) {
+          lines.push({ kind: "row", text: a.name });
+          if (a.description) lines.push({ kind: "desc", text: a.description });
+        }
+      }
+
+      // Compute the panel height by summing per-line spacing.
+      const SPACING: Record<Line["kind"], number> = {
+        header:   34,
+        headline: 30,
+        section:  28,
+        row:      22,
+        desc:     20,
+      };
+      const TITLE_BAND = 56;     // gold "LEVEL UP!" title at the top
+      const FOOTER_BAND = 32;    // dismissal hint at the bottom
+      const TOP_PAD = 10;
+      const BOTTOM_PAD = 12;
+      let bodyH = TOP_PAD;
+      for (const l of lines) bodyH += SPACING[l.kind];
+      bodyH += BOTTOM_PAD;
+      const H = TITLE_BAND + bodyH + FOOTER_BAND;
       const X = ARENA_X + (ARENA_W - W) / 2;
       const Y = ARENA_Y + (ARENA_H - H) / 2;
+
       const objs: Phaser.GameObjects.GameObject[] = [];
       const bg = this.add
         .rectangle(X, Y, W, H, 0x161629, 0.97)
@@ -3630,23 +3694,33 @@ export class CombatScene extends Phaser.Scene {
         .setOrigin(0.5, 0)
         .setDepth(151);
       objs.push(title);
-      let cy = Y + 64;
-      for (const ev of events) {
+
+      // Walk the line list and stamp each text in turn.
+      let cy = Y + TITLE_BAND + TOP_PAD;
+      for (const l of lines) {
+        const style: Partial<Phaser.Types.GameObjects.Text.TextStyle> =
+          l.kind === "header"   ? { fontFamily: "Georgia, serif", fontSize: "20px", color: "#f6efd6" } :
+          l.kind === "headline" ? { fontFamily: "Georgia, serif", fontSize: "22px", color: "#9be39b" } :
+          l.kind === "section"  ? { fontFamily: "Georgia, serif", fontSize: "14px", color: "#ffd470" } :
+          l.kind === "row"      ? { fontFamily: "Georgia, serif", fontSize: "16px", color: "#f6efd6" } :
+          /* desc */              { fontFamily: "Georgia, serif", fontSize: "13px", color: "#bdb38a", wordWrap: { width: wrapW } };
         objs.push(
           this.add
-            .text(X + W / 2, cy, ev.message, {
-              fontFamily: "Georgia, serif",
-              fontSize: "16px",
-              color: "#f6efd6",
-            })
+            .text(X + W / 2, cy, l.text, style)
             .setOrigin(0.5, 0)
             .setDepth(151),
         );
-        cy += 26;
+        cy += SPACING[l.kind];
       }
+
+      // Footer: dismissal hint, plus the "(N of M)" counter when
+      // there's more than one level-up queued.
+      const hint = total > 1
+        ? `[ Space / Enter to continue — ${idx} of ${total} ]`
+        : "[ Space / Enter to continue ]";
       objs.push(
         this.add
-          .text(X + W / 2, Y + H - 24, "[ Space / Enter to continue ]", {
+          .text(X + W / 2, Y + H - 24, hint, {
             fontFamily: "monospace",
             fontSize: "12px",
             color: "#bdb38a",

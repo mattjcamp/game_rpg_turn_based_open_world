@@ -1,22 +1,15 @@
 cd /Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/web
 npm run dev
-
 python3 main.py
 
 ## Bugs
 
-Deployed version:
-
-Failed to compile.
-
-./src/game/scenes/CombatScene.ts
-1460:20  Error: React Hook "useCombatItem" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.  react-hooks/rules-of-hooks
-
 ## Polish
 
-- When a character equips an item in combat, the item that was in the slot previous should be returned to the personal inventory
-- For now, we only need slots in for body (armor) and hands (weapons). In the future, we will have more detailed ways to equip items but since we don't support that yet having extra slots will confuse players.
-- When a character levels up, a dialog should appear with the detailed calculations of how much their HP and MP increased and what new spells and abilities are unlocked
+- Add spells, abilities, AC Calc, Damage Calc to character sheets
+- Double check that class abilities have been ported
+
+Thief Shadow Step doesn't exist in Python either. No Shadow Step, no Backstab, no Sneak ability anywhere in the source data or code. Thieves have lockpicking ungated from level 1 in Python, and that's the extent of their class abilities. So if you want Shadow Step, that's a content-design request, not a porting one — separate scope from the dialog.
 
 ## V2 Features
 - Infravision should act more like normal vision, just with all tiles displayed with a red tint, the range of infravision should match the other lighting effects

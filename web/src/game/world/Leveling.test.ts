@@ -3,9 +3,15 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { awardXp, xpForNextLevel } from "./Leveling";
+import {
+  awardXp,
+  xpForNextLevel,
+  spellsUnlockedAt,
+  abilitiesUnlockedAt,
+} from "./Leveling";
 import type { PartyMember } from "./Party";
 import type { ClassTemplate, RaceInfo } from "./Classes";
+import type { Spell } from "./Spells";
 
 function member(overrides: Partial<PartyMember> = {}): PartyMember {
   return {
@@ -139,5 +145,180 @@ describe("awardXp", () => {
     // hp_per_level 15 + CON mod 0 → +15 to both max and current
     expect(m.maxHp).toBe(45);
     expect(m.hp).toBe(35);
+  });
+
+  it("populates newSpells / newAbilities arrays even when empty", () => {
+    // Default Fighter has no class abilities and we pass no spells —
+    // the dialog still wants empty arrays rather than undefined so
+    // it can `.length === 0` cleanly.
+    const m = member({ level: 1, exp: 0 });
+    const events = awardXp(m, 1500, fighterTpl, null);
+    expect(events[0].newSpells).toEqual([]);
+    expect(events[0].newAbilities).toEqual([]);
+  });
+});
+
+describe("spellsUnlockedAt", () => {
+  // Two spell fixtures: Heal (Cleric L1 / Paladin L3) and Turn Undead
+  // (Cleric L2 / Paladin L5). The per-class override is the
+  // interesting case — spellsUnlockedAt has to honour it.
+  const heal: Spell = {
+    id: "heal", name: "Heal", description: "Restore HP.",
+    allowable_classes: ["Cleric", "Paladin"],
+    casting_type: "priest", min_level: 1,
+    class_min_levels: { Paladin: 3 },
+    mp_cost: 4, duration: "instant", effect_type: "heal", usable_in: ["battle"],
+  };
+  const turnUndead: Spell = {
+    id: "turn_undead", name: "Turn Undead", description: "Channel holy power.",
+    allowable_classes: ["Cleric", "Paladin"],
+    casting_type: "priest", min_level: 2,
+    class_min_levels: { Paladin: 5 },
+    mp_cost: 0, duration: "instant", effect_type: "undead_damage",
+    targeting: "auto_monster", usable_in: ["battle"],
+  };
+  const magicDart: Spell = {
+    id: "magic_dart", name: "Magic Dart", description: "Bolt of force.",
+    allowable_classes: ["Wizard"],
+    casting_type: "sorcerer", min_level: 1,
+    mp_cost: 2, duration: "instant", effect_type: "damage", usable_in: ["battle"],
+  };
+  const all = [heal, turnUndead, magicDart];
+
+  it("returns spells whose effective min_level matches the given level", () => {
+    // Cleric reaches L2 — Turn Undead unlocks (its base min_level is 2).
+    const out = spellsUnlockedAt("Cleric", 2, all);
+    expect(out.map((s) => s.name)).toEqual(["Turn Undead"]);
+  });
+
+  it("respects class_min_levels overrides (Paladin L5 Turn Undead)", () => {
+    // At Paladin L5, Turn Undead unlocks via the per-class override.
+    const out5 = spellsUnlockedAt("Paladin", 5, all);
+    expect(out5.map((s) => s.name)).toEqual(["Turn Undead"]);
+    // At Paladin L2 nothing unlocks — base min_level wouldn't apply,
+    // and the override hasn't kicked in yet.
+    const out2 = spellsUnlockedAt("Paladin", 2, all);
+    expect(out2).toEqual([]);
+    // At Paladin L3 Heal unlocks via the override.
+    const out3 = spellsUnlockedAt("Paladin", 3, all);
+    expect(out3.map((s) => s.name)).toEqual(["Heal"]);
+  });
+
+  it("filters out spells the class can't cast", () => {
+    // Wizard at L2 doesn't get any of these (only Magic Dart, which
+    // unlocked at L1).
+    expect(spellsUnlockedAt("Wizard", 2, all)).toEqual([]);
+    // At L1, the Wizard picks up Magic Dart.
+    expect(spellsUnlockedAt("Wizard", 1, all).map((s) => s.name))
+      .toEqual(["Magic Dart"]);
+  });
+
+  it("is case-insensitive on the class match", () => {
+    expect(spellsUnlockedAt("cleric", 2, all).map((s) => s.name))
+      .toEqual(["Turn Undead"]);
+  });
+
+  it("surfaces the spell's MP cost + description for the dialog", () => {
+    const out = spellsUnlockedAt("Wizard", 1, all);
+    expect(out[0]).toEqual({
+      name: "Magic Dart",
+      mpCost: 2,
+      description: "Bolt of force.",
+    });
+  });
+});
+
+describe("abilitiesUnlockedAt", () => {
+  const ranger: ClassTemplate = {
+    name: "Ranger", hpPerLevel: 10, mpPerLevel: 3, expPerLevel: 1500, range: 6,
+    classAbilities: [
+      { name: "Herbalism",   minLevel: 1, description: "Spot reagents." },
+      { name: "Pick Locks",  minLevel: 3, description: "Pick mundane locks." },
+      { name: "Detect Traps", minLevel: 3, description: "See traps before stepping on them." },
+    ],
+  };
+  const fighter: ClassTemplate = {
+    name: "Fighter", hpPerLevel: 15, mpPerLevel: 0, expPerLevel: 1500, range: 4,
+  };
+
+  it("returns abilities whose minLevel matches exactly", () => {
+    expect(abilitiesUnlockedAt(ranger, 3).map((a) => a.name).sort())
+      .toEqual(["Detect Traps", "Pick Locks"]);
+  });
+
+  it("returns the level-1 abilities at level 1 (character-creation grants)", () => {
+    expect(abilitiesUnlockedAt(ranger, 1).map((a) => a.name)).toEqual(["Herbalism"]);
+  });
+
+  it("returns [] for a level with no unlocks", () => {
+    expect(abilitiesUnlockedAt(ranger, 2)).toEqual([]);
+    expect(abilitiesUnlockedAt(ranger, 4)).toEqual([]);
+  });
+
+  it("returns [] for plain classes with no class_abilities defined", () => {
+    expect(abilitiesUnlockedAt(fighter, 1)).toEqual([]);
+    expect(abilitiesUnlockedAt(fighter, 5)).toEqual([]);
+  });
+});
+
+describe("awardXp — new spell/ability events", () => {
+  // Paladin reaching level 5 should pick up Turn Undead via spell
+  // class_min_levels AND the class ability if both are present.
+  const paladin: ClassTemplate = {
+    name: "Paladin", hpPerLevel: 10, mpPerLevel: 5, expPerLevel: 1500, range: 4,
+    mpSource: { ability: "wisdom" },
+    classAbilities: [
+      { name: "Turn Undead", minLevel: 5,
+        description: "Channel holy energy to turn undead." },
+    ],
+  };
+  const turnUndead: Spell = {
+    id: "turn_undead", name: "Turn Undead", description: "Holy blast.",
+    allowable_classes: ["Cleric", "Paladin"],
+    casting_type: "priest", min_level: 2,
+    class_min_levels: { Paladin: 5 },
+    mp_cost: 0, duration: "instant", effect_type: "undead_damage",
+    targeting: "auto_monster", usable_in: ["battle"],
+  };
+
+  it("attaches newSpells when a level-up clears a spell threshold", () => {
+    const m = member({
+      class: "Paladin", level: 4, exp: 4 * 1500 - 1,
+      hp: 50, maxHp: 50, mp: 5, maxMp: 5,
+    });
+    // One nudge of XP carries them across the level-5 threshold.
+    const events = awardXp(m, 2, paladin, null, [turnUndead]);
+    expect(events).toHaveLength(1);
+    expect(events[0].newLevel).toBe(5);
+    expect(events[0].newSpells.map((s) => s.name)).toEqual(["Turn Undead"]);
+  });
+
+  it("attaches newAbilities for a class ability gated to this level", () => {
+    const m = member({
+      class: "Paladin", level: 4, exp: 4 * 1500 - 1,
+      hp: 50, maxHp: 50, mp: 5, maxMp: 5,
+    });
+    const events = awardXp(m, 2, paladin, null, [turnUndead]);
+    expect(events[0].newAbilities.map((a) => a.name)).toEqual(["Turn Undead"]);
+  });
+
+  it("each level in a multi-level award sees only that level's unlocks", () => {
+    // Ranger going from 1 → 4 in one award. Pick Locks + Detect Traps
+    // unlock at L3 only — not at L2 or L4.
+    const ranger: ClassTemplate = {
+      name: "Ranger", hpPerLevel: 10, mpPerLevel: 3, expPerLevel: 1500, range: 6,
+      mpSource: { ability: "wisdom" },
+      classAbilities: [
+        { name: "Pick Locks",  minLevel: 3, description: "" },
+        { name: "Detect Traps", minLevel: 3, description: "" },
+      ],
+    };
+    const m = member({ class: "Ranger", level: 1, exp: 0 });
+    const events = awardXp(m, 4500, ranger, null, []);
+    expect(events.map((e) => e.newLevel)).toEqual([2, 3, 4]);
+    expect(events[0].newAbilities).toEqual([]);
+    expect(events[1].newAbilities.map((a) => a.name).sort())
+      .toEqual(["Detect Traps", "Pick Locks"]);
+    expect(events[2].newAbilities).toEqual([]);
   });
 });

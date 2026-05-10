@@ -19,6 +19,22 @@
 
 import type { PartyMember } from "./Party";
 import type { ClassTemplate, RaceInfo } from "./Classes";
+import type { Spell } from "./Spells";
+import { minLevelFor } from "./Spells";
+
+/** A class ability or spell that becomes available at this level-up. */
+export interface UnlockedSpell {
+  /** Spell name as the dialog should display it. */
+  name: string;
+  /** MP cost — surfaced in the dialog so casters know what it'll run them. */
+  mpCost: number;
+  description: string;
+}
+
+export interface UnlockedAbility {
+  name: string;
+  description: string;
+}
 
 export interface LevelUpEvent {
   name: string;
@@ -26,6 +42,12 @@ export interface LevelUpEvent {
   hpGain: number;
   mpGain: number;
   message: string;
+  /** Spells the member learns at this exact level. Filtered against
+   *  the class's `allowable_classes` + per-class min-level rules. */
+  newSpells: UnlockedSpell[];
+  /** Non-spell class abilities (Pick Locks, Turn Undead, …) whose
+   *  `min_level` matches this level. */
+  newAbilities: UnlockedAbility[];
 }
 
 /** D&D-style modifier (10 = 0, 18 = +4, 8 = -1, …). */
@@ -62,6 +84,43 @@ export function xpForNextLevel(
 }
 
 /**
+ * Spells the member's class learns at exactly `level`. Filters the
+ * full catalog against the class's allowable list and per-class
+ * level overrides. Used at level-up to surface "you can now cast X".
+ *
+ * Pure helper — exported so the same predicate can drive a "What's
+ * next?" preview elsewhere in the UI.
+ */
+export function spellsUnlockedAt(
+  klass: string,
+  level: number,
+  spells: ReadonlyArray<Spell>,
+): UnlockedSpell[] {
+  const klassLower = klass.toLowerCase();
+  const out: UnlockedSpell[] = [];
+  for (const s of spells) {
+    if (!s.allowable_classes.some((c) => c.toLowerCase() === klassLower)) continue;
+    if (minLevelFor(s, klass) !== level) continue;
+    out.push({
+      name: s.name,
+      mpCost: s.mp_cost,
+      description: s.description,
+    });
+  }
+  return out;
+}
+
+/** Class abilities (non-spell) whose `minLevel` matches `level`. */
+export function abilitiesUnlockedAt(
+  tpl: ClassTemplate,
+  level: number,
+): UnlockedAbility[] {
+  return (tpl.classAbilities ?? [])
+    .filter((a) => a.minLevel === level)
+    .map((a) => ({ name: a.name, description: a.description }));
+}
+
+/**
  * Add XP and apply any level-ups in place. Returns one event per
  * level gained so the caller can show messages / play sfx / animate.
  *
@@ -69,12 +128,17 @@ export function xpForNextLevel(
  * and (for casters) `member.maxMp`, `member.mp`. HP / MP are bumped
  * by the gain on each level so a wounded member partially heals on
  * level-up — same behaviour as the Python game.
+ *
+ * `spells` is the full spell catalog; pass `[]` (or omit) to skip
+ * the spell-unlock diff. The class template's own `classAbilities`
+ * already covers non-spell unlocks without needing extra data.
  */
 export function awardXp(
   member: PartyMember,
   xp: number,
   tpl: ClassTemplate,
   race: RaceInfo | null,
+  spells: ReadonlyArray<Spell> = [],
 ): LevelUpEvent[] {
   if (xp <= 0) return [];
   member.exp += xp;
@@ -98,6 +162,11 @@ export function awardXp(
       }
     }
 
+    // Diff against the *new* level — these are unlocks the player
+    // didn't have a moment ago.
+    const newSpells = spellsUnlockedAt(member.class, member.level, spells);
+    const newAbilities = abilitiesUnlockedAt(tpl, member.level);
+
     let msg = `${member.name} reached Level ${member.level}! HP+${hpGain}`;
     if (mpGain > 0) msg += ` MP+${mpGain}`;
     events.push({
@@ -106,6 +175,8 @@ export function awardXp(
       hpGain,
       mpGain,
       message: msg,
+      newSpells,
+      newAbilities,
     });
   }
   return events;
