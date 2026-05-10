@@ -6,9 +6,8 @@ python3 main.py
 ## Polish
 
 - Do a full QA on party creation attributes, combat, etc. Do a few playthroughs.
-
+cd 
 ## V2 Features
-- Lighting should not pass through walls and essentially only light based on Light of Sight and the lighting effect range
 - Infravision should act more like normal vision, just with all tiles displayed with a red tint, the range of infravision should match the other lighting effects
 - In the character creation screen, add descriptions of races and classes with detailed lists of special abilities
 

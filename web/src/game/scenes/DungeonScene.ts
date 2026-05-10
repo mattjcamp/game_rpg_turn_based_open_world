@@ -669,20 +669,36 @@ export class DungeonScene extends Phaser.Scene {
     // their own pool on top. Both go through `brightnessAt`, which
     // takes the brighter of the two contributions per cell.
     const lights = this.collectLights();
+    // Dungeon-flavoured LOS blocker. Walls / closed doors / non-
+    // walkable cells block; tiles flagged `transparent` (water,
+    // glass, etc.) pass light through. Mirrors `tileLightBlocker`
+    // for TileMap, but reads the dungeon level's tile array + per-
+    // cell `tileProperties.walkable` overrides instead of going
+    // through TileMap.
+    const lvl = this.level;
+    const blocks = (col: number, row: number): boolean => {
+      if (col < 0 || row < 0 || col >= lvl.width || row >= lvl.height) return true;
+      const props = lvl.tileProperties[`${col},${row}`];
+      if (props && typeof props.walkable === "boolean") return !props.walkable;
+      const def = tileDef(lvl.tiles[row][col]);
+      if (def.flags?.transparent) return false;
+      return !def.walkable;
+    };
     for (let row = 0; row < this.level.height; row++) {
       for (let col = 0; col < this.level.width; col++) {
         const rect = this.darknessRects.get(`${col},${row}`);
         const tintRect = this.tintRects.get(`${col},${row}`);
         if (!rect || !tintRect) continue;
         // ── Combined brightness ──
-        const b = brightnessAt(col, row, lights, { col: dp.col, row: dp.row }, partyR);
+        const b = brightnessAt(col, row, lights, { col: dp.col, row: dp.row }, partyR, blocks);
         // ── Party-only brightness (drives the tint wash) ──
         // The tint is a property of what the PARTY carries, so we don't
         // want a wall torch to look red just because the party has
         // Infravision — the wash should only paint cells the party's
         // light actually reaches. Compute partyB by passing an empty
-        // lights array.
-        const partyB = brightnessAt(col, row, [], { col: dp.col, row: dp.row }, partyR);
+        // lights array (still LOS-gated so the wash doesn't bleed
+        // through walls either).
+        const partyB = brightnessAt(col, row, [], { col: dp.col, row: dp.row }, partyR, blocks);
         if (b > 0) {
           this.level.exploredTiles.add(`${col},${row}`);
           rect.setFillStyle(0x000000, Math.max(0, Math.min(0.92, (1 - b) * 0.92)));

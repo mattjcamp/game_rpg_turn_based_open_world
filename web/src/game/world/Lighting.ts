@@ -118,6 +118,43 @@ export function mapIsDark(lights: LightSource[]): boolean {
 }
 
 /**
+ * Bresenham-walk a line from (x0, y0) to (x1, y1) and return false
+ * if any **intermediate** cell satisfies `isBlocking`. The endpoints
+ * themselves are exempt — a wall-mounted torch (start tile is a
+ * wall) can still illuminate adjacent floor tiles, and a wall (end
+ * tile) doesn't self-block when a nearby light hits it.
+ *
+ * Used by `brightnessAt` to enforce line-of-sight so light doesn't
+ * leak through walls / locked doors / dense forest. The check is
+ * direction-symmetric (LOS A→B === LOS B→A) so it's fine to walk
+ * either way; we walk source → target by convention.
+ */
+export function hasLineOfSight(
+  x0: number, y0: number,
+  x1: number, y1: number,
+  isBlocking: (col: number, row: number) => boolean,
+): boolean {
+  if (x0 === x1 && y0 === y1) return true;
+  const dx = Math.abs(x1 - x0);
+  const dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1;
+  const sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+  let x = x0;
+  let y = y0;
+  // Walk one Bresenham step at a time. We step BEFORE checking so
+  // the start tile is skipped naturally; once we land on the end
+  // tile we return true without re-checking it.
+  while (true) {
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x += sx; }
+    if (e2 <  dx) { err += dx; y += sy; }
+    if (x === x1 && y === y1) return true;
+    if (isBlocking(x, y)) return false;
+  }
+}
+
+/**
  * Compute the brightness 0..1 at a given cell.
  *
  * Each light contributes `1 - dist/radius` clamped to [0, 1] using
@@ -128,13 +165,22 @@ export function mapIsDark(lights: LightSource[]): boolean {
  * The party position and party light radius are passed in; the party
  * is always treated as a light source so the player is never standing
  * in pitch black.
+ *
+ * `isBlocking`, when supplied, enforces line-of-sight: each light's
+ * contribution is dropped when an intermediate tile blocks the
+ * Bresenham line from light to target. Without it (back-compat for
+ * tests that don't care), all lights illuminate radially. Apply this
+ * uniformly to map lights AND the party pool — a wall between the
+ * party and a tile blocks the party's own pool too, which is what
+ * "respects LOS" means in conventional roguelike lighting.
  */
 export function brightnessAt(
   col: number,
   row: number,
   lights: LightSource[],
   party: { col: number; row: number },
-  partyRadius = PARTY_LIGHT_RADIUS
+  partyRadius = PARTY_LIGHT_RADIUS,
+  isBlocking?: (col: number, row: number) => boolean,
 ): number {
   let best = 0;
   // Party light
@@ -142,13 +188,37 @@ export function brightnessAt(
   const dPartyR = Math.abs(row - party.row);
   const dParty = Math.max(dPartyC, dPartyR);
   if (dParty <= partyRadius) {
-    best = Math.max(best, 1 - dParty / Math.max(partyRadius, 1));
+    if (!isBlocking || hasLineOfSight(party.col, party.row, col, row, isBlocking)) {
+      best = Math.max(best, 1 - dParty / Math.max(partyRadius, 1));
+    }
   }
   for (const L of lights) {
     const d = Math.max(Math.abs(col - L.col), Math.abs(row - L.row));
     if (d > L.radius) continue;
+    if (isBlocking && !hasLineOfSight(L.col, L.row, col, row, isBlocking)) continue;
     const b = 1 - d / Math.max(L.radius, 1);
     if (b > best) best = b;
   }
   return Math.max(0, Math.min(1, best));
+}
+
+/**
+ * Build an `isBlocking` callback for a `TileMap` — a tile blocks
+ * light when it's non-walkable AND not flagged `transparent`.
+ * That picks up walls, locked doors, and forest tree-walls (which
+ * use a `tile_properties.walkable` override) while letting water
+ * (already flagged transparent) pass light through normally.
+ *
+ * Out-of-bounds cells are treated as blockers so a light near the
+ * edge of the map doesn't escape and illuminate void tiles.
+ */
+export function tileLightBlocker(
+  map: TileMap,
+): (col: number, row: number) => boolean {
+  return (col, row) => {
+    if (!map.inBounds(col, row)) return true;
+    const def = tileDef(map.getTile(col, row));
+    if (def.flags?.transparent) return false;
+    return !map.isWalkable(col, row);
+  };
 }

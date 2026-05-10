@@ -113,6 +113,7 @@ import {
   collectLightSources,
   brightnessAt,
   mapIsDark,
+  tileLightBlocker,
   PARTY_LIGHT_RADIUS,
   type LightSource,
 } from "../world/Lighting";
@@ -622,6 +623,10 @@ export class TownScene extends Phaser.Scene {
    */
   private refreshDarkness(): void {
     const party = { col: this.playerCol, row: this.playerRow };
+    // Build the line-of-sight blocker once per refresh — `brightnessAt`
+    // calls it for every (light, target) pair, but the closure can be
+    // shared across the W*H * lights iteration of this method.
+    const blocks = tileLightBlocker(this.tileMap);
     if (!this.dark) {
       // Outdoor / lit map. The only darkness here comes from the game
       // clock (dawn/dusk/night). The party-light tint layer never
@@ -653,7 +658,7 @@ export class TownScene extends Phaser.Scene {
           const radius = partyData
             ? partyLightRadius(partyData, PARTY_LIGHT_RADIUS)
             : PARTY_LIGHT_RADIUS;
-          const b = brightnessAt(col, row, this.mapLights, party, radius);
+          const b = brightnessAt(col, row, this.mapLights, party, radius, blocks);
           const alpha = Math.max(0, Math.min(1, (1 - b) * clockParams.maxAlpha));
           rect.setFillStyle(clockParams.tint, alpha);
         }
@@ -676,7 +681,7 @@ export class TownScene extends Phaser.Scene {
       for (let col = 0; col < this.town.width; col++) {
         const rect = this.darkness.get(`${col},${row}`);
         if (!rect) continue;
-        const b = brightnessAt(col, row, this.mapLights, party, radius);
+        const b = brightnessAt(col, row, this.mapLights, party, radius, blocks);
         // Darkness alpha is the inverse of brightness, with a small
         // ambient floor so even fully-lit tiles read as warm rather
         // than 100% transparent. Cap at 0.92 so the player can still

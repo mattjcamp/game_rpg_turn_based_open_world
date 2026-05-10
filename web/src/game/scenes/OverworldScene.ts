@@ -27,6 +27,7 @@ import {
   collectLightSources,
   brightnessAt,
   mapIsDark,
+  tileLightBlocker,
   type LightSource,
 } from "../world/Lighting";
 import { decorationFor } from "../world/Decorations";
@@ -464,13 +465,17 @@ export class OverworldScene extends Phaser.Scene {
     const partyR = gameState.partyData
       ? partyLightRadius(gameState.partyData, 2)
       : 2;
+    // LOS blocker for the overworld tile map. Built once per refresh
+    // so the closure is shared across the W*H * lights iteration.
+    const blocks = tileLightBlocker(this.tileMap);
     for (let row = 0; row < this.tileMap.height; row++) {
       for (let col = 0; col < this.tileMap.width; col++) {
         const rect = this.darkness.get(`${col},${row}`);
         if (!rect) continue;
         if (this.dark) {
-          // Interior darkness — same logic as before.
-          const b = brightnessAt(col, row, this.mapLights, party);
+          // Interior darkness — same logic as before, with LOS so
+          // walls / locked doors don't pass light through.
+          const b = brightnessAt(col, row, this.mapLights, party, undefined, blocks);
           rect.setFillStyle(0x000000, Math.max(0, Math.min(0.92, (1 - b) * 0.92)));
           continue;
         }
@@ -487,8 +492,9 @@ export class OverworldScene extends Phaser.Scene {
         // every map-defined light (spawn-tile campfires, fairy
         // lights, etc.). Previously this passed [] for the lights
         // array, so the player had no way to navigate by torchlight
-        // even in tile patches the map clearly marks as lit.
-        const b = brightnessAt(col, row, this.mapLights, party, partyR);
+        // even in tile patches the map clearly marks as lit. LOS
+        // blocker keeps light pools from leaking through walls.
+        const b = brightnessAt(col, row, this.mapLights, party, partyR, blocks);
         const alpha = Math.max(0, Math.min(1, (1 - b) * clockParams.maxAlpha));
         rect.setFillStyle(clockParams.tint, alpha);
       }

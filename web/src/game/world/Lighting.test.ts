@@ -7,9 +7,11 @@ import { TileMap } from "./TileMap";
 import {
   collectLightSources,
   brightnessAt,
+  hasLineOfSight,
   mapIsDark,
+  tileLightBlocker,
 } from "./Lighting";
-import { TILE_GRASS } from "./Tiles";
+import { TILE_GRASS, TILE_MOUNTAIN } from "./Tiles";
 
 function blank(w = 5, h = 5): TileMap {
   const tiles = Array.from({ length: h }, () =>
@@ -97,5 +99,118 @@ describe("brightnessAt", () => {
     const farParty = { col: 100, row: 100 };
     // Standing on the second light → 1.0 even though far from first.
     expect(brightnessAt(5, 5, lights, farParty)).toBeCloseTo(1.0);
+  });
+});
+
+describe("hasLineOfSight", () => {
+  const NEVER_BLOCKS = (): boolean => false;
+  const ALWAYS_BLOCKS = (): boolean => true;
+
+  it("returns true for the same tile", () => {
+    expect(hasLineOfSight(3, 3, 3, 3, NEVER_BLOCKS)).toBe(true);
+  });
+
+  it("returns true for adjacent tiles regardless of the blocker", () => {
+    // Adjacent — there are no intermediate cells to block.
+    expect(hasLineOfSight(0, 0, 1, 0, ALWAYS_BLOCKS)).toBe(true);
+    expect(hasLineOfSight(0, 0, 1, 1, ALWAYS_BLOCKS)).toBe(true);
+    expect(hasLineOfSight(0, 0, 0, 1, ALWAYS_BLOCKS)).toBe(true);
+  });
+
+  it("returns false when an intermediate tile blocks", () => {
+    // Walk (0,0) → (4,0). One blocker at (2,0).
+    const blocker = (c: number, r: number): boolean => c === 2 && r === 0;
+    expect(hasLineOfSight(0, 0, 4, 0, blocker)).toBe(false);
+  });
+
+  it("the start tile is exempt from blocking (wall-mounted torch case)", () => {
+    // The torch sits on a wall at (0,0). Light should still reach
+    // the floor at (2,0) even though the start tile would say block.
+    const blocker = (c: number, r: number): boolean => c === 0 && r === 0;
+    expect(hasLineOfSight(0, 0, 2, 0, blocker)).toBe(true);
+  });
+
+  it("the end tile is exempt from blocking (wall lit by adjacent torch)", () => {
+    // Floor torch at (0,0), wall at (3,0). The wall itself shouldn't
+    // self-block — the player should see the wall lit when adjacent.
+    const blocker = (c: number, r: number): boolean => c === 3 && r === 0;
+    expect(hasLineOfSight(0, 0, 3, 0, blocker)).toBe(true);
+  });
+
+  it("works on diagonals — Bresenham steps both axes", () => {
+    // Diagonal from (0,0) → (4,4). One blocker at (2,2).
+    const blocker = (c: number, r: number): boolean => c === 2 && r === 2;
+    expect(hasLineOfSight(0, 0, 4, 4, blocker)).toBe(false);
+  });
+});
+
+describe("tileLightBlocker", () => {
+  it("treats walkable tiles as non-blocking", () => {
+    const m = new TileMap(3, 3, [
+      [TILE_GRASS, TILE_GRASS, TILE_GRASS],
+      [TILE_GRASS, TILE_GRASS, TILE_GRASS],
+      [TILE_GRASS, TILE_GRASS, TILE_GRASS],
+    ]);
+    const blocks = tileLightBlocker(m);
+    expect(blocks(1, 1)).toBe(false);
+  });
+
+  it("treats non-walkable tiles as blocking", () => {
+    const m = new TileMap(3, 3, [
+      [TILE_GRASS, TILE_MOUNTAIN, TILE_GRASS],
+      [TILE_GRASS, TILE_GRASS, TILE_GRASS],
+      [TILE_GRASS, TILE_GRASS, TILE_GRASS],
+    ]);
+    const blocks = tileLightBlocker(m);
+    expect(blocks(1, 0)).toBe(true);
+  });
+
+  it("treats out-of-bounds as blocking (light can't escape the map)", () => {
+    const m = new TileMap(2, 2, [[TILE_GRASS, TILE_GRASS], [TILE_GRASS, TILE_GRASS]]);
+    const blocks = tileLightBlocker(m);
+    expect(blocks(-1, 0)).toBe(true);
+    expect(blocks(0, -1)).toBe(true);
+    expect(blocks(2, 0)).toBe(true);
+    expect(blocks(0, 2)).toBe(true);
+  });
+});
+
+describe("brightnessAt with LOS", () => {
+  it("a light contributes nothing when blocked by an intermediate wall", () => {
+    // Light at (0, 0) radius 4. Target at (4, 0). Wall at (2, 0).
+    const lights = [{ col: 0, row: 0, radius: 4 }];
+    const farParty = { col: 100, row: 100 };
+    const blocker = (c: number, r: number): boolean => c === 2 && r === 0;
+    // Without LOS: light reaches with brightness 1 - 4/4 = 0.
+    // Actually 1 - 4/4 = 0, so use radius=8 to test mid-pool blocking.
+    const lights2 = [{ col: 0, row: 0, radius: 8 }];
+    expect(brightnessAt(4, 0, lights2, farParty, 0, blocker)).toBe(0);
+    expect(brightnessAt(4, 0, lights2, farParty)).toBeGreaterThan(0);
+    void lights;
+  });
+
+  it("party light is also LOS-gated", () => {
+    // Party at (0, 0), target at (4, 0), wall at (2, 0).
+    const blocker = (c: number, r: number): boolean => c === 2 && r === 0;
+    expect(brightnessAt(4, 0, [], { col: 0, row: 0 }, 6, blocker)).toBe(0);
+    expect(brightnessAt(4, 0, [], { col: 0, row: 0 }, 6)).toBeGreaterThan(0);
+  });
+
+  it("a wall-mounted torch still illuminates the wall and adjacent floor", () => {
+    // Torch on a wall at (0, 0). Wall counts as the source — exempt
+    // from its own blocking. Adjacent floor tile gets lit.
+    const torch = [{ col: 0, row: 0, radius: 3 }];
+    const farParty = { col: 100, row: 100 };
+    const blocker = (c: number, r: number): boolean => c === 0 && r === 0;
+    expect(brightnessAt(1, 0, torch, farParty, 0, blocker)).toBeGreaterThan(0);
+  });
+
+  it("an unblocked light contributes the same with or without LOS", () => {
+    const torch = [{ col: 0, row: 0, radius: 4 }];
+    const farParty = { col: 100, row: 100 };
+    const noBlock = (): boolean => false;
+    const a = brightnessAt(2, 0, torch, farParty);
+    const b = brightnessAt(2, 0, torch, farParty, undefined, noBlock);
+    expect(a).toBeCloseTo(b);
   });
 });
