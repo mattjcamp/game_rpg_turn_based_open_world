@@ -10,6 +10,7 @@ python3 main.py
 
 ## Polish
 
+- Implement "Light" party level spell
 - Double check that class abilities have been ported
 "Thief Shadow Step doesn't exist in Python either. No Shadow Step, no Backstab, no Sneak ability anywhere in the source data or code. Thieves have lockpicking ungated from level 1 in Python, and that's the extent of their class abilities. So if you want Shadow Step, that's a content-design request, not a porting one — separate scope from the dialog."
 

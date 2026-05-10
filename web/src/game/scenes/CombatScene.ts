@@ -592,6 +592,16 @@ export class CombatScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor("#0c0c14");
     this.cameras.main.fadeIn(220, 0, 0, 0);
 
+    // Belt-and-braces — destroy any leftover static decor (panels /
+    // headers / labels) tracked from a previous create() pass before
+    // any draw runs below. `init()` should have done this already on
+    // scene boot, but a Phaser shutdown race can let create() run
+    // with stale GameObjects still in the staticDecor pool. The
+    // forest-dungeon → combat → forest-dungeon loop is where this
+    // symptom surfaced; clearing here closes the race regardless of
+    // init's timing.
+    this.clearStaleDraws();
+
     this.drawHeader();
     this.drawArena();
     this.drawHud();
@@ -732,6 +742,20 @@ export class CombatScene extends Phaser.Scene {
     );
   }
 
+  /**
+   * Destroy every panel / label / divider tracked in `staticDecor`
+   * so the draw functions below can repopulate from a clean slate.
+   * Called once at the top of `create()` to defend against the
+   * Phaser shutdown race that left phantom panels (and a missing
+   * action menu) over the new combat. `init()` does the same on
+   * scene boot — this is the second line of defense for paths
+   * where init's destroy didn't catch everything.
+   */
+  private clearStaleDraws(): void {
+    for (const obj of this.staticDecor) obj?.destroy();
+    this.staticDecor.length = 0;
+  }
+
   private drawHeader(): void {
     this.panel(0, 0, 960, HEADER_H);
     this.track(
@@ -783,6 +807,31 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private drawHud(): void {
+    // Idempotent rebuild — destroy any leftover party cards / action
+    // rows that survived from a previous create() pass before
+    // stamping fresh ones. `init()` already does this on scene boot,
+    // but a Phaser shutdown race can leave the new create() path
+    // running with stale entries still in the maps; the user-reported
+    // "action menu missing" symptom shows up specifically in the
+    // forest-dungeon → combat → forest-dungeon → combat loop where
+    // the timing is tight. Clearing here means a duplicate draw pass
+    // can never leave us in a half-state.
+    //
+    // `staticDecor` is NOT cleared here because drawHeader / drawArena
+    // already contributed to it before us — see `clearStaleDraws()`,
+    // which runs once at the top of create() to handle that pool.
+    for (const card of this.partyCards.values()) {
+      card?.hpBar?.destroy();
+      card?.hpText?.destroy();
+      card?.mpBar?.destroy();
+      card?.mpText?.destroy();
+    }
+    this.partyCards.clear();
+    for (const t of this.actionTexts) t?.destroy();
+    this.actionTexts.length = 0;
+    for (const h of this.actionRowHandles) h?.destroy();
+    this.actionRowHandles.length = 0;
+
     this.panel(HUD_X, HUD_Y, HUD_W, HUD_H);
     let cy = HUD_Y + 12;
 
@@ -924,6 +973,23 @@ export class CombatScene extends Phaser.Scene {
   private tileY(row: number): number { return ARENA_Y + row * TILE + TILE / 2; }
 
   private drawCombatants(): void {
+    // Idempotent rebuild — see drawHud() for the rationale. Phaser
+    // races during forest-dungeon → combat re-entry could leave
+    // bodies / selection rings / monster HP bars from the previous
+    // encounter in the maps even after init()'s defensive destroy,
+    // producing the "phantom green bars floating over empty grass"
+    // visual the user reported. Clearing at the top of the draw
+    // closes that race regardless of init's timing.
+    for (const body of this.bodies.values()) body?.destroy();
+    this.bodies.clear();
+    for (const ring of this.selRings.values()) ring?.destroy();
+    this.selRings.clear();
+    for (const b of this.monsterHpBars.values()) {
+      b.bg?.destroy();
+      b.bar?.destroy();
+    }
+    this.monsterHpBars.clear();
+
     for (const c of this.combat.combatants) {
       const x = this.tileX(c.position.col);
       const y = this.tileY(c.position.row);
@@ -978,6 +1044,16 @@ export class CombatScene extends Phaser.Scene {
   private installInput(): void {
     const k = this.input.keyboard;
     if (!k) return;
+    // Phaser doesn't auto-clean keyboard listeners across scene.start
+    // cycles — each combat → dungeon → combat re-entry would stack
+    // another `keydown-ENTER` handler on top of the previous one.
+    // After a few rounds, pressing Enter on the Cast row would fire
+    // activateAction twice in a row: first call opens the spell
+    // picker, second call immediately dispatches whatever the cursor
+    // is on (the first spell), so the player never sees the picker.
+    // Same risk for every other key. Remove all listeners up front so
+    // each create() starts from a clean slate.
+    k.removeAllListeners();
     const stepMap: Record<string, Direction> = {
       W: "n", A: "w", S: "s", D: "e",
       UP: "n", DOWN: "s", LEFT: "w", RIGHT: "e",
