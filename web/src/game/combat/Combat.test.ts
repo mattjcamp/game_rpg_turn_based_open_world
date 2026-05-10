@@ -853,3 +853,164 @@ describe("Combat — monster passives + on-hit + spell AI", () => {
   });
 });
 
+
+// ── Thief class abilities ─────────────────────────────────────────
+
+/** A Thief built for tests: dagger in hand, level + DEX overridable. */
+function makeThief(overrides: Partial<Combatant> = {}): Combatant {
+  return make("thief", "party", {
+    name: "Lyra",
+    charClass: "Thief",
+    level: 3,
+    weaponName: "Dagger",
+    dexterity: 16, // +3 mod
+    dexMod: 3,
+    attackBonus: 5, // guarantees a hit at AC 12 with most rolls
+    damage: { dice: 1, sides: 4, bonus: 0 },
+    ...overrides,
+  });
+}
+
+describe("Combat — Thief Backstab", () => {
+  it("upgrades a normal hit to a crit when the DEX save passes", () => {
+    // RNG sequence:
+    //   [0] initiative (party)
+    //   [1] initiative (enemy)
+    //   [2] attack d20 — 0.5 → 11 (hit but not nat-20 crit)
+    //   [3] save d20  — 0.95 → 20 (with DEX +3 = 23 ≥ DC 12 → crit!)
+    //   [4..] damage dice — crit doubles them
+    const rng = mulberry32(42);
+    const thief = makeThief();
+    const goblin = make("goblin", "enemies", {
+      name: "Goblin", ac: 10, hp: 30, maxHp: 30,
+    });
+    const c = new Combat([thief], [goblin], rng);
+    while (c.current.id !== "thief") c.endTurn();
+    const result = c.attack("goblin");
+    expect(result.hit).toBe(true);
+    // The dedicated backstab flag came back true and the crit flag
+    // is set — even though the underlying d20 wasn't a 20.
+    expect(result.backstab).toBe(true);
+    expect(result.critical).toBe(true);
+    expect(result.roll).toBeLessThan(20);
+    // The combat log carries a BACKSTAB stinger so the scene can spot it.
+    expect(c.log.some((l) => l.includes("BACKSTAB"))).toBe(true);
+  });
+
+  it("skips Backstab for a Thief wielding a non-dagger", () => {
+    // Swap the dagger for a short_sword — the gate should fail.
+    const thief = makeThief({ weaponName: "Short Sword" });
+    const goblin = make("goblin", "enemies", { name: "Goblin", ac: 10 });
+    const c = new Combat([thief], [goblin], mulberry32(7));
+    while (c.current.id !== "thief") c.endTurn();
+    const result = c.attack("goblin");
+    expect(result.backstab).toBeFalsy();
+    // The log doesn't claim a backstab.
+    expect(c.log.some((l) => l.includes("BACKSTAB"))).toBe(false);
+  });
+
+  it("skips Backstab for a level-2 Thief (the unlock is level 3)", () => {
+    const thief = makeThief({ level: 2 });
+    const goblin = make("goblin", "enemies", { name: "Goblin", ac: 10 });
+    const c = new Combat([thief], [goblin], mulberry32(7));
+    while (c.current.id !== "thief") c.endTurn();
+    const result = c.attack("goblin");
+    expect(result.backstab).toBeFalsy();
+  });
+
+  it("skips Backstab for non-Thief classes — no Ranger backstabs", () => {
+    const ranger = makeThief({ charClass: "Ranger", name: "Aragorn" });
+    const goblin = make("goblin", "enemies", { name: "Goblin", ac: 10 });
+    const c = new Combat([ranger], [goblin], mulberry32(7));
+    while (c.current.id !== "thief") c.endTurn();
+    const result = c.attack("goblin");
+    expect(result.backstab).toBeFalsy();
+  });
+
+  it("doesn't double-promote a natural-20 crit", () => {
+    // mulberry32(1) at this offset rolls a nat-20 on attack. The save
+    // would also crit, but we don't want the result to claim BACKSTAB
+    // when the attack was already a crit — that would surface a
+    // misleading flag to the scene.
+    const thief = makeThief();
+    const goblin = make("goblin", "enemies", { name: "Goblin", ac: 0 });
+    // RNG that produces a nat-20 first (rngArray-style: feed 1.0).
+    const seq = [0.99, 0.0, 0.99, 0.0, 0.5, 0.5];
+    let i = 0;
+    const rng = () => seq[i++ % seq.length];
+    const c = new Combat([thief], [goblin], rng);
+    while (c.current.id !== "thief") c.endTurn();
+    const result = c.attack("goblin");
+    // 0.99 → d20 = floor(0.99*20)+1 = 20 → nat-20 crit
+    expect(result.roll).toBe(20);
+    expect(result.critical).toBe(true);
+    expect(result.backstab).toBeFalsy();
+  });
+});
+
+describe("Combat — Thief Shadow Step", () => {
+  it("preserves remaining movement when a level-7 Thief bumps a kill", () => {
+    const thief = makeThief({
+      level: 7,
+      damage: { dice: 10, sides: 10, bonus: 99 }, // overkill
+      attackBonus: 99,
+      baseMoveRange: 4,
+    });
+    const goblin = make("goblin", "enemies", {
+      name: "Goblin", ac: 0, hp: 1, maxHp: 1,
+    });
+    // Second goblin off in the corner so the encounter isn't over
+    // when the bump-kill resolves — Shadow Step is gated on
+    // `!isOver`, mirroring the Python version where victory wins
+    // priority over the phase transition.
+    const goblin2 = make("goblin2", "enemies", {
+      name: "Goblin 2", ac: 99, hp: 99, maxHp: 99,
+    });
+    const c = new Combat([thief], [goblin, goblin2], mulberry32(3));
+    while (c.current.id !== "thief") c.endTurn();
+    // Stand the thief adjacent so a single step toward the goblin
+    // triggers the bump-attack. Combat lays out positions on
+    // construction; rather than fight that, reposition both
+    // combatants directly.
+    thief.position = { col: 5, row: 5 };
+    goblin.position = { col: 6, row: 5 };
+    goblin2.position = { col: 0, row: 0 };
+    const before = c.movePoints;
+    const result = c.tryMove("e");
+    expect(result.kind).toBe("attacked");
+    if (result.kind === "attacked") expect(result.result.killed).toBe(true);
+    // Thief's remaining moves were NOT zeroed by the bump-attack.
+    expect(c.movePoints).toBe(before);
+    // Combat log shows the Shadow Step stinger.
+    expect(c.log.some((l) => l.includes("Shadow Step"))).toBe(true);
+  });
+
+  it("zeros movement for a level-6 Thief (the unlock is level 7)", () => {
+    const thief = makeThief({
+      level: 6,
+      damage: { dice: 10, sides: 10, bonus: 99 },
+      attackBonus: 99,
+    });
+    const goblin = make("goblin", "enemies", { ac: 0, hp: 1, maxHp: 1 });
+    const c = new Combat([thief], [goblin], mulberry32(3));
+    while (c.current.id !== "thief") c.endTurn();
+    thief.position = { col: 5, row: 5 };
+    goblin.position = { col: 6, row: 5 };
+    c.tryMove("e");
+    expect(c.movePoints).toBe(0);
+  });
+
+  it("zeros movement when a Thief bumps but doesn't kill", () => {
+    // Level 7 Thief, but the goblin has more HP than the dagger can
+    // dent in one swing — Shadow Step only triggers on the killing
+    // blow.
+    const thief = makeThief({ level: 7 });
+    const goblin = make("goblin", "enemies", { ac: 0, hp: 99, maxHp: 99 });
+    const c = new Combat([thief], [goblin], mulberry32(3));
+    while (c.current.id !== "thief") c.endTurn();
+    thief.position = { col: 5, row: 5 };
+    goblin.position = { col: 6, row: 5 };
+    c.tryMove("e");
+    expect(c.movePoints).toBe(0);
+  });
+});

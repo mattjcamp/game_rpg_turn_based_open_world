@@ -229,12 +229,20 @@ describe("spellsUnlockedAt", () => {
 });
 
 describe("abilitiesUnlockedAt", () => {
+  // Ranger now ships only Pick Locks + Detect Traps at level 3 —
+  // Herbalism moved to Druid. The fixture follows the real data
+  // so the unit test stays an honest model of the engine.
   const ranger: ClassTemplate = {
     name: "Ranger", hpPerLevel: 10, mpPerLevel: 3, expPerLevel: 1500, range: 6,
     classAbilities: [
-      { name: "Herbalism",   minLevel: 1, description: "Spot reagents." },
       { name: "Pick Locks",  minLevel: 3, description: "Pick mundane locks." },
       { name: "Detect Traps", minLevel: 3, description: "See traps before stepping on them." },
+    ],
+  };
+  const druid: ClassTemplate = {
+    name: "Druid", hpPerLevel: 5, mpPerLevel: 8, expPerLevel: 1500, range: 2,
+    classAbilities: [
+      { name: "Herbalism", minLevel: 1, description: "Spot reagents." },
     ],
   };
   const fighter: ClassTemplate = {
@@ -247,7 +255,7 @@ describe("abilitiesUnlockedAt", () => {
   });
 
   it("returns the level-1 abilities at level 1 (character-creation grants)", () => {
-    expect(abilitiesUnlockedAt(ranger, 1).map((a) => a.name)).toEqual(["Herbalism"]);
+    expect(abilitiesUnlockedAt(druid, 1).map((a) => a.name)).toEqual(["Herbalism"]);
   });
 
   it("returns [] for a level with no unlocks", () => {

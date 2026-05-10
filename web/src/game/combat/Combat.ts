@@ -36,7 +36,7 @@ import {
   type Direction,
   type GridPos,
 } from "./Arena";
-import { rollAttack, rollDamage, rollInitiative } from "./engine";
+import { getModifier, rollAttack, rollD20, rollDamage, rollInitiative } from "./engine";
 import {
   sumBuff,
   tickBuffs,
@@ -82,6 +82,35 @@ function nearestInRange(
 function hasPassive(c: Combatant, kind: MonsterPassive["type"]): boolean {
   if (!c.passives) return false;
   return c.passives.some((p) => p.type === kind);
+}
+
+// ── Class-gated ability predicates ────────────────────────────────
+//
+// Backstab + Shadow Step both gate on (class === "Thief", level ≥ N)
+// plus a per-ability extra check. Centralised here so combat.attack
+// and combat.tryMove read identical gates.
+
+/** True when the attacker meets the Backstab prerequisites: alive
+ *  Thief, level 3+, wielding a Dagger. The roll itself (d20+DEX vs
+ *  DC 12) lives in `Combat.attack` so the saving-throw RNG share the
+ *  same `this.rng` as the rest of the encounter. */
+export function canBackstab(c: Combatant): boolean {
+  if (c.hp <= 0) return false;
+  if (!c.charClass) return false;
+  if (c.charClass.toLowerCase() !== "thief") return false;
+  if ((c.level ?? 1) < 3) return false;
+  if (!c.weaponName) return false;
+  return c.weaponName.toLowerCase() === "dagger";
+}
+
+/** True when a successful bump-attack should leave the attacker's
+ *  remaining movement intact (Thief Shadow Step). Level 7+ Thieves
+ *  only — the Python version requires the same. */
+export function canShadowStep(c: Combatant): boolean {
+  if (c.hp <= 0) return false;
+  if (!c.charClass) return false;
+  if (c.charClass.toLowerCase() !== "thief") return false;
+  return (c.level ?? 1) >= 7;
 }
 
 /** True when this combatant's turns are run by the monster-AI loop. */
@@ -371,9 +400,20 @@ export class Combat {
       if (occupant.side === actor.side) {
         return { kind: "blocked", reason: "ally" };
       }
-      // Enemy in the way → bump attack. Consumes all remaining moves.
+      // Enemy in the way → bump attack. Normally this zeros the
+      // remaining moves so the turn ends after the swing. Thief
+      // Shadow Step (level 7+) overrides this on a killing blow —
+      // the Thief keeps whatever movement they had left so they
+      // can step away from the corpse before the next enemy turn,
+      // matching the Python game's PHASE_SHADOW_STEP behaviour.
       const result = this.attack(occupant.id);
-      this.movePoints = 0;
+      if (result.killed && canShadowStep(actor) && !this.isOver) {
+        this.log.push(
+          `${actor.name} Shadow Steps! (${this.movePoints} moves remaining)`,
+        );
+      } else {
+        this.movePoints = 0;
+      }
       return { kind: "attacked", result };
     }
 
@@ -403,6 +443,24 @@ export class Combat {
     const effAtk = this.effectiveAttackBonus(attacker);
     const effAc = this.effectiveAc(target);
     const roll = rollAttack(effAtk, effAc, this.rng);
+    // Thief Backstab — level 3+ Thief wielding a Dagger gets a chance
+    // to upgrade a normal melee hit to a crit. Mirrors Python's
+    // `combat.py` backstab block: d20 + DEX vs DC 12 on top of a hit
+    // that wasn't already a nat-20 crit. The flag rides back on the
+    // AttackResult so the scene can play the stinger animation.
+    let backstab = false;
+    let critical = roll.critical;
+    if (roll.hit && !critical && canBackstab(attacker)) {
+      const saveRoll = rollD20(this.rng);
+      const dexMod = getModifier(attacker.dexterity ?? 10);
+      if (saveRoll + dexMod >= 12) {
+        backstab = true;
+        critical = true;
+        this.log.push(
+          `${attacker.name} finds an opening! (d20:${saveRoll}+${dexMod}=${saveRoll + dexMod} vs DC 12) — BACKSTAB!`,
+        );
+      }
+    }
     let damage = 0;
     if (roll.hit) {
       // `damage_bonus` buffs (Elixir of Strength) add a flat amount on
@@ -414,7 +472,7 @@ export class Combat {
         attacker.damage.dice,
         attacker.damage.sides,
         attacker.damage.bonus + buffBonus,
-        roll.critical,
+        critical,
         this.rng
       );
       target.hp = Math.max(0, target.hp - damage);
@@ -436,7 +494,7 @@ export class Combat {
     const dice = `d20:${roll.roll}${bonusStr}=${roll.total} vs AC${effAc}`;
     this.log.push(
       roll.hit
-        ? `${attacker.name} ${roll.critical ? "crits" : "hits"} ${target.name} (${dice}) — ${damage} dmg${killed ? ", defeated!" : "."}`
+        ? `${attacker.name} ${critical ? "crits" : "hits"} ${target.name} (${dice}) — ${damage} dmg${killed ? ", defeated!" : "."}`
         : `${attacker.name} swings at ${target.name} (${dice}) — miss.`
     );
     return {
@@ -445,7 +503,8 @@ export class Combat {
       hit: roll.hit,
       roll: roll.roll,
       total: roll.total,
-      critical: roll.critical,
+      critical,
+      backstab,
       damage,
       killed,
     };

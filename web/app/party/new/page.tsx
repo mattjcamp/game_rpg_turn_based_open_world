@@ -375,12 +375,7 @@ const CLASS_LORE: Record<ClassName, ClassLore> = {
     tagline: "Master of arcane forces — fragile but devastatingly powerful at range.",
     description:
       "The most diverse and powerful spell list in the game, from Fireball to Animate Dead. Lowest HP per level, no armor, daggers only — keep them behind the front line.",
-    abilities: [
-      {
-        name: "Arcane Focus",
-        description: "Spell damage is increased by the Intelligence modifier.",
-      },
-    ],
+    abilities: [],
   },
   Cleric: {
     tagline: "Holy warrior and healer — the party's lifeline in long fights.",
@@ -441,15 +436,10 @@ const CLASS_LORE: Record<ClassName, ClassLore> = {
     ],
   },
   Ranger: {
-    tagline: "Versatile woodsman — bow master, herbalist, and able scout.",
+    tagline: "Versatile woodsman — bow master and able scout.",
     description:
       "Durable frontliner with bow mastery and limited healing. 6-tile combat range matches a Thief; proficient with every bow in the game. A self-sufficient pick.",
     abilities: [
-      {
-        name: "Herbalism",
-        description:
-          "Examining a wilderness tile rolls d20 + INT vs DC 13 — success identifies a potion reagent.",
-      },
       {
         name: "Pick Locks",
         minLevel: 3,
@@ -465,17 +455,18 @@ const CLASS_LORE: Record<ClassName, ClassLore> = {
     ],
   },
   Druid: {
-    tagline: "Nature's emissary — the only dual-caster, drawing from both spell lists.",
+    tagline: "Nature's emissary — dual-caster and herbalist of the wilds.",
     description:
-      "Game's only hybrid caster, with both Priest and Sorcerer spells. MP pool is roughly half a Wizard's at equivalent stats but regenerates twice as fast. Cloth-only — keep them protected.",
+      "Game's only hybrid caster, with both Priest and Sorcerer spells. MP pool is roughly half a Wizard's at equivalent stats. Cloth-only — keep them protected.",
     abilities: [
       {
         name: "Dual Casting",
         description: "Access to both Priest and Sorcerer spell lists.",
       },
       {
-        name: "2× MP Regen",
-        description: "MP regenerates twice as fast as other classes.",
+        name: "Herbalism",
+        description:
+          "Druids' nature lore spots reagents in the wild — examining a tile rolls d20 + INT vs DC 13, and each overworld step rolls again at DC 20 for a passive find.",
       },
     ],
   },

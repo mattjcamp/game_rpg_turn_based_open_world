@@ -4,7 +4,7 @@
  * When the party stands on an overworld tile and presses E, the scene
  * zooms into a 12×14 themed grid. The party walks a single avatar
  * around picking up forageable items (rocks, healing herbs, reagents).
- * Rangers and Alchemists give the party two advantages: doubled
+ * Druids and Alchemists give the party two advantages: doubled
  * reagent weight in the random loot table, and a one-time INT
  * saving-throw on first visit to discover a free reagent.
  *
@@ -60,7 +60,14 @@ export const FORAGE_REAGENTS = [
   "Spring Water",
 ];
 
-const HERBALIST_CLASSES = new Set(["ranger", "alchemist"]);
+/** Classes that count as "herbalists" for the forage / examine /
+ *  passive-overworld discovery paths. Druids carry the traditional
+ *  herb-lore — they're the nature-attuned dual caster — while
+ *  Alchemists need plant matter as raw stock for potions, so they
+ *  know reagents by trade. Rangers used to share Herbalism but the
+ *  class was overloaded; nature lore now sits with Druids where it
+ *  thematically belongs. */
+const HERBALIST_CLASSES = new Set(["druid", "alchemist"]);
 
 /** Themes the scene uses for floor / edge colouring. */
 export const EXAMINE_THEMES: Record<number, { floor: number; edge: number; obstacle: number }> = {
@@ -96,7 +103,7 @@ export interface ExamineLayout {
   obstacles: Map<string, ObstacleKind>;
   /** Ground items by `${col},${row}`. */
   groundItems: Map<string, { item: string }>;
-  /** True once a herbalist (Ranger / Alchemist) has combed this area. */
+  /** True once a herbalist (Druid / Alchemist) has combed this area. */
   reagentsSearched: boolean;
 }
 
@@ -204,7 +211,7 @@ export interface HerbalistDiscovery {
 }
 
 /**
- * For each alive Ranger/Alchemist, roll d20 + INT modifier vs DC 13.
+ * For each alive Druid/Alchemist, roll d20 + INT modifier vs DC 13.
  * On success the character finds a random reagent, which is appended
  * to the party stash. Returns the per-member discoveries (caller
  * builds a UI message).
@@ -280,7 +287,7 @@ export function isForageableTile(tileId: number): boolean {
 }
 
 /**
- * Per-step herbalism roll for every alive Ranger / Alchemist.
+ * Per-step herbalism roll for every alive Druid / Alchemist.
  * Each qualifying member rolls `d20 + INT modifier vs DC 20`; on
  * success a random reagent from `FORAGE_REAGENTS` is added to the
  * party stash and a `HerbalistDiscovery` entry is returned so the

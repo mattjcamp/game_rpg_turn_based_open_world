@@ -24,7 +24,7 @@ function makeParty() {
     roster: [
       { name: "Gimli",   class: "Fighter",  race: "Dwarf",   level: 1, hp: 20, intelligence: 10 },
       { name: "Merry",   class: "Thief",    race: "Halfling",level: 1, hp: 18, intelligence: 12 },
-      { name: "Brom",    class: "Ranger",   race: "Human",   level: 1, hp: 16, intelligence: 14 },
+      { name: "Brom",    class: "Druid",    race: "Human",   level: 1, hp: 16, intelligence: 14 },
       { name: "Selina",  class: "Alchemist",race: "Gnome",   level: 1, hp: 18, intelligence: 16 },
     ],
     active_party: [0, 1, 2, 3],
@@ -53,25 +53,25 @@ describe("themeTileFor", () => {
 });
 
 describe("hasHerbalist", () => {
-  it("detects an alive Ranger", () => {
+  it("detects an alive Druid", () => {
     const p = makeParty();
     expect(hasHerbalist(activeMembers(p))).toBe(true);
   });
 
   it("detects an alive Alchemist", () => {
     const p = makeParty();
-    p.roster[2].hp = 0; // kill the Ranger; the Alchemist still qualifies
+    p.roster[2].hp = 0; // kill the Druid; the Alchemist still qualifies
     expect(hasHerbalist(activeMembers(p))).toBe(true);
   });
 
   it("returns false when the only herbalist is unconscious", () => {
     const p = makeParty();
-    p.roster[2].hp = 0; // Ranger down
+    p.roster[2].hp = 0; // Druid down
     p.roster[3].hp = 0; // Alchemist down
     expect(hasHerbalist(activeMembers(p))).toBe(false);
   });
 
-  it("returns false for parties without a Ranger or Alchemist", () => {
+  it("returns false for parties without a Druid or Alchemist", () => {
     const p = partyFromRaw({
       gold: 0,
       roster: [{ name: "Solo", class: "Fighter", race: "Human", level: 1, hp: 12 }],
@@ -118,12 +118,12 @@ describe("generateExamineLayout", () => {
 });
 
 describe("attemptHerbalistDiscovery", () => {
-  it("only rolls for alive Rangers and Alchemists", () => {
+  it("only rolls for alive Druids and Alchemists", () => {
     const p = makeParty();
     // rng sequence:
-    //   member loop is roster order [Fighter, Thief, Ranger, Alchemist].
+    //   member loop is roster order [Fighter, Thief, Druid, Alchemist].
     //   Fighter / Thief are skipped before any rng call.
-    //   Ranger:    randInt(1,20) → floor(0.95 * 20) + 1 = 20  → success
+    //   Druid:    randInt(1,20) → floor(0.95 * 20) + 1 = 20  → success
     //              then floor(0.0 * 5) → 0 → "Moonpetal"
     //   Alchemist: randInt(1,20) → floor(0.95 * 20) + 1 = 20  → success
     //              then floor(0.5 * 5) → 2 → "Serpent Root"
@@ -139,7 +139,7 @@ describe("attemptHerbalistDiscovery", () => {
 
   it("skips a herbalist whose roll falls under DC 13", () => {
     const p = makeParty();
-    // randInt picks 1 → roll = 1 + INT mod (Ranger has INT 14 → +2) = 3 < 13.
+    // randInt picks 1 → roll = 1 + INT mod (Druid has INT 14 → +2) = 3 < 13.
     // Same for Alchemist (INT 16 → +3, roll = 4) → still < 13.
     const rng = seqRng([0.0]);
     const out = attemptHerbalistDiscovery(p, activeMembers(p), rng);
@@ -172,7 +172,7 @@ describe("isForageableTile", () => {
 });
 
 describe("attemptOverworldHerbalism (passive per-step roll)", () => {
-  it("returns no finds without a Ranger or Alchemist", () => {
+  it("returns no finds without a Druid or Alchemist", () => {
     const p = partyFromRaw({
       gold: 0,
       roster: [
@@ -185,12 +185,12 @@ describe("attemptOverworldHerbalism (passive per-step roll)", () => {
     expect(p.inventory).toEqual([]);
   });
 
-  it("requires d20 + INT mod ≥ 20 — Ranger at INT 14 needs a nat 18+", () => {
+  it("requires d20 + INT mod ≥ 20 — Druid at INT 14 needs a nat 18+", () => {
     // INT 14 → +2 mod. DC 20 means raw d20 must be ≥ 18 (rolls 18, 19, 20
     // succeed). randInt uses `floor(rng() * 20) + 1`, so rng = 0.85 →
     // d20 = 18, the lowest passing roll.
     const p = makeParty();
-    p.roster[3].hp = 0; // remove Alchemist so only the Ranger rolls
+    p.roster[3].hp = 0; // remove Alchemist so only the Druid rolls
     const rng = seqRng([0.85, 0.0]); // nat 18 + Moonpetal pick
     const out = attemptOverworldHerbalism(p, activeMembers(p), rng);
     expect(out).toEqual([{ member: "Brom", reagent: "Moonpetal" }]);
@@ -208,7 +208,7 @@ describe("attemptOverworldHerbalism (passive per-step roll)", () => {
 
   it("rolls independently for each herbalist on the same step", () => {
     const p = makeParty();
-    // Ranger (INT 14, +2 mod): nat 18 succeeds; pick Moonpetal (rng 0.0).
+    // Druid (INT 14, +2 mod): nat 18 succeeds; pick Moonpetal (rng 0.0).
     // Alchemist (INT 16, +3 mod): nat 17 succeeds (17 + 3 = 20); pick
     //   Glowcap Mushroom (rng 0.20 → idx 1).
     const rng = seqRng([0.85, 0.0, 0.80, 0.20]);
@@ -222,7 +222,7 @@ describe("attemptOverworldHerbalism (passive per-step roll)", () => {
 
   it("ignores downed herbalists", () => {
     const p = makeParty();
-    p.roster[2].hp = 0; // Ranger down
+    p.roster[2].hp = 0; // Druid down
     p.roster[3].hp = 0; // Alchemist down
     // Even a nat 20 wouldn't matter — they shouldn't roll at all.
     const out = attemptOverworldHerbalism(p, activeMembers(p), () => 0.99);
@@ -233,7 +233,7 @@ describe("attemptOverworldHerbalism (passive per-step roll)", () => {
     const p = partyFromRaw({
       gold: 0,
       roster: [
-        { name: "Idris", class: "Ranger", race: "Human", level: 1, hp: 14, intelligence: 10 },
+        { name: "Idris", class: "Druid", race: "Human", level: 1, hp: 14, intelligence: 10 },
       ],
       active_party: [0],
     });

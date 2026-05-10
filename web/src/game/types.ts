@@ -25,6 +25,19 @@ export interface Combatant {
   damage: DamageRoll;
   /** D&D ability modifier for DEX, used for initiative. */
   dexMod: number;
+  /** PartyMember class (capitalised — "Thief", "Ranger", …) for
+   *  combatants on the party side. Optional because monster
+   *  combatants and legacy test fixtures omit it. Read by class-
+   *  gated mechanics like Thief Backstab + Shadow Step. */
+  charClass?: string;
+  /** Character level, used by class-gated ability cutoffs
+   *  (Backstab @ 3+, Shadow Step @ 7+, Ranger Pick Locks @ 3+).
+   *  Optional for the same reason as `charClass`. */
+  level?: number;
+  /** Name of the weapon equipped in the active hand at combat-start.
+   *  Read by Backstab (the dagger gate). Null when fighting unarmed;
+   *  undefined for monsters and legacy fixtures. */
+  weaponName?: string | null;
   /** Full ability scores carried over from the PartyMember (or
    *  monster spec). Optional because legacy fixtures and some of the
    *  combat tests omit them — combat helpers default each to 10
@@ -130,6 +143,10 @@ export interface AttackResult {
   /** d20 + attackBonus. */
   total: number;
   critical: boolean;
+  /** True when a Thief's Backstab promoted a normal hit to a crit.
+   *  Always implies `critical === true`. The scene reads this flag to
+   *  play the dedicated stinger animation/log line. */
+  backstab?: boolean;
   /** Damage dealt; 0 on miss. */
   damage: number;
   /** Was the target reduced to 0 HP by this attack? */
