@@ -283,6 +283,221 @@ function fmtMod(n: number): string {
   return n >= 0 ? `+${n}` : String(n);
 }
 
+// ── Race & class lore (mirrors docs/manuals/players_guide.md) ─────
+//
+// The character creator displays a description block when the player
+// selects a race or class so they know what they're picking. This
+// data is sourced from the Player's Guide (the design source of
+// truth) and the per-class JSONs (the implementation source of
+// truth). Where both agree we use the manual's flavor text; where
+// the manual mentions abilities not yet in the JSON (Backstab,
+// Shadow Step, Holy Smite) we still show them so the player knows
+// what to expect — they're tagged with the level they unlock at.
+//
+// The lore tables stay in this file (rather than being fetched from
+// JSON) because the rest of the creator already mirrors data with
+// hardcoded constants — staying consistent with that pattern.
+
+interface AbilityLore {
+  name: string;
+  /** Level the ability unlocks; omitted means "from level 1". */
+  minLevel?: number;
+  description: string;
+}
+
+interface RaceLore {
+  /** Italic flavor tagline from the Player's Guide. */
+  tagline: string;
+  /** Innate racial ability. Every shipped race has exactly one. */
+  ability: AbilityLore;
+}
+
+interface ClassLore {
+  /** Italic flavor tagline from the Player's Guide. */
+  tagline: string;
+  /** Multi-paragraph description condensed to one or two sentences. */
+  description: string;
+  /** Class abilities, in unlock order. */
+  abilities: AbilityLore[];
+}
+
+const RACE_LORE: Record<RaceName, RaceLore> = {
+  Human: {
+    tagline: "Versatile and adaptable; excels in no single area but has no weaknesses.",
+    ability: {
+      name: "Fast Learner",
+      description:
+        "Humans require only 750 XP per level instead of the standard 1000, leveling up 25% faster than other races.",
+    },
+  },
+  Dwarf: {
+    tagline: "Stout and hardy, natural miners and warriors with keen underground senses.",
+    ability: {
+      name: "Infravision",
+      description:
+        "Dwarves can see in total darkness — dungeon corridors that would be pitch-black to other races stay dimly visible.",
+    },
+  },
+  Halfling: {
+    tagline: "Small and nimble, surprisingly resilient and hard to hit.",
+    ability: {
+      name: "Pickpocket",
+      description:
+        "Halflings can attempt to steal items from town NPCs. Once per NPC, with a chance of failure.",
+    },
+  },
+  Elf: {
+    tagline: "Graceful and keen-minded, with a natural affinity for magic and sharp senses.",
+    ability: {
+      name: "Galadriel's Light",
+      description:
+        "Elves can conjure a soft magical illumination, lighting up dark areas without consuming a torch.",
+    },
+  },
+  Gnome: {
+    tagline: "Clever and curious, combining tinkering skill with innate magical talent.",
+    ability: {
+      name: "Tinker",
+      description:
+        "Once per in-game day, fashion any single item normally found in a general store.",
+    },
+  },
+};
+
+const CLASS_LORE: Record<ClassName, ClassLore> = {
+  Fighter: {
+    tagline: "The quintessential warrior — tough, versatile, and deadly in melee.",
+    description:
+      "The backbone of any party. Highest HP per level, a generous 4-tile combat range, every weapon and every armor type. Casts no spells but more than makes up for it with raw staying power.",
+    abilities: [],
+  },
+  Wizard: {
+    tagline: "Master of arcane forces — fragile but devastatingly powerful at range.",
+    description:
+      "The most diverse and powerful spell list in the game, from Fireball to Animate Dead. Lowest HP per level, no armor, daggers only — keep them behind the front line.",
+    abilities: [
+      {
+        name: "Arcane Focus",
+        description: "Spell damage is increased by the Intelligence modifier.",
+      },
+    ],
+  },
+  Cleric: {
+    tagline: "Holy warrior and healer — the party's lifeline in long fights.",
+    description:
+      "The primary healers. Minor Heal, Major Heal, Mass Heal, and Restore keep the party standing; Cure Poison clears nasty status effects. Can also fight respectably with maces and clubs.",
+    abilities: [
+      {
+        name: "Turn Undead",
+        minLevel: 2,
+        description:
+          "Channel holy energy at every undead on the field — failed Wisdom save = destroyed, success = 50% max-HP damage.",
+      },
+    ],
+  },
+  Thief: {
+    tagline: "Quick, cunning, and deadly from the shadows — unmatched utility.",
+    description:
+      "Longest combat range of any class (6 tiles). Real value outside combat is Pick Locks and Detect Traps, opening areas and loot other classes can't reach.",
+    abilities: [
+      {
+        name: "Pick Locks",
+        description:
+          "Open locked doors and chests — d20 + DEX vs DC 12, one lockpick consumed per attempt.",
+      },
+      {
+        name: "Detect Traps",
+        description:
+          "Reveal hidden traps before the party steps on them.",
+      },
+      {
+        name: "Backstab",
+        minLevel: 3,
+        description:
+          "Critical hits with daggers on a successful DEX save.",
+      },
+      {
+        name: "Shadow Step",
+        minLevel: 7,
+        description: "Move after attacking — true hit-and-run play.",
+      },
+    ],
+  },
+  Paladin: {
+    tagline: "Holy knight — a tough fighter with limited healing and anti-undead power.",
+    description:
+      "Combines Fighter durability with limited Priest magic. Heaviest armor, any weapon, Minor Heal between fights. The premier anti-undead warrior outside the Cleric.",
+    abilities: [
+      {
+        name: "Holy Smite",
+        description: "Double damage against undead enemies.",
+      },
+      {
+        name: "Turn Undead",
+        minLevel: 5,
+        description:
+          "Channel holy energy at every undead on the field, just as a Cleric does.",
+      },
+    ],
+  },
+  Ranger: {
+    tagline: "Versatile woodsman — bow master, herbalist, and able scout.",
+    description:
+      "Durable frontliner with bow mastery and limited healing. 6-tile combat range matches a Thief; proficient with every bow in the game. A self-sufficient pick.",
+    abilities: [
+      {
+        name: "Herbalism",
+        description:
+          "Examining a wilderness tile rolls d20 + INT vs DC 13 — success identifies a potion reagent.",
+      },
+      {
+        name: "Pick Locks",
+        minLevel: 3,
+        description:
+          "From level 3, pick locked doors and chests exactly as a Thief can.",
+      },
+      {
+        name: "Detect Traps",
+        minLevel: 3,
+        description:
+          "From level 3, woodcraft reveals hidden traps before the party steps on them.",
+      },
+    ],
+  },
+  Druid: {
+    tagline: "Nature's emissary — the only dual-caster, drawing from both spell lists.",
+    description:
+      "Game's only hybrid caster, with both Priest and Sorcerer spells. MP pool is roughly half a Wizard's at equivalent stats but regenerates twice as fast. Cloth-only — keep them protected.",
+    abilities: [
+      {
+        name: "Dual Casting",
+        description: "Access to both Priest and Sorcerer spell lists.",
+      },
+      {
+        name: "2× MP Regen",
+        description: "MP regenerates twice as fast as other classes.",
+      },
+    ],
+  },
+  Alchemist: {
+    tagline: "Master of potions and elixirs — support specialist and crafter.",
+    description:
+      "Modest combat ability but unique value through potion crafting. 4-tile range, Sling for ranged, access to Sorcerer spells. Half-caster MP pool — lean on potions and thrown oils as much as on spells.",
+    abilities: [
+      {
+        name: "Brew Potions",
+        description:
+          "Craft potions from reagents found in shops and dungeons.",
+      },
+      {
+        name: "Herbalism",
+        description:
+          "Doubles the chance of finding reagents when examining the wilderness.",
+      },
+    ],
+  },
+};
+
 // ── Page ──────────────────────────────────────────────────────────
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
@@ -486,6 +701,10 @@ export default function NewCharacterPage() {
                 );
               })}
             </div>
+            {/* Race lore — flavor + innate ability. Updates as the
+                player flips between race options so the description
+                always matches the highlighted choice. */}
+            <RaceLoreCard race={race} />
           </div>
           <div>
             <h2 className="text-sm uppercase tracking-wider text-parchment/60">Gender</h2>
@@ -516,6 +735,9 @@ export default function NewCharacterPage() {
           <p className="mt-3 text-xs text-parchment/50">
             Wizards require an arcane heritage (Human, Elf, or Gnome).
           </p>
+          {/* Class lore — flavor + abilities list with level gates.
+              Updates as the player flips between class options. */}
+          <ClassLoreCard klass={klass} />
         </section>
       )}
 
@@ -749,5 +971,63 @@ function Pick({
     >
       {children}
     </button>
+  );
+}
+
+/** Description card shown below the race grid in step 2. Pulls from
+ *  RACE_LORE so the flavor + innate ability stay in sync with the
+ *  Player's Guide. Updates whenever the selected race changes. */
+function RaceLoreCard({ race }: { race: RaceName }) {
+  const lore = RACE_LORE[race];
+  return (
+    <div className="mt-4 rounded border border-parchment/20 bg-parchment/5 p-4">
+      <div className="text-base font-display text-parchment">{race}</div>
+      <p className="mt-1 text-sm italic text-parchment/70">{lore.tagline}</p>
+      <div className="mt-3">
+        <div className="text-[11px] uppercase tracking-wider text-parchment/50">
+          Innate Ability
+        </div>
+        <div className="mt-1 text-sm text-parchment">
+          <strong className="text-ember">{lore.ability.name}</strong>
+          <span className="text-parchment/80"> — {lore.ability.description}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Description card shown below the class grid in step 3. Lists
+ *  flavor text + every class ability with its unlock level. Mirrors
+ *  the Player's Guide so players see what they're committing to,
+ *  including high-level abilities like Backstab + Shadow Step that
+ *  unlock long after character creation. */
+function ClassLoreCard({ klass }: { klass: ClassName }) {
+  const lore = CLASS_LORE[klass];
+  return (
+    <div className="mt-4 rounded border border-parchment/20 bg-parchment/5 p-4">
+      <div className="text-base font-display text-parchment">{klass}</div>
+      <p className="mt-1 text-sm italic text-parchment/70">{lore.tagline}</p>
+      <p className="mt-2 text-sm text-parchment/80">{lore.description}</p>
+      {lore.abilities.length > 0 && (
+        <div className="mt-3">
+          <div className="text-[11px] uppercase tracking-wider text-parchment/50">
+            Class Abilities
+          </div>
+          <ul className="mt-1 space-y-1.5 text-sm">
+            {lore.abilities.map((a) => (
+              <li key={a.name} className="text-parchment/80">
+                <strong className="text-ember">{a.name}</strong>
+                {a.minLevel != null && a.minLevel > 1 && (
+                  <span className="ml-1 text-parchment/50">
+                    (Lvl {a.minLevel}+)
+                  </span>
+                )}
+                <span> — {a.description}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }

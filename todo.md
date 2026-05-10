@@ -15,10 +15,9 @@ python3 main.py
 
 ## V2 Features
 - Polish the various "light effects". Make sure they are consistant and behave as expected. Infravision should act more like normal vision, just with all tiles displayed with a red tint, the range of infravision should match the other lighting effects
-- In the character creation screen, add descriptions of races and classes with detailed lists of special abilities
 - create outline for random lore generation. Make a user control that lists out things like cultures, races, lost civilizations, events, epics, names, gods, current people. A user control could generate this content (outline first) and lore will be saved to data files so the user can make minor changes. The lore will be used in the content creation in some way.
 - Add books feature to add a way to communicate content
-
+- Note that experience level is different in the game vs the manual, once we decide on which way to go we need to make sure they are in sync
 
 ## Web V2 Refactor Items
 - Curate the data model and remove attributes that are unused
