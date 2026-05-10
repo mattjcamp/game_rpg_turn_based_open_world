@@ -1276,7 +1276,11 @@ export class TownScene extends Phaser.Scene {
     if (counterKey) {
       const counter = this.counters.get(counterKey);
       if (counter) {
-        this.openShopAtCounter(counter, counter.name);
+        // Tile coords identify this physical counter — two General
+        // Stores in the same town (e.g. side-by-side stalls) each
+        // get their own stock so the player can rediscover arrows
+        // at the second one after the first sells out.
+        this.openShopAtCounter(counter, counter.name, `${nc},${nr}`);
         return;
       }
     }
@@ -1921,7 +1925,12 @@ export class TownScene extends Phaser.Scene {
       this.openTempleAtCounter(counter, `${npc.name} — Temple${godSuffix}`);
       return;
     }
-    this.openShopAtCounter(counter, `${npc.name} — ${counter.name}`);
+    // The NPC's home position uniquely identifies this shopkeeper
+    // even if two NPCs in the same town share a name (e.g. two
+    // general-store keepers in a busy market town); home_col/row
+    // are stable across NPC wandering, unlike `npc.col/row`.
+    const instance = `npc:${npc.homeCol},${npc.homeRow}`;
+    this.openShopAtCounter(counter, `${npc.name} — ${counter.name}`, instance);
   }
 
   /**
@@ -1929,21 +1938,34 @@ export class TownScene extends Phaser.Scene {
    * when the player walks into a counter tile (a shop_type-tagged tile
    * in the General Store, Weapons Shop, etc.). Service counters
    * (healing) dispatch to the temple UI so the same tile can host either.
+   *
+   * `instance` uniquely identifies this physical counter (tile coords
+   * for tile-bump shops, NPC home tile for NPC-mediated shops). Two
+   * General Stores in the same town keep separate stocks so the player
+   * can find a fresh cache of arrows at counter B after counter A
+   * sells out.
    */
-  private openShopAtCounter(counter: Counter, title: string): void {
+  private openShopAtCounter(
+    counter: Counter,
+    title: string,
+    instance: string,
+  ): void {
     if (counter.kind === "service") {
       this.openTempleAtCounter(counter, title);
       return;
     }
     // Resolve (or seed) this shop's per-instance stock — keyed by
-    // (townName, shopType) so each physical counter tracks its own
-    // wares. Building interiors keep their `building:Foo` prefix on
-    // `townName`, which is exactly what we want.
+    // (townName, shopType, instance) so each physical counter tracks
+    // its own wares. Building interiors keep their `building:Foo`
+    // prefix on `townName`, which already disambiguates each interior;
+    // `instance` adds the second axis so two counters inside one
+    // interior also stay separate.
     const stock = getOrSeedShopStock(
       gameState.shopInventories,
       this.townName,
       counter.shopType,
       counter.items,
+      instance,
     );
     this.shop = {
       title,

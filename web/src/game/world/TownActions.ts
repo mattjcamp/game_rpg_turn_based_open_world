@@ -159,12 +159,30 @@ export function sellItem(
 /**
  * Compose the unique key for a shop instance. A general store in
  * Plainstown is a different shop than the general store in another
- * town, so we key by `(townName, shopType)`. Building interiors keep
- * their `building:Foo` prefix in `townName`, which is exactly what we
- * want — each interior's shop is its own counter.
+ * town, AND two general stores in the *same* town are different from
+ * each other — so we key by `(townName, shopType, instance)`. The
+ * `instance` is whatever uniquely identifies this physical counter:
+ *   - tile-bump shops: the tile coordinates (`"<col>,<row>"`)
+ *   - NPC-mediated shops: the NPC's home tile
+ *
+ * Building interiors keep their `building:Foo` prefix in `townName`,
+ * which already disambiguates each interior. The `instance` adds the
+ * second axis so two counters inside one interior also stay separate.
+ *
+ * The `instance` arg is optional — when omitted (the legacy callers
+ * before per-instance support landed) the key falls back to the old
+ * two-segment shape so existing tests that only thread (town, type)
+ * still pass.
  */
-export function shopStockKey(townName: string, shopType: string): string {
-  return `${townName}|${shopType}`;
+export function shopStockKey(
+  townName: string,
+  shopType: string,
+  instance?: string,
+): string {
+  if (instance == null || instance.length === 0) {
+    return `${townName}|${shopType}`;
+  }
+  return `${townName}|${shopType}|${instance}`;
 }
 
 /**
@@ -173,14 +191,20 @@ export function shopStockKey(townName: string, shopType: string): string {
  * walks into this counter. The returned array is the same reference
  * stored in `inventories`, so mutations from buy/sell propagate
  * naturally and survive serialisation.
+ *
+ * Pass `instance` (e.g. the tile coords or NPC home position) to
+ * key the stock per physical counter — without it, every counter of
+ * the same shopType in the same town shares one inventory, which
+ * defeats the "discover new caches as items become scarce" design.
  */
 export function getOrSeedShopStock(
   inventories: Map<string, string[]>,
   townName: string,
   shopType: string,
   defaults: string[],
+  instance?: string,
 ): string[] {
-  const key = shopStockKey(townName, shopType);
+  const key = shopStockKey(townName, shopType, instance);
   let stock = inventories.get(key);
   if (!stock) {
     stock = [...defaults];

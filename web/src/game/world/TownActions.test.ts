@@ -56,6 +56,21 @@ describe("shopStockKey", () => {
     expect(shopStockKey("building:Inside House 2", "weapon"))
       .toBe("building:Inside House 2|weapon");
   });
+
+  it("appends the instance segment when one is provided", () => {
+    // Two general counters in the same town keep separate keys when
+    // they pass distinct tile-coord instance strings.
+    expect(shopStockKey("Plainstown", "general", "5,7"))
+      .toBe("Plainstown|general|5,7");
+    expect(shopStockKey("Plainstown", "general", "8,7"))
+      .toBe("Plainstown|general|8,7");
+  });
+
+  it("falls back to the legacy two-segment shape when instance is empty", () => {
+    expect(shopStockKey("Plainstown", "general", "")).toBe("Plainstown|general");
+    expect(shopStockKey("Plainstown", "general", undefined))
+      .toBe("Plainstown|general");
+  });
 });
 
 describe("getOrSeedShopStock", () => {
@@ -85,6 +100,42 @@ describe("getOrSeedShopStock", () => {
     expect(a).not.toBe(b);
     expect(a).toEqual(["A"]);
     expect(b).toEqual(["B"]);
+  });
+
+  it("gives each instance of the same shopType its own stock", () => {
+    // Two general counters in the same town: one at tile 5,7, another
+    // at tile 8,7. Buying out arrows from the first should leave the
+    // second one's bundle of arrows untouched.
+    const inv = new Map<string, string[]>();
+    const a = getOrSeedShopStock(inv, "Plainstown", "general", ["Arrows", "Healing Potion"], "5,7");
+    const b = getOrSeedShopStock(inv, "Plainstown", "general", ["Arrows", "Healing Potion"], "8,7");
+    expect(a).not.toBe(b);
+    a.splice(0, 1);
+    expect(a).toEqual(["Healing Potion"]);
+    expect(b).toEqual(["Arrows", "Healing Potion"]);
+  });
+
+  it("an NPC-mediated counter and a tile-bump counter sharing a shopType stay separate", () => {
+    // Player buys arrows from the shopkeep NPC. Walking up to the
+    // matching counter tile should still find a fresh stock there
+    // because the instance keys differ (`npc:HC,HR` vs `C,R`).
+    const inv = new Map<string, string[]>();
+    const npcStock = getOrSeedShopStock(inv, "Plainstown", "general", ["Arrows"], "npc:5,7");
+    const tileStock = getOrSeedShopStock(inv, "Plainstown", "general", ["Arrows"], "5,7");
+    expect(npcStock).not.toBe(tileStock);
+    npcStock.length = 0;
+    expect(tileStock).toEqual(["Arrows"]);
+  });
+
+  it("re-seeds independently for each instance and returns the same ref next time", () => {
+    const inv = new Map<string, string[]>();
+    const first = getOrSeedShopStock(inv, "Plainstown", "general", ["X"], "5,7");
+    const second = getOrSeedShopStock(inv, "Plainstown", "general", ["WRONG"], "5,7");
+    expect(second).toBe(first);
+    // The other instance's stock is untouched and still seeds from its
+    // own defaults.
+    const other = getOrSeedShopStock(inv, "Plainstown", "general", ["Y"], "8,7");
+    expect(other).toEqual(["Y"]);
   });
 });
 

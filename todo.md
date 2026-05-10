@@ -6,7 +6,7 @@ python3 main.py
 ## Polish
 
 - In the battle screen, characters should be able to use potions, herbs, and other combat usuable items (but not party usable items like torches or camping supplies)
-- In the battle screen, cha
+- In the battle screen, characters should be able to use their turn to equip an item in their personal inventory.
 - Do a full QA on party creation attributes, combat, etc. Do a few playthroughs.
 
 ## V2 Features
