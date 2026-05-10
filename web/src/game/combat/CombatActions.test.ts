@@ -12,7 +12,10 @@ import {
   maxRangeFor,
   classifyCombatCast,
   describeStatusCast,
+  useCombatItem,
 } from "./CombatActions";
+import type { PartyMember } from "../world/Party";
+import type { Buff } from "./Buffs";
 import { spellFromRaw, type Spell } from "../world/Spells";
 import { mulberry32 } from "../rng";
 import type { Combatant } from "../types";
@@ -608,5 +611,255 @@ describe("traceDirectionalRay", () => {
     );
     expect(trace.hitId).toBe("e");
     expect(trace.endCol).toBe(9);
+  });
+});
+
+describe("useCombatItem", () => {
+  // Minimal item-fixture builders. Default to combat-usable (matches
+  // the Items model default for `usable` items).
+  const healingPotion: Item = {
+    name: "Healing Potion", category: "general", description: "",
+    slots: [], characterCanEquip: false, partyCanEquip: false,
+    usable: true, effect: "heal_hp", power: 30,
+  };
+  const manaPotion: Item = {
+    name: "Mana Potion", category: "general", description: "",
+    slots: [], characterCanEquip: false, partyCanEquip: false,
+    usable: true, effect: "heal_mp", power: 10,
+  };
+  const antidote: Item = {
+    name: "Antidote", category: "general", description: "",
+    slots: [], characterCanEquip: false, partyCanEquip: false,
+    usable: true, effect: "cure_poison",
+  };
+  const elixirStr: Item = {
+    name: "Elixir of Strength", category: "general", description: "",
+    slots: [], characterCanEquip: false, partyCanEquip: false,
+    usable: true, effect: "buff_strength", power: 2,
+  };
+  const fireOil: Item = {
+    name: "Fire Oil", category: "general", description: "",
+    slots: [], characterCanEquip: false, partyCanEquip: false,
+    usable: true, effect: "combat_only", power: 8, throwable: true,
+  };
+  const campingSupplies: Item = {
+    name: "Camping Supplies", category: "general", description: "",
+    slots: [], characterCanEquip: false, partyCanEquip: false,
+    usable: true, combatUsable: false, effect: "rest",
+  };
+
+  // PartyMember stubs only carry the fields heal_mp reads.
+  const memberWithMp = (mp: number, maxMp: number): PartyMember =>
+    ({ name: "X", mp, maxMp } as unknown as PartyMember);
+
+  it("heal_hp: dice + power restores HP up to maxHp and ends the turn", () => {
+    const me = makeCombatant({ id: "me", hp: 5, maxHp: 50 });
+    const r = useCombatItem(me, null, [], healingPotion, mulberry32(1));
+    expect(r.ok).toBe(true);
+    expect(r.effect).toBe("heal_hp");
+    expect(r.endsTurn).toBe(true);
+    // 30 (power) + 1d6 → at least 31, capped at maxHp - hp = 45.
+    expect(r.amount).toBeGreaterThanOrEqual(1);
+    expect(me.hp).toBeGreaterThan(5);
+    expect(me.hp).toBeLessThanOrEqual(50);
+  });
+
+  it("heal_hp: refuses cleanly when caster is already at full HP (no consumption)", () => {
+    const me = makeCombatant({ id: "me", hp: 50, maxHp: 50 });
+    const r = useCombatItem(me, null, [], healingPotion, mulberry32(1));
+    expect(r.ok).toBe(false);
+    expect(r.endsTurn).toBe(false);
+    expect(me.hp).toBe(50);
+  });
+
+  it("heal_hp clamps at maxHp", () => {
+    // Tiny gap to maxHp ensures the clamp triggers regardless of dice.
+    const me = makeCombatant({ id: "me", hp: 49, maxHp: 50 });
+    const r = useCombatItem(me, null, [], healingPotion, mulberry32(1));
+    expect(r.ok).toBe(true);
+    expect(me.hp).toBe(50);
+    expect(r.amount).toBe(1);
+  });
+
+  it("heal_mp: restores caster MP via the matching PartyMember", () => {
+    const me = makeCombatant({ id: "me" });
+    const member = memberWithMp(2, 30);
+    const r = useCombatItem(me, member, [], manaPotion, mulberry32(2));
+    expect(r.ok).toBe(true);
+    expect(r.effect).toBe("heal_mp");
+    expect(r.endsTurn).toBe(true);
+    expect(member.mp).toBeGreaterThan(2);
+    expect(member.mp ?? 0).toBeLessThanOrEqual(30);
+  });
+
+  it("heal_mp refuses when caster has no MP pool (non-caster)", () => {
+    const me = makeCombatant({ id: "me" });
+    // No member, or member without maxMp — both should refuse.
+    const r1 = useCombatItem(me, null, [], manaPotion, mulberry32(1));
+    expect(r1.ok).toBe(false);
+    const noMp = { name: "Fighter" } as unknown as PartyMember;
+    const r2 = useCombatItem(me, noMp, [], manaPotion, mulberry32(1));
+    expect(r2.ok).toBe(false);
+  });
+
+  it("heal_mp refuses when MP is already maxed", () => {
+    const me = makeCombatant({ id: "me" });
+    const member = memberWithMp(30, 30);
+    const r = useCombatItem(me, member, [], manaPotion, mulberry32(1));
+    expect(r.ok).toBe(false);
+    expect(member.mp).toBe(30);
+  });
+
+  it("cure_poison refuses politely (status engine not yet modelled)", () => {
+    const me = makeCombatant({ id: "me" });
+    const r = useCombatItem(me, null, [], antidote, mulberry32(1));
+    // Refusal so the player isn't billed for a no-op until the status
+    // engine lands.
+    expect(r.ok).toBe(false);
+    expect(r.effect).toBe("cure_poison");
+    expect(r.endsTurn).toBe(false);
+  });
+
+  // Helper: build a recording stub for the addBuff hook so the test
+  // can verify exactly what was staged. `seenSources` lets us preload
+  // the "already active" state for the stacking-refusal cases.
+  function buffHooks(seenSources: string[] = []) {
+    const calls: Array<{ id: string; buff: Buff }> = [];
+    const seen = new Set(seenSources);
+    return {
+      calls,
+      hooks: {
+        addBuff(id: string, buff: Buff): void {
+          calls.push({ id, buff });
+          seen.add(buff.source);
+        },
+        hasBuffFromSource(_id: string, src: string): boolean {
+          void _id;
+          return seen.has(src);
+        },
+      },
+    };
+  }
+
+  it("buff_strength: stages attack_bonus + damage_bonus buffs and ends the turn", () => {
+    const me = makeCombatant({ id: "me" });
+    const { hooks, calls } = buffHooks();
+    const r = useCombatItem(me, null, [], elixirStr, mulberry32(1), hooks);
+    expect(r.ok).toBe(true);
+    expect(r.effect).toBe("buff_strength");
+    expect(r.endsTurn).toBe(true);
+    // Two buff entries — one for the d20 hit roll, one for the damage
+    // total. Both target the caster, both carry the item name as
+    // `source` so the stack-refusal check below has something to key on.
+    expect(calls).toHaveLength(2);
+    const kinds = calls.map((c) => c.buff.kind).sort();
+    expect(kinds).toEqual(["attack_bonus", "damage_bonus"]);
+    for (const c of calls) {
+      expect(c.id).toBe("me");
+      expect(c.buff.value).toBe(2);
+      expect(c.buff.source).toBe("Elixir of Strength");
+      expect(c.buff.turnsLeft).toBeGreaterThan(0);
+    }
+  });
+
+  it("buff_strength: refuses when the same elixir is already active (no double-stack)", () => {
+    const me = makeCombatant({ id: "me" });
+    // Pre-seed the hooks as if Elixir of Strength was already on the
+    // combatant — `hasBuffFromSource` will return true.
+    const { hooks, calls } = buffHooks(["Elixir of Strength"]);
+    const r = useCombatItem(me, null, [], elixirStr, mulberry32(1), hooks);
+    expect(r.ok).toBe(false);
+    expect(r.endsTurn).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("buff_strength: refuses gracefully when no buff hooks are wired", () => {
+    const me = makeCombatant({ id: "me" });
+    // Calling without hooks (e.g. a non-combat path) falls back to a
+    // refusal so the helper stays usable everywhere.
+    const r = useCombatItem(me, null, [], elixirStr, mulberry32(1));
+    expect(r.ok).toBe(false);
+    expect(r.endsTurn).toBe(false);
+  });
+
+  it("buff_ac: stages a single ac_bonus buff", () => {
+    const elixirAc: Item = {
+      name: "Elixir of Warding", category: "general", description: "",
+      slots: [], characterCanEquip: false, partyCanEquip: false,
+      usable: true, effect: "buff_ac", power: 2,
+    };
+    const me = makeCombatant({ id: "me" });
+    const { hooks, calls } = buffHooks();
+    const r = useCombatItem(me, null, [], elixirAc, mulberry32(1), hooks);
+    expect(r.ok).toBe(true);
+    expect(r.endsTurn).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].buff.kind).toBe("ac_bonus");
+    expect(calls[0].buff.value).toBe(2);
+    expect(calls[0].buff.source).toBe("Elixir of Warding");
+  });
+
+  it("buff_strength: defaults the value to 2 when items.json omits power", () => {
+    const noPower: Item = {
+      ...elixirStr, power: undefined,
+    };
+    const me = makeCombatant({ id: "me" });
+    const { hooks, calls } = buffHooks();
+    const r = useCombatItem(me, null, [], noPower, mulberry32(1), hooks);
+    expect(r.ok).toBe(true);
+    expect(calls.every((c) => c.buff.value === 2)).toBe(true);
+  });
+
+  it("combat_only: splashes damage on every alive enemy", () => {
+    const me = makeCombatant({ id: "me" });
+    const a = makeCombatant({ id: "a", side: "enemies", hp: 30, maxHp: 30 });
+    const b = makeCombatant({ id: "b", side: "enemies", hp: 30, maxHp: 30 });
+    const r = useCombatItem(me, null, [a, b], fireOil, mulberry32(3));
+    expect(r.ok).toBe(true);
+    expect(r.effect).toBe("combat_only");
+    expect(r.endsTurn).toBe(true);
+    expect(r.enemyHits).toHaveLength(2);
+    // Each takes 8 (power) + 1d6 ≥ 9 damage.
+    expect(a.hp).toBeLessThan(30);
+    expect(b.hp).toBeLessThan(30);
+  });
+
+  it("combat_only refuses when there are no live enemies", () => {
+    const me = makeCombatant({ id: "me" });
+    const dead = makeCombatant({ id: "d", side: "enemies", hp: 0, maxHp: 20 });
+    const r = useCombatItem(me, null, [dead], fireOil, mulberry32(1));
+    expect(r.ok).toBe(false);
+    expect(r.endsTurn).toBe(false);
+    // The dead enemy stays at 0 — no negative HP.
+    expect(dead.hp).toBe(0);
+  });
+
+  it("combat_only flags killed targets in enemyHits", () => {
+    const me = makeCombatant({ id: "me" });
+    const frail = makeCombatant({ id: "f", side: "enemies", hp: 1, maxHp: 1 });
+    const r = useCombatItem(me, null, [frail], fireOil, mulberry32(1));
+    expect(r.ok).toBe(true);
+    expect(r.enemyHits?.[0].killed).toBe(true);
+    expect(frail.hp).toBe(0);
+  });
+
+  it("refuses non-combat-usable items even if usable (Camping Supplies)", () => {
+    const me = makeCombatant({ id: "me", hp: 5, maxHp: 50 });
+    const r = useCombatItem(me, null, [], campingSupplies, mulberry32(1));
+    expect(r.ok).toBe(false);
+    expect(r.endsTurn).toBe(false);
+    expect(me.hp).toBe(5); // no healing applied
+  });
+
+  it("refuses non-usable items (defense in depth — picker shouldn't offer them)", () => {
+    const me = makeCombatant({ id: "me", hp: 5, maxHp: 50 });
+    const sword: Item = {
+      name: "Sword", category: "weapons", description: "",
+      slots: ["right_hand"], characterCanEquip: true, partyCanEquip: false,
+      usable: false, effect: null, power: 6,
+    };
+    const r = useCombatItem(me, null, [], sword, mulberry32(1));
+    expect(r.ok).toBe(false);
+    expect(me.hp).toBe(5);
   });
 });

@@ -440,6 +440,48 @@ describe("Combat — buff registry", () => {
     expect(c.effectiveAttackBonus(c.byId("e1"))).toBe(1);   // 3 - 2
   });
 
+  it("effectiveDamageBonus sums damage_bonus buffs (Elixir of Strength path)", () => {
+    const c = new Combat(
+      [make("p1", "party")],
+      [make("e1", "enemies")],
+      mulberry32(1),
+    );
+    // Two parallel +2 buffs (Elixir of Strength stages exactly one
+    // attack_bonus + one damage_bonus when applied via useCombatItem).
+    c.addBuff("p1", { kind: "damage_bonus", value: 2, turnsLeft: 99, source: "Elixir of Strength" });
+    expect(c.effectiveDamageBonus(c.byId("p1"))).toBe(2);
+    // No double-count — attack_bonus on the same combatant isn't
+    // counted toward damage.
+    c.addBuff("p1", { kind: "attack_bonus", value: 2, turnsLeft: 99, source: "Elixir of Strength" });
+    expect(c.effectiveDamageBonus(c.byId("p1"))).toBe(2);
+    // Multiple damage_bonus entries from different sources stack.
+    c.addBuff("p1", { kind: "damage_bonus", value: 1, turnsLeft: 99, source: "Other" });
+    expect(c.effectiveDamageBonus(c.byId("p1"))).toBe(3);
+  });
+
+  it("attack damage absorbs an active damage_bonus buff", () => {
+    // Pin the d20 + dice rolls by giving the attacker an absurd hit
+    // bonus so the swing always lands and using a deterministic seed.
+    const attacker = make("p1", "party", { attackBonus: 99, damage: { dice: 1, sides: 6, bonus: 0 } });
+    const target = make("e1", "enemies", { ac: 5, hp: 100, maxHp: 100 });
+    const ctrl = new Combat([attacker], [target], mulberry32(42));
+    // Force p1 to be current — find them in the initiative order and
+    // advance the cursor so `attack` reads the right actor.
+    while (ctrl.current.id !== "p1") ctrl.endTurn();
+    const before = ctrl.attack("e1").damage;
+
+    // Set up an identical scenario but with a +5 damage_bonus active.
+    const att2 = make("p1", "party", { attackBonus: 99, damage: { dice: 1, sides: 6, bonus: 0 } });
+    const tgt2 = make("e1", "enemies", { ac: 5, hp: 100, maxHp: 100 });
+    const ctrl2 = new Combat([att2], [tgt2], mulberry32(42));
+    while (ctrl2.current.id !== "p1") ctrl2.endTurn();
+    ctrl2.addBuff("p1", { kind: "damage_bonus", value: 5, turnsLeft: 99, source: "Elixir" });
+    const after = ctrl2.attack("e1").damage;
+
+    // Same seed, same dice — the only difference is the +5 bonus.
+    expect(after - before).toBe(5);
+  });
+
   it("ticks every buff once per round and logs an expire line", () => {
     const c = new Combat(
       [make("p1", "party")],

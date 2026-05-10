@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { slotsForItem, getItem, type Item } from "./Items";
+import { slotsForItem, getItem, isCombatUsable, type Item } from "./Items";
 
 function table(): Map<string, Item> {
   const m = new Map<string, Item>();
@@ -58,5 +58,35 @@ describe("slotsForItem", () => {
 
   it("returns [] for unknown items", () => {
     expect(slotsForItem(table(), "Mythril Plate")).toEqual([]);
+  });
+});
+
+describe("isCombatUsable", () => {
+  // The "default true" rule mirrors the Python game so authors don't
+  // have to set the flag on every potion / herb. Only items that
+  // explicitly opt out (`combat_usable: false`) get filtered from the
+  // combat Use-item picker.
+  function mk(over: Partial<Item>): Item {
+    return {
+      name: "Test", category: "general", description: "", slots: [],
+      characterCanEquip: false, partyCanEquip: false,
+      usable: false, effect: null, ...over,
+    };
+  }
+
+  it("returns false for non-usable items even with combatUsable:true set", () => {
+    expect(isCombatUsable(mk({ usable: false, combatUsable: true }))).toBe(false);
+  });
+
+  it("returns true for a usable item with no combatUsable flag (default)", () => {
+    expect(isCombatUsable(mk({ usable: true }))).toBe(true);
+  });
+
+  it("returns true when combatUsable is explicitly true", () => {
+    expect(isCombatUsable(mk({ usable: true, combatUsable: true }))).toBe(true);
+  });
+
+  it("returns false when combatUsable is explicitly false (Camping Supplies)", () => {
+    expect(isCombatUsable(mk({ usable: true, combatUsable: false }))).toBe(false);
   });
 });

@@ -331,6 +331,17 @@ export class Combat {
     return c.ac + sumBuff(list, "ac_bonus") - sumBuff(list, "ac_penalty");
   }
 
+  /**
+   * Extra damage on top of the weapon's dice + base bonus, summed
+   * across active `damage_bonus` buffs. Mirrors the Python game's
+   * STR-buff path where Elixir of Strength bumps both attack and
+   * damage — we model that as two parallel buff kinds so callers
+   * stay explicit about which side of the calc each adds to.
+   */
+  effectiveDamageBonus(c: Combatant): number {
+    return sumBuff(this.buffs.get(c.id), "damage_bonus");
+  }
+
   // ── Movement & bump-attack ───────────────────────────────────────
 
   /**
@@ -394,10 +405,15 @@ export class Combat {
     const roll = rollAttack(effAtk, effAc, this.rng);
     let damage = 0;
     if (roll.hit) {
+      // `damage_bonus` buffs (Elixir of Strength) add a flat amount on
+      // top of the weapon's dice + base bonus. Critical hits double
+      // the dice but not the bonus — the buff stays additive on the
+      // bonus side, matching how `rollDamage` treats `bonus` already.
+      const buffBonus = this.effectiveDamageBonus(attacker);
       damage = rollDamage(
         attacker.damage.dice,
         attacker.damage.sides,
-        attacker.damage.bonus,
+        attacker.damage.bonus + buffBonus,
         roll.critical,
         this.rng
       );

@@ -14,10 +14,13 @@
 
 import type { Combatant, AttackResult } from "../types";
 import type { Item } from "../world/Items";
+import { isCombatUsable } from "../world/Items";
 import type { Spell } from "../world/Spells";
+import type { PartyMember } from "../world/Party";
 import { rollAttack, rollDamage } from "./engine";
 import type { RNG } from "../rng";
 import { assetUrl } from "../world/Module";
+import type { Buff } from "./Buffs";
 
 /**
  * Throwable / ranged attack — used by the Throw action and by ranged
@@ -525,4 +528,281 @@ export function resolveTurnUndead(
     }
   }
   return { outcomes, hadTargets: true };
+}
+
+// ── Combat-usable consumables (Healing Potion, Antidote, Fire Oil…) ──
+//
+// Mirrors src/states/combat.py::_apply_use_item — same effect tags,
+// same dice rolls, same "drink ends the turn" cadence. Pure helper:
+// mutates the caster's hp / member's mp / enemy hp in place, returns a
+// result the scene logs and animates. Item consumption (splice from
+// personal or shared stash) stays in the scene, mirroring how the
+// Throw action works — that way the rest of this file stays free of
+// inventory bookkeeping.
+
+/** Per-enemy damage outcome for a `combat_only` mass-damage item. */
+export interface UseItemEnemyHit {
+  id: string;
+  damage: number;
+  killed: boolean;
+}
+
+export interface UseItemOutcome {
+  /** `false` when the item is unusable (no effect, not combat-usable),
+   *  the relevant resource is already topped up, or the supporting
+   *  member data is missing for an MP heal. The scene re-uses the
+   *  message either way; on `false` it should NOT consume the item. */
+  ok: boolean;
+  /** The item's `effect` tag, echoed back so the scene can pick a VFX. */
+  effect: string;
+  message: string;
+  /** HP or MP restored on the caster (`heal_hp` / `heal_mp`). */
+  amount?: number;
+  /** Per-enemy damage outcomes for `combat_only` (Fire Oil etc.). */
+  enemyHits?: UseItemEnemyHit[];
+  /** Whether the item use should advance the turn. True for every
+   *  successful use; false on refusal so the player can pick something
+   *  else without forfeiting their turn. */
+  endsTurn: boolean;
+}
+
+/**
+ * Optional hooks the scene wires up so this pure helper can stage
+ * combat buffs without depending on the `Combat` controller. Tests
+ * can pass stubs that record the calls; the real call site forwards
+ * to `combat.addBuff` / `combat.hasBuffFromSource`.
+ *
+ * Both are optional: when omitted, the buff branches refuse politely
+ * just like they did before the buff system landed (so anyone calling
+ * `useCombatItem` from a non-combat path still gets sane behaviour).
+ */
+export interface UseItemBuffHooks {
+  addBuff(combatantId: string, buff: Buff): void;
+  /** True when a buff with this `source` (item name) is already active
+   *  on the combatant — used to refuse a second Elixir of Strength
+   *  rather than letting them stack indefinitely. */
+  hasBuffFromSource(combatantId: string, source: string): boolean;
+}
+
+/**
+ * Apply a usable item's effect during combat. The CombatScene calls
+ * this after the player has picked an item from the Use picker.
+ *
+ *   - `caster`: the active Combatant (mutated for HP heals).
+ *   - `member`: the matching PartyMember row (needed for `heal_mp` —
+ *     Combatants don't carry an MP pool). Nullable so monster summons
+ *     and AI-controlled allies can still call this for HP heals; an
+ *     `heal_mp` on a null member refuses politely.
+ *   - `enemies`: alive + dead enemy combatants for `combat_only`
+ *     throws; dead targets are filtered out before damage rolls.
+ *   - `item`: the catalog entry (must satisfy `isCombatUsable`).
+ *   - `rng`: injected RNG so tests can pin outcomes.
+ *   - `buffs`: optional buff hooks for Elixir-style consumables.
+ *     Without them the strength/ac branches still refuse politely.
+ */
+export function useCombatItem(
+  caster: Combatant,
+  member: PartyMember | null,
+  enemies: Combatant[],
+  item: Item,
+  rng: RNG,
+  buffs?: UseItemBuffHooks,
+): UseItemOutcome {
+  // Defense in depth: the picker filters by `isCombatUsable` already,
+  // but a stale picker entry or a future caller might still pass an
+  // item that shouldn't apply. Refuse cleanly instead of trusting the
+  // call site.
+  if (!isCombatUsable(item)) {
+    return {
+      ok: false,
+      effect: item.effect ?? "",
+      message: `${item.name} can't be used in combat.`,
+      endsTurn: false,
+    };
+  }
+  const effect = item.effect ?? "";
+  const power = item.power ?? 0;
+
+  switch (effect) {
+    case "heal_hp": {
+      if (caster.hp >= caster.maxHp) {
+        return {
+          ok: false,
+          effect,
+          message: `${caster.name} is already at full HP.`,
+          endsTurn: false,
+        };
+      }
+      // Mirrors Python: heal = power + 1d6, clamp to maxHp.
+      const dice = rollDamage(1, 6, 0, false, rng);
+      const heal = Math.max(1, power + dice);
+      const before = caster.hp;
+      caster.hp = Math.min(caster.maxHp, caster.hp + heal);
+      const actual = caster.hp - before;
+      return {
+        ok: true,
+        effect,
+        amount: actual,
+        message: `${caster.name} uses ${item.name}! (+${actual} HP)`,
+        endsTurn: true,
+      };
+    }
+    case "heal_mp": {
+      if (!member || member.maxMp == null) {
+        return {
+          ok: false,
+          effect,
+          message: `${caster.name} has no magic to restore.`,
+          endsTurn: false,
+        };
+      }
+      const cur = member.mp ?? 0;
+      if (cur >= member.maxMp) {
+        return {
+          ok: false,
+          effect,
+          message: `${caster.name}'s magic reserves are already full.`,
+          endsTurn: false,
+        };
+      }
+      // Python: restore = power + 1d4.
+      const dice = rollDamage(1, 4, 0, false, rng);
+      const restore = Math.max(1, power + dice);
+      const next = Math.min(member.maxMp, cur + restore);
+      const actual = next - cur;
+      member.mp = next;
+      return {
+        ok: true,
+        effect,
+        amount: actual,
+        message: `${caster.name} uses ${item.name}! (+${actual} MP)`,
+        endsTurn: true,
+      };
+    }
+    case "cure_poison": {
+      // Poison status isn't modelled on Combatant in the web port yet
+      // (mirroring the gap on PartyMember). Refuse without consuming
+      // the item so the player isn't billed for a no-op. When the
+      // status engine lands this branch can scan + clear flags.
+      return {
+        ok: false,
+        effect,
+        message: `${caster.name} isn't poisoned.`,
+        endsTurn: false,
+      };
+    }
+    case "buff_strength": {
+      // Elixir of Strength: bumps STR for the rest of combat, which
+      // in the Python game feeds both attack-bonus and damage. We
+      // model that as two parallel buff entries — `attack_bonus` so
+      // the d20 hit roll picks it up, and `damage_bonus` so the
+      // post-dice total also gets the swing. `power` is the per-
+      // potion magnitude from items.json (default 2).
+      if (!buffs) {
+        return {
+          ok: false,
+          effect,
+          message: `${item.name} can't be applied right now.`,
+          endsTurn: false,
+        };
+      }
+      if (buffs.hasBuffFromSource(caster.id, item.name)) {
+        return {
+          ok: false,
+          effect,
+          message: `${caster.name} is already feeling the surge from ${item.name}.`,
+          endsTurn: false,
+        };
+      }
+      const value = power > 0 ? power : 2;
+      // Long turnsLeft so the buff stays for the rest of the
+      // encounter — the Python `potion_buffs` dict has no expiry,
+      // and we wipe combatant buffs at encounter end anyway.
+      const turnsLeft = 99;
+      buffs.addBuff(caster.id, {
+        kind: "attack_bonus", value, turnsLeft, source: item.name,
+      });
+      buffs.addBuff(caster.id, {
+        kind: "damage_bonus", value, turnsLeft, source: item.name,
+      });
+      return {
+        ok: true,
+        effect,
+        amount: value,
+        message: `${caster.name} drinks ${item.name}! (+${value} STR)`,
+        endsTurn: true,
+      };
+    }
+    case "buff_ac": {
+      // Elixir of Warding: AC bonus for the rest of the encounter.
+      if (!buffs) {
+        return {
+          ok: false,
+          effect,
+          message: `${item.name} can't be applied right now.`,
+          endsTurn: false,
+        };
+      }
+      if (buffs.hasBuffFromSource(caster.id, item.name)) {
+        return {
+          ok: false,
+          effect,
+          message: `${caster.name} is already shielded by ${item.name}.`,
+          endsTurn: false,
+        };
+      }
+      const value = power > 0 ? power : 2;
+      buffs.addBuff(caster.id, {
+        kind: "ac_bonus", value, turnsLeft: 99, source: item.name,
+      });
+      return {
+        ok: true,
+        effect,
+        amount: value,
+        message: `${caster.name} drinks ${item.name}! (+${value} AC)`,
+        endsTurn: true,
+      };
+    }
+    case "combat_only": {
+      // Throwables like Fire Oil — splash damage to every alive enemy.
+      // Mirrors Python: each target takes `power + 1d6`, capped at 0.
+      const alive = enemies.filter((e) => e.hp > 0);
+      if (alive.length === 0) {
+        return {
+          ok: false,
+          effect,
+          message: `No enemies left to target with ${item.name}.`,
+          endsTurn: false,
+        };
+      }
+      const hits: UseItemEnemyHit[] = [];
+      let total = 0;
+      for (const e of alive) {
+        const dice = rollDamage(1, 6, 0, false, rng);
+        const dmg = Math.max(1, power + dice);
+        const before = e.hp;
+        e.hp = Math.max(0, e.hp - dmg);
+        const dealt = before - e.hp;
+        total += dealt;
+        hits.push({ id: e.id, damage: dealt, killed: e.hp === 0 });
+      }
+      return {
+        ok: true,
+        effect,
+        message: `${caster.name} hurls ${item.name}! Splash damage hits everyone! (${total} total)`,
+        enemyHits: hits,
+        endsTurn: true,
+      };
+    }
+    default: {
+      // Unknown effect tag — consume the item but log generically so a
+      // future items.json entry doesn't crash combat.
+      return {
+        ok: true,
+        effect,
+        message: `${caster.name} uses ${item.name}.`,
+        endsTurn: true,
+      };
+    }
+  }
 }

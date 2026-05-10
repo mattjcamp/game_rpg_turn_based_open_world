@@ -29,6 +29,15 @@ export interface Item {
   partyCanEquip: boolean;
   /** Whether using consumes a charge / acts at runtime. */
   usable: boolean;
+  /**
+   * Whether a `usable` item can be drunk / applied during a combat
+   * encounter (Healing Potion = unset → defaults true; Camping
+   * Supplies = explicit `false`). Mirrors items.json `combat_usable`.
+   * Left optional in the model so authors don't have to mark every
+   * potion or herb; consumers should call `isCombatUsable(item)`
+   * which encodes the "default true for usable items" rule.
+   */
+  combatUsable?: boolean;
   /** Free-form effect tag for usable items (e.g. "heal_hp"). */
   effect: string | null;
   // Combat / display stats — present where relevant.
@@ -86,6 +95,7 @@ interface RawItem {
   party_can_equip?: boolean;
   character_can_equip?: boolean;
   usable?: boolean;
+  combat_usable?: boolean;
   effect?: string | null;
   power?: number;
   ranged?: boolean;
@@ -125,6 +135,9 @@ function itemFromRaw(name: string, category: Item["category"], r: RawItem): Item
     characterCanEquip: !!r.character_can_equip,
     partyCanEquip: !!r.party_can_equip,
     usable: !!r.usable,
+    // Pass the raw flag through unchanged so the default-true rule
+    // lives in `isCombatUsable` (one place, easier to reason about).
+    combatUsable: r.combat_usable,
     effect: r.effect ?? null,
     power: r.power,
     ranged: r.ranged,
@@ -165,6 +178,24 @@ export function stackSizeOf(item: Item): number {
  */
 export function isStackable(item: Item): boolean {
   return !!item.stackable;
+}
+
+/**
+ * Whether a usable item can be drunk / applied during a combat round.
+ * Mirrors the Python game's `info.get("combat_usable", True)` rule:
+ *   - non-usable items always return false (nothing to apply)
+ *   - usable items default to combat-usable unless `combat_usable` is
+ *     explicitly false in items.json (Camping Supplies is the only
+ *     ship-time entry that opts out — its "rest" effect needs the
+ *     party to be safely outside an encounter).
+ *
+ * Used by the CombatScene Use-item picker to filter the inventory
+ * down to potions / herbs / antidotes / throwables-with-effects, and
+ * to skip torches and camping supplies.
+ */
+export function isCombatUsable(item: Item): boolean {
+  if (!item.usable) return false;
+  return item.combatUsable !== false;
 }
 
 export async function loadItems(url = dataPath("items.json")): Promise<Map<string, Item>> {

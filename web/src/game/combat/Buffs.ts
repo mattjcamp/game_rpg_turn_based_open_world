@@ -8,8 +8,15 @@
  * down at the end of each round, expiring with a log line.
  *
  * Mechanical kinds shipped today:
- *   - attack_bonus   — added to the d20 hit roll (Bless +2)
- *   - ac_bonus       — added to the combatant's AC (Shield +1)
+ *   - attack_bonus   — added to the d20 hit roll (Bless +2,
+ *                      Elixir of Strength +2)
+ *   - ac_bonus       — added to the combatant's AC (Shield +1,
+ *                      Elixir of Warding +2)
+ *   - damage_bonus   — added to the post-dice damage total on melee
+ *                      hits (Elixir of Strength). The Python game
+ *                      models this as raising STR which feeds both
+ *                      attack and damage; we split it into the two
+ *                      buff kinds so the math stays explicit.
  *   - attack_penalty — subtracted from the d20 hit roll (Curse -2)
  *   - ac_penalty     — subtracted from the combatant's AC (Curse -2)
  *   - range_bonus    — added to baseMoveRange (Long Shanks +4)
@@ -22,6 +29,7 @@
 export type BuffKind =
   | "attack_bonus"
   | "ac_bonus"
+  | "damage_bonus"
   | "attack_penalty"
   | "ac_penalty"
   | "range_bonus";

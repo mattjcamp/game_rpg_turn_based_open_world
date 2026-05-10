@@ -75,7 +75,10 @@ import {
   resolveTurnUndead,
   makeSummonedSkeleton,
   traceDirectionalRay,
+  useCombatItem,
 } from "../combat/CombatActions";
+import { isCombatUsable } from "../world/Items";
+import type { Buff } from "../combat/Buffs";
 import { combatantsFromParty, syncCombatHpBack, abilityMod } from "../combat/CombatBridge";
 import { useEquippedDurability } from "../world/PartyActions";
 import {
@@ -212,7 +215,7 @@ const FONT_MONO  = (color: number = C.dim)  => ({ fontFamily: "monospace",     f
 /** Action menu — what the active party member can do this turn.
  *  No "Flee" — once battle is joined, the party fights to win or
  *  loses (matches the Python game's combat loop). */
-type ActionId = "attack" | "range" | "throw" | "cast" | "end";
+type ActionId = "attack" | "range" | "throw" | "cast" | "use" | "end";
 
 interface ActionEntry {
   id: ActionId;
@@ -224,6 +227,11 @@ const PARTY_ACTIONS: ActionEntry[] = [
   { id: "range",  label: "Range"           },
   { id: "throw",  label: "Throw"           },
   { id: "cast",   label: "Cast"            },
+  // "Use" surfaces combat-usable consumables — Healing Potion, Mana
+  // Potion, Antidote, Healing Herb, the throwable poisons. Party-only
+  // items (Torch, Camping Supplies, Lockpick) are filtered out by
+  // `isCombatUsable` so they never appear in this picker.
+  { id: "use",    label: "Use Item"        },
   { id: "end",    label: "End Turn  [SPACE]" },
 ];
 
@@ -236,7 +244,8 @@ const PARTY_ACTIONS: ActionEntry[] = [
  *                     action (numbered 1..N on the arena)
  */
 type SceneMode =
-  | "default" | "pick-throw" | "pick-spell" | "pick-target" | "pick-tile"
+  | "default" | "pick-throw" | "pick-spell" | "pick-use"
+  | "pick-target" | "pick-tile"
   /** Magic Dart-style spells: player presses an arrow key to fire
    *  along that cardinal direction up to the spell's range. */
   | "pick-direction";
@@ -320,6 +329,14 @@ export class CombatScene extends Phaser.Scene {
   private pendingAction: PendingAction | null = null;
   /** Items the user can pick to throw — populated when entering pick-throw mode. */
   private throwOptions: Array<{ item: Item; source: "personal" | "stash"; index: number }> = [];
+  /**
+   * Items the user can pick from the Use Item action — combat-usable
+   * consumables in personal inventory or shared stash. Filtered by
+   * `isCombatUsable` so torches / camping supplies are excluded.
+   * Same shape as `throwOptions` so the consumption helper can take
+   * either list.
+   */
+  private useOptions: Array<{ item: Item; source: "personal" | "stash"; index: number }> = [];
   private spellOptions: Spell[] = [];
   /** Shared cursor for the scrollable pickers (pick-throw / pick-spell).
    *  Index into the corresponding options array. */
@@ -417,6 +434,7 @@ export class CombatScene extends Phaser.Scene {
     this.mode = "default";
     this.pendingAction = null;
     this.throwOptions = [];
+    this.useOptions = [];
     this.spellOptions = [];
     this.pickerCursor = 0;
     // Picker / targeting / tile-cursor overlays are also
@@ -970,6 +988,7 @@ export class CombatScene extends Phaser.Scene {
     this.mode = "default";
     this.pendingAction = null;
     this.throwOptions = [];
+    this.useOptions = [];
     this.spellOptions = [];
     this.pickerCursor = 0;
     this.clearPicker();
@@ -987,9 +1006,10 @@ export class CombatScene extends Phaser.Scene {
    * what the player sees on screen.
    */
   private onDigit(n: number): void {
-    if (this.mode === "pick-throw" || this.mode === "pick-spell") {
+    if (this.mode === "pick-throw" || this.mode === "pick-spell" || this.mode === "pick-use") {
       const total =
         this.mode === "pick-throw" ? this.throwOptions.length :
+        this.mode === "pick-use"   ? this.useOptions.length :
         this.spellOptions.length;
       if (total === 0) return;
       const visibleMax = 12;
@@ -1027,7 +1047,7 @@ export class CombatScene extends Phaser.Scene {
     if (!this.canTakePlayerInput()) return;
     // In a scrollable picker UP/DOWN walks the picker cursor — not
     // the avatar.
-    if (this.mode === "pick-throw" || this.mode === "pick-spell") {
+    if (this.mode === "pick-throw" || this.mode === "pick-spell" || this.mode === "pick-use") {
       if (key === "UP")   return this.movePickerCursor(-1);
       if (key === "DOWN") return this.movePickerCursor(1);
       return; // ignore left/right in pickers
@@ -1061,11 +1081,13 @@ export class CombatScene extends Phaser.Scene {
   private movePickerCursor(delta: number): void {
     const total =
       this.mode === "pick-throw" ? this.throwOptions.length :
-      this.mode === "pick-spell" ? this.spellOptions.length : 0;
+      this.mode === "pick-spell" ? this.spellOptions.length :
+      this.mode === "pick-use"   ? this.useOptions.length : 0;
     if (total === 0) return;
     this.pickerCursor = (this.pickerCursor + delta + total) % total;
     if (this.mode === "pick-throw") this.refreshThrowPicker();
     else if (this.mode === "pick-spell") this.refreshSpellPicker();
+    else if (this.mode === "pick-use") this.refreshUsePicker();
   }
 
   private moveActionCursor(delta: number): void {
@@ -1085,11 +1107,13 @@ export class CombatScene extends Phaser.Scene {
         ? this.items.get(member.equipped.rightHand) ?? null
         : null;
     const canRange = !!equippedWeapon && isRanged(equippedWeapon);
+    const canUse = !!member && this.partyHasCombatUsable();
     const enabledIdx = PARTY_ACTIONS
       .map((a, i) => {
         if (a.id === "range" && !canRange) return -1;
         if (a.id === "throw" && !canThrow) return -1;
         if (a.id === "cast"  && !canCast)  return -1;
+        if (a.id === "use"   && !canUse)   return -1;
         return i;
       })
       .filter((i) => i >= 0);
@@ -1133,6 +1157,12 @@ export class CombatScene extends Phaser.Scene {
       this.dispatchSpell(spell);
       return;
     }
+    if (this.mode === "pick-use") {
+      const opt = this.useOptions[this.pickerCursor];
+      if (!opt) return;
+      this.applyUseItem(opt);
+      return;
+    }
     if (this.mode === "pick-tile") {
       void this.resolveTileSpell();
       return;
@@ -1161,6 +1191,7 @@ export class CombatScene extends Phaser.Scene {
     if (a.id === "range") return this.startRangeAttack();
     if (a.id === "throw") return this.openThrowPicker();
     if (a.id === "cast")  return this.openSpellPicker();
+    if (a.id === "use")   return this.openUsePicker();
     if (a.id === "end")   return this.onEndTurnClicked();
   }
 
@@ -1317,6 +1348,153 @@ export class CombatScene extends Phaser.Scene {
     );
     this.renderPicker("PICK ITEM TO THROW", lines, this.pickerCursor);
   }
+
+  /**
+   * Build the Use-Item picker — combat-usable consumables in the
+   * active member's personal inventory plus the shared stash. Filters
+   * by `isCombatUsable` so torches / camping supplies / lockpicks
+   * never show up; throwables WITH effects (poisons, fire oils) DO
+   * show up here AND on the Throw picker, since either action is a
+   * valid way to use them. Picker entries collapse duplicate items
+   * within the same source so a stack of three Healing Potions reads
+   * as `Healing Potion ×3`.
+   */
+  private openUsePicker(): void {
+    const member = this.memberForCurrent();
+    const party = gameState.partyData;
+    const opts: typeof this.useOptions = [];
+    if (member) {
+      member.inventory.forEach((it, idx) => {
+        const def = this.items.get(it.item);
+        if (def && isCombatUsable(def)) {
+          opts.push({ item: def, source: "personal", index: idx });
+        }
+      });
+    }
+    if (party) {
+      party.inventory.forEach((it, idx) => {
+        const def = this.items.get(it.item);
+        if (def && isCombatUsable(def)) {
+          opts.push({ item: def, source: "stash", index: idx });
+        }
+      });
+    }
+    if (opts.length === 0) {
+      this.combat.log.push(`${this.combat.current.name} has nothing usable.`);
+      this.refreshLog();
+      return;
+    }
+    this.useOptions = opts;
+    this.pickerCursor = 0;
+    this.mode = "pick-use";
+    this.refreshUsePicker();
+  }
+
+  /** Rebuild the use picker so the cursor + scroll window update. */
+  private refreshUsePicker(): void {
+    const lines = this.useOptions.map((o) => {
+      const eff = o.item.effect ?? "—";
+      const tag =
+        eff === "heal_hp"      ? "+HP" :
+        eff === "heal_mp"      ? "+MP" :
+        eff === "cure_poison"  ? "cure poison" :
+        eff === "buff_strength" ? "+STR" :
+        eff === "buff_ac"       ? "+AC" :
+        eff === "combat_only"   ? "splash" :
+        eff;
+      return `${o.item.name.padEnd(18, " ")} ${tag}`;
+    });
+    this.renderPicker("USE ITEM", lines, this.pickerCursor);
+  }
+
+  /**
+   * Resolve a picked Use-item: consume it from inventory, apply the
+   * effect via the pure helper, log + animate the outcome, then end
+   * the turn. Refusals (already at full HP, no enemies for a splash,
+   * unknown effect) bail out of the picker without burning the item
+   * or the turn so the player can pick something else.
+   */
+  private applyUseItem(opt: typeof this.useOptions[number]): void {
+    const me = this.combat.current;
+    const member = this.memberForCurrent();
+    const enemies = this.combat.combatants.filter(
+      (c) => c.side !== me.side && c.hp > 0,
+    );
+    // Forward the buff hooks so Elixir of Strength / Warding can stage
+    // their addBuff entries through the same path Bless / Shield use.
+    // Bound methods so the helper can call them like plain functions.
+    const buffHooks = {
+      addBuff: (id: string, b: Buff): void => this.combat.addBuff(id, b),
+      hasBuffFromSource: (id: string, src: string): boolean =>
+        this.combat.hasBuffFromSource(id, src),
+    };
+    const result = useCombatItem(me, member, enemies, opt.item, defaultRng, buffHooks);
+
+    // Refusal: log, hold the picker open so the player can re-choose.
+    if (!result.ok) {
+      this.combat.log.push(result.message);
+      this.refreshLog();
+      this.mode = "default";
+      this.clearPicker();
+      this.refreshActionMenu();
+      return;
+    }
+
+    // Item is consumed — Throw uses the same "splice on selection"
+    // pattern, but for Use we splice AFTER resolving so a refusal
+    // (already-full HP) doesn't burn the potion. Same arrays, same
+    // index semantics; the helper above doesn't touch inventory.
+    if (opt.source === "personal" && member) {
+      member.inventory.splice(opt.index, 1);
+    } else if (opt.source === "stash" && gameState.partyData) {
+      gameState.partyData.inventory.splice(opt.index, 1);
+    }
+
+    this.combat.log.push(result.message);
+    this.refreshLog();
+    this.mode = "default";
+    this.clearPicker();
+
+    // VFX + HP/MP refresh so the heal sparkle lands on the caster and
+    // splash damage updates each enemy's bar.
+    if (result.effect === "heal_hp") {
+      void this.healTargetVfx(me);
+      Sfx.play("heal");
+      this.refreshHp(me);
+    } else if (result.effect === "heal_mp") {
+      void this.auraOn(me, VFX_COLOURS.arcane);
+      // refreshHp re-reads the live PartyMember and resizes the MP
+      // bar in tandem, so a single call covers both meters.
+      this.refreshHp(me);
+    } else if (result.effect === "buff_strength") {
+      // Crimson surge for STR — same colour family the renderer uses
+      // for damage flashes so the link to "you'll hit harder" reads.
+      void this.auraOn(me, VFX_COLOURS.fire);
+      Sfx.play("defend");
+    } else if (result.effect === "buff_ac") {
+      // Silver-tinged shield aura for AC.
+      void this.auraOn(me, VFX_COLOURS.shield);
+      Sfx.play("defend");
+    } else if (result.effect === "combat_only" && result.enemyHits) {
+      Sfx.play("attack");
+      for (const hit of result.enemyHits) {
+        const target = this.combat.combatants.find((c) => c.id === hit.id);
+        if (!target) continue;
+        const body = this.bodies.get(target.id);
+        if (body) flashTarget(this, body, VFX_COLOURS.fire);
+        this.refreshHp(target);
+        if (hit.killed) {
+          this.combat.log.push(`${target.name} is incinerated!`);
+        }
+      }
+      this.refreshLog();
+    }
+
+    if (this.combat.isOver) return this.endEncounter();
+    if (result.endsTurn) this.endActorTurn();
+    else this.refreshActionMenu();
+  }
+
 
   /**
    * Spell-pick → action dispatch. Classifies the spell, and either
@@ -2906,11 +3084,13 @@ export class CombatScene extends Phaser.Scene {
       return !!partyData && partyHasAmmo(partyData, equippedWeapon.ammo);
     })();
     const canRange = !!equippedWeapon && isRanged(equippedWeapon) && ammoOk;
+    const canUse = !!member && this.partyHasCombatUsable();
     const isEnabled = (id: ActionId): boolean => {
       if (!playerTurn) return false;
       if (id === "range") return canRange;
       if (id === "throw") return canThrow;
       if (id === "cast")  return canCast;
+      if (id === "use")   return canUse;
       return true;
     };
     for (let i = 0; i < PARTY_ACTIONS.length; i++) {
@@ -2943,6 +3123,25 @@ export class CombatScene extends Phaser.Scene {
     const check = (name: string) => {
       const def = this.items.get(name);
       return !!def && isThrowable(def);
+    };
+    if (member && member.inventory.some((it) => check(it.item))) return true;
+    if (party && party.inventory.some((it) => check(it.item))) return true;
+    return false;
+  }
+
+  /**
+   * True when the active member or shared stash holds at least one
+   * combat-usable consumable (potion, herb, antidote, throwable
+   * poison, fire oil). Drives the Use Item row's enable state — the
+   * row is greyed out when there's nothing to drink so the player
+   * isn't tempted to open an empty picker.
+   */
+  private partyHasCombatUsable(): boolean {
+    const member = this.memberForCurrent();
+    const party = gameState.partyData;
+    const check = (name: string) => {
+      const def = this.items.get(name);
+      return !!def && isCombatUsable(def);
     };
     if (member && member.inventory.some((it) => check(it.item))) return true;
     if (party && party.inventory.some((it) => check(it.item))) return true;
