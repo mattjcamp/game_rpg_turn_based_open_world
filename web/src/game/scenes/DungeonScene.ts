@@ -102,6 +102,12 @@ import {
 import {
   advanceClock,
 } from "../world/GameTime";
+import {
+  installSceneLog,
+  refreshSceneLog,
+  LOG_HEIGHT,
+  type SceneLogHandle,
+} from "../world/SceneLog";
 import { brightnessAt, type LightSource } from "../world/Lighting";
 import { roamStep } from "../world/SpawnPoints";
 import {
@@ -111,7 +117,6 @@ import {
 } from "../data/monsters";
 
 const TILE = 32;
-const HUD_HEIGHT = 56;
 
 // Visual-tier thresholds for the fog-of-war fade. Cells the party has
 // stepped into render at the brightness their lighting computation
@@ -173,9 +178,10 @@ export class DungeonScene extends Phaser.Scene {
    *  re-entry. The graphics are pulsed in update(). */
   private detectedTrapMarks: Map<string, Phaser.GameObjects.Graphics> = new Map();
   private player!: Phaser.GameObjects.Image;
-  private status!: Phaser.GameObjects.Text;
-  private hpSummary!: Phaser.GameObjects.Text;
-  private hint!: Phaser.GameObjects.Text;
+  /** Bottom-of-viewport log strip — same helper every map scene
+   *  uses, so the player has a single consistent place to read time
+   *  and moon phase regardless of which map they're standing on. */
+  private sceneLog?: SceneLogHandle;
   private message?: Phaser.GameObjects.Text;
   private messageTimer?: Phaser.Time.TimerEvent;
 
@@ -670,57 +676,27 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private drawHud(): void {
-    this.add
-      .rectangle(0, 0, 960, HUD_HEIGHT, 0x161629, 0.92)
-      .setOrigin(0)
-      .setScrollFactor(0)
-      .setStrokeStyle(1, 0x2a2a3a);
-    this.status = this.add
-      .text(16, 12, "", {
-        fontFamily: "Georgia, serif",
-        fontSize: "16px",
-        color: "#f6efd6",
-      })
-      .setScrollFactor(0);
-    this.hpSummary = this.add
-      .text(16, 32, "", {
-        fontFamily: "monospace",
-        fontSize: "12px",
-        color: "#bdb38a",
-      })
-      .setScrollFactor(0);
-    this.hint = this.add
-      .text(960 - 16, 12, "WASD / arrows · ESC on stairs to leave", {
-        fontFamily: "monospace",
-        fontSize: "12px",
-        color: "#bdb38a",
-      })
-      .setOrigin(1, 0)
-      .setScrollFactor(0);
+    // Single shared bottom log strip — see OverworldScene.drawHud for
+    // the rationale (one consistent log surface across every map
+    // scene, replacing the per-scene top HUD bar).
+    this.sceneLog = installSceneLog(this);
   }
 
   private installCamera(): void {
+    // Bounds extended downward by LOG_HEIGHT so the camera can scroll
+    // the bottom row of tiles above the log strip pinned to the
+    // viewport's bottom edge.
     this.cameras.main.setBounds(
       0,
-      -HUD_HEIGHT,
+      0,
       this.level.width * TILE,
-      this.level.height * TILE + HUD_HEIGHT,
+      this.level.height * TILE + LOG_HEIGHT,
     );
     this.cameras.main.startFollow(this.player, true, 0.2, 0.2);
   }
 
   private refreshHud(): void {
-    const total = this.levels.length;
-    const depth = this.currentLevel + 1;
-    const floorLabel = total > 1 ? `  ·  Floor ${depth}/${total}` : "";
-    this.status.setText(`${this.dungeonName}${floorLabel}`);
-    if (this.partyData) {
-      const members = activeMembers(this.partyData);
-      const summary = members
-        .map((m) => `${m.name} ${Math.max(0, m.hp)}/${m.maxHp}`)
-        .join("  ·  ");
-      this.hpSummary.setText(summary);
-    }
+    if (this.sceneLog) refreshSceneLog(this.sceneLog, gameState.clock);
   }
 
   /**
@@ -1475,9 +1451,9 @@ export class DungeonScene extends Phaser.Scene {
     this.drawPlayer();
     this.cameras.main.setBounds(
       0,
-      -HUD_HEIGHT,
+      0,
       this.level.width * TILE,
-      this.level.height * TILE + HUD_HEIGHT,
+      this.level.height * TILE + LOG_HEIGHT,
     );
     this.cameras.main.startFollow(this.player, true, 0.2, 0.2);
     this.refreshDarkness();
@@ -1503,9 +1479,9 @@ export class DungeonScene extends Phaser.Scene {
     this.drawPlayer();
     this.cameras.main.setBounds(
       0,
-      -HUD_HEIGHT,
+      0,
       this.level.width * TILE,
-      this.level.height * TILE + HUD_HEIGHT,
+      this.level.height * TILE + LOG_HEIGHT,
     );
     this.cameras.main.startFollow(this.player, true, 0.2, 0.2);
     this.refreshDarkness();

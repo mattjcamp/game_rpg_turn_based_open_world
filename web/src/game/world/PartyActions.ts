@@ -966,6 +966,66 @@ export function castMassHeal(
   };
 }
 
+// ── Self-cast utility spells ──────────────────────────────────────
+//
+// Spells that don't need a target prompt — Light is the canonical
+// example. They consume MP from the best-positioned caster (highest
+// level, most MP) and mutate party-wide state directly.
+
+/** Default magic-light burn-time when the spell omits `effect_value.steps`.
+ *  Matches the Python game's hook default (100 steps). */
+const MAGIC_LIGHT_DEFAULT_STEPS = 100;
+
+/**
+ * Cast Light — a magic-torch spell that adds light-steps to the
+ * party's torch counter. The same counter physical Torches feed
+ * (`party.torchSteps`), so the lighting overlay (warm tint, 4-tile
+ * radius) renders identically — semantically a magical version of a
+ * lit torch.
+ *
+ * Mirrors the Python game's `_on_spell_magic_light` flow: pick the
+ * best caster, deduct MP, set `torch_active = True; torch_steps =
+ * steps`. Stacks with an already-burning torch by topping the
+ * counter rather than starting fresh — same behaviour as
+ * `consumeTorch`, so a player who lights a real torch and then
+ * casts Light gets the sum, not min/max.
+ */
+export function castMagicLight(
+  party: Party,
+  members: PartyMember[],
+  spell: Spell,
+  rng: () => number = Math.random,
+): ActionResult {
+  void rng;  // reserved for future variability — Python version is deterministic too.
+  const possible = castersFor(spell, members);
+  if (possible.length === 0) {
+    return { ok: false, message: "No one in the party can cast that spell." };
+  }
+  // Same caster-priority rule as `castMassHeal`: highest level wins,
+  // tie-break by remaining MP. Keeps tests deterministic and avoids
+  // stomping a low-level caster's mana when a senior caster is
+  // standing right there.
+  possible.sort((a, b) => b.level - a.level || (b.mp ?? 0) - (a.mp ?? 0));
+  const caster = possible[0];
+  caster.mp = (caster.mp ?? 0) - spell.mp_cost;
+  const ev = spell.effect_value ?? {};
+  // `effect_value.steps` is the canonical field; coerce defensively
+  // since the JSON schema is duck-typed at the data layer.
+  const rawSteps = ev.steps;
+  const steps =
+    typeof rawSteps === "number" && Number.isFinite(rawSteps) && rawSteps > 0
+      ? Math.floor(rawSteps)
+      : MAGIC_LIGHT_DEFAULT_STEPS;
+  // Stack with any active torch / previous Light cast, same as
+  // `consumeTorch`. Math.max guards against a corrupt save with a
+  // negative torchSteps.
+  party.torchSteps = Math.max(party.torchSteps, 0) + steps;
+  return {
+    ok: true,
+    message: `${caster.name} casts ${spell.name}! A radiant orb illuminates the way.`,
+  };
+}
+
 /**
  * Targeting kind for menu-cast spells. UI uses this to know whether
  * to prompt for a target via 1-4 or to cast immediately.
@@ -982,7 +1042,14 @@ export function classifyMenuCast(spell: Spell): MenuCastKind {
   if (spell.effect_type === "heal" || spell.effect_type === "major_heal") {
     return "single-ally";
   }
-  // Other utility spells (knock, magic_light, etc.) need world-state
+  // Light is a self-cast utility spell — adds torch-step lighting to
+  // the party without prompting for a target. Mirrors the Python
+  // game's `_on_spell_magic_light` (a hook that toggles the dungeon's
+  // torch state), but routed through the same `party.torchSteps`
+  // counter the web port uses for physical torches and Galadriel's
+  // Light, so the lighting renderer doesn't need a separate path.
+  if (spell.effect_type === "magic_light") return "self";
+  // Other utility spells (knock, reveal_map, etc.) need world-state
   // hooks (unlock door, light tile) we haven't built yet.
   return "unsupported";
 }

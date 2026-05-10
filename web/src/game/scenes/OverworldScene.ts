@@ -36,16 +36,16 @@ import { installTileEffects } from "../world/TileEffects";
 import {
   advanceClock,
   clockDarknessParams,
-  dateStr,
-  lunarPhaseIndex,
-  lunarPhaseName,
-  timeStr,
 } from "../world/GameTime";
-import { paintMoonPhase, MOON_HUD_SIZE } from "../world/MoonIcon";
+import {
+  installSceneLog,
+  refreshSceneLog,
+  LOG_HEIGHT,
+  type SceneLogHandle,
+} from "../world/SceneLog";
 import { partyLightRadius } from "../world/PartyActions";
 import { gameState, triggerKey } from "../state";
 import { rememberScene } from "../save";
-import type { Combatant } from "../types";
 import {
   loadSpawnPoints,
   trySpawnMonster,
@@ -92,7 +92,6 @@ import {
 import { normalizeSpritePath } from "../world/Towns";
 
 const TILE = 32; // matches the source PNGs' native size
-const HUD_HEIGHT = 56;
 
 /**
  * One-shot gate for the save-resume routing. Set after the first
@@ -108,11 +107,10 @@ let _resumeChecked = false;
 export class OverworldScene extends Phaser.Scene {
   private tileMap!: TileMap;
   private player!: Phaser.GameObjects.Image;
-  private status!: Phaser.GameObjects.Text;
-  private hpSummary!: Phaser.GameObjects.Text;
-  private hint!: Phaser.GameObjects.Text;
-  private clockText!: Phaser.GameObjects.Text;
-  private moonIcon!: Phaser.GameObjects.Graphics;
+  /** Bottom-of-viewport log strip (time + moon phase). The same
+   *  helper is wired into TownScene and DungeonScene so every map
+   *  scene presents an identical strip in the same screen position. */
+  private sceneLog?: SceneLogHandle;
   private busy = false;
   /** Backwards-compat handle — kept around so old code paths that
    *  test `if (this.defeatOverlay)` still work. The new modal lives
@@ -615,98 +613,33 @@ export class OverworldScene extends Phaser.Scene {
   }
 
   private installCamera(): void {
-    // Bounds extended upward by HUD_HEIGHT so the camera always has
-    // headroom to scroll the world strictly below the HUD bar. Without
-    // this, when the player stands at row 0 the camera clamps scrollY
-    // to 0 and the top tiles render under the HUD.
+    // Bounds extended downward by LOG_HEIGHT so the camera always
+    // has headroom to scroll the bottom row of tiles above the log
+    // strip. Without this, when the party stands on the bottom row
+    // of a tall map the camera clamps and the player marker hides
+    // behind the strip pinned at the viewport's bottom edge.
     this.cameras.main.setBounds(
       0,
-      -HUD_HEIGHT,
+      0,
       this.tileMap.width * TILE,
-      this.tileMap.height * TILE + HUD_HEIGHT
+      this.tileMap.height * TILE + LOG_HEIGHT
     );
     this.cameras.main.startFollow(this.player, true, 0.2, 0.2);
   }
 
   private drawHud(): void {
-    // HUD bar pinned to the top of the viewport with setScrollFactor(0).
-    const bar = this.add
-      .rectangle(0, 0, 960, HUD_HEIGHT, 0x161629, 0.92)
-      .setOrigin(0)
-      .setScrollFactor(0)
-      .setStrokeStyle(1, 0x2a2a3a);
-    void bar;
-
-    this.status = this.add
-      .text(16, 12, "", {
-        fontFamily: "Georgia, serif",
-        fontSize: "16px",
-        color: "#f6efd6",
-      })
-      .setScrollFactor(0);
-
-    this.hpSummary = this.add
-      .text(16, 32, "", {
-        fontFamily: "monospace",
-        fontSize: "12px",
-        color: "#bdb38a",
-      })
-      .setScrollFactor(0);
-
-    this.hint = this.add
-      .text(960 - 16, 4, "WASD / arrows · Space = wait · E = examine · ✦ = encounter", {
-        fontFamily: "monospace",
-        fontSize: "12px",
-        color: "#bdb38a",
-      })
-      .setOrigin(1, 0)
-      .setScrollFactor(0);
-
-    // Game-clock + moon-phase readout, right-aligned under the hint.
-    // The Graphics moon is drawn at (960-16-iconRight) with text to its
-    // right (more readable than text-right-of-icon on narrow phrases).
-    this.clockText = this.add
-      .text(960 - 16, 22, "", {
-        fontFamily: "monospace",
-        fontSize: "12px",
-        color: "#dcdcc8",
-      })
-      .setOrigin(1, 0)
-      .setScrollFactor(0);
-    this.moonIcon = this.add
-      .graphics()
-      .setDepth(1)
-      .setScrollFactor(0);
+    // Single shared log strip at the bottom of the viewport. The
+    // pre-existing top-bar HUD (party HP, tile coords, controls hint)
+    // was retired in favour of one consistent log surface across all
+    // map scenes — the player gets a predictable place to read time
+    // + moon phase whether they're standing on the overworld, in a
+    // town, or deep in a dungeon. Future iterations will surface
+    // step-driven log lines into this same strip.
+    this.sceneLog = installSceneLog(this);
   }
 
   private refreshHud(): void {
-    const { col, row } = gameState.playerPos;
-    const tileName = tileDef(this.tileMap.getTile(col, row)).name;
-    this.status.setText(`(${col}, ${row})  ·  ${tileName}`);
-    const partyText = gameState.party
-      .map((c: Combatant) => `${c.name} ${c.hp}/${c.maxHp}`)
-      .join("   ");
-    this.hpSummary.setText(partyText);
-    this.refreshClockHud();
-  }
-
-  /**
-   * Update the date/time + moon-phase readout in the HUD's top-right.
-   * Repaints the moon icon only when the lunar phase actually rolls
-   * over (one of eight per 28-day cycle), so per-step cost stays at
-   * a single text update.
-   */
-  private refreshClockHud(): void {
-    const c = gameState.clock;
-    const text = `${dateStr(c)} ${timeStr(c)} · ${lunarPhaseName(c)}`;
-    this.clockText.setText(text);
-    // Reposition the moon to the left of the text every refresh
-    // (text width changes as the time string ticks), and repaint its
-    // shape only when the phase index changes.
-    const r = MOON_HUD_SIZE / 2;
-    const cx = (960 - 16) - this.clockText.width - r - 6;
-    const cy = 22 + this.clockText.height / 2;
-    paintMoonPhase(this.moonIcon, cx, cy, r, lunarPhaseIndex(c));
+    if (this.sceneLog) refreshSceneLog(this.sceneLog, gameState.clock);
   }
 
   // ── Input ────────────────────────────────────────────────────────

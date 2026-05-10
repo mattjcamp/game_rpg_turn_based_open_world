@@ -78,7 +78,17 @@
       }
     ],
     "giver_col": 12,
-    "giver_row": 9
+    "giver_row": 9,
+    "is_final_quest": false,
+    "victory_text": "",
+    "reward_world_unlocks": [
+      {
+        "kind": "remove_obstacle",
+        "col": 11,
+        "row": 17,
+        "tile": 0
+      }
+    ]
   },
   {
     "name": "Goblins in the Hill",

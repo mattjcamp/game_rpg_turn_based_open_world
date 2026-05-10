@@ -7,11 +7,13 @@ python3 main.py
 - Link to other page to show Python and editor version since that is really a challenging process for people to use. In the figure, I will build a cleaner version of this along with a module sharing feature.
 
 ## Bugs
-- On quests where the result is that a tile is added or removed, this is not happening and must be ported
+
 
 ## Polish
 
 - Implement "Light" party level spell
+- Need to work on the forest dungeon portal system, it's too hard to see the portals and they should say "go deeper into the woods" not "descend the stairs"
+
 - Double check that class abilities have been ported
 "Thief Shadow Step doesn't exist in Python either. No Shadow Step, no Backstab, no Sneak ability anywhere in the source data or code. Thieves have lockpicking ungated from level 1 in Python, and that's the extent of their class abilities. So if you want Shadow Step, that's a content-design request, not a porting one — separate scope from the dialog."
 

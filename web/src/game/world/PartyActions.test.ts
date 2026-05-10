@@ -6,6 +6,7 @@ import {
   returnItemToStash,
   castHealOnTarget,
   castMassHeal,
+  castMagicLight,
   classifyMenuCast,
   rollDice,
   statMod,
@@ -164,12 +165,26 @@ const massHeal: Spell = spellFromRaw({
   usable_in: ["battle", "town", "overworld", "dungeon"],
 });
 
+const lightSpell: Spell = spellFromRaw({
+  id: "light", name: "Light", description: "",
+  allowable_classes: ["Cleric", "Paladin", "Druid"],
+  casting_type: "priest",
+  min_level: 1, mp_cost: 3, duration: 100,
+  effect_type: "magic_light",
+  effect_value: { steps: 100 },
+  range: 0, targeting: "self",
+  usable_in: ["dungeon"],
+});
+
 describe("classifyMenuCast", () => {
   it("classifies single-target heal as single-ally", () => {
     expect(classifyMenuCast(heal)).toBe("single-ally");
   });
   it("classifies mass_heal as mass", () => {
     expect(classifyMenuCast(massHeal)).toBe("mass");
+  });
+  it("classifies magic_light (Light) as self", () => {
+    expect(classifyMenuCast(lightSpell)).toBe("self");
   });
   it("classifies unknown effect_type as unsupported", () => {
     const k = spellFromRaw({
@@ -248,6 +263,69 @@ describe("castMassHeal", () => {
     const p = makeParty();
     const r = castMassHeal(p, activeMembers(p), massHeal, () => 0);
     expect(r.ok).toBe(false);
+  });
+});
+
+describe("castMagicLight (Light)", () => {
+  it("adds the spell's steps to torchSteps and spends MP", () => {
+    const p = makeParty();
+    const members = activeMembers(p);
+    expect(p.torchSteps).toBe(0);
+    const beforeMp = members[3].mp ?? 0;
+    const r = castMagicLight(p, members, lightSpell);
+    expect(r.ok).toBe(true);
+    expect(p.torchSteps).toBe(100);
+    expect(members[3].mp).toBe(beforeMp - lightSpell.mp_cost);
+    expect(r.message).toContain("Light");
+    expect(r.message).toContain("Selina"); // Cleric is the eligible caster
+  });
+
+  it("stacks on top of an already-burning torch", () => {
+    const p = makeParty();
+    p.torchSteps = 40; // simulate a half-burnt torch
+    castMagicLight(p, activeMembers(p), lightSpell);
+    expect(p.torchSteps).toBe(140);
+  });
+
+  it("falls back to 100 steps when effect_value.steps is missing", () => {
+    const p = makeParty();
+    const noSteps = spellFromRaw({
+      id: "light", name: "Light", description: "",
+      allowable_classes: ["Cleric"], casting_type: "priest",
+      min_level: 1, mp_cost: 3, duration: "instant",
+      effect_type: "magic_light",
+      // intentionally omit effect_value
+      usable_in: ["dungeon"],
+    });
+    castMagicLight(p, activeMembers(p), noSteps);
+    expect(p.torchSteps).toBe(100);
+  });
+
+  it("prefers the highest-level caster (then most MP)", () => {
+    const p = makeParty();
+    const members = activeMembers(p);
+    // Add a second cleric at higher level so the priority rule has work to do.
+    members[3].level = 3;
+    // Pretend Selina has less MP than the (synthetic) lower-level cleric
+    members[3].mp = 5;
+    // Replace Gandolf with another Cleric at level 1 to act as a worse pick.
+    members[2].class = "Cleric";
+    members[2].mp = 12;
+    members[2].maxMp = 12;
+    castMagicLight(p, members, lightSpell);
+    // High level Selina spent the MP, not the level-1 Cleric
+    expect(members[3].mp).toBe(5 - lightSpell.mp_cost);
+    expect(members[2].mp).toBe(12);
+  });
+
+  it("fails when no caster has the class + MP to cast", () => {
+    const p = makeParty();
+    const members = activeMembers(p);
+    members[3].mp = 0;  // drain Selina, the only Cleric
+    const before = p.torchSteps;
+    const r = castMagicLight(p, members, lightSpell);
+    expect(r.ok).toBe(false);
+    expect(p.torchSteps).toBe(before);
   });
 });
 

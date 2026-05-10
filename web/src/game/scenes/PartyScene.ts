@@ -67,6 +67,7 @@ import {
   returnItemToStash,
   castHealOnTarget,
   castMassHeal,
+  castMagicLight,
   classifyMenuCast,
   equipItemFromInventory,
   equipItemIntoSlot,
@@ -869,7 +870,27 @@ export class PartyScene extends Phaser.Scene {
       this.render();
       return;
     }
-    // Unsupported in the menu (knock, magic_light…) — give a polite
+    if (kind === "self") {
+      // Self-cast utility spells — currently Light, which feeds the
+      // party's torch-step counter so the lighting overlay treats it
+      // like a magic torch. No target prompt, just MP + state mutation
+      // and a feedback line. Other self-cast spells will route through
+      // the same dispatch as they're added.
+      if (sr.spell.effect_type === "magic_light") {
+        const result = castMagicLight(this.party, members, sr.spell);
+        this.feedback = result.message;
+        this.mode = "inventory";
+        this.buildRows();
+        this.render();
+        return;
+      }
+      // Self-cast spells we recognise but haven't wired yet — keep the
+      // unsupported fallback rather than silently consuming MP.
+      this.feedback = `${sr.spell.name} has no effect outside combat (yet).`;
+      this.render();
+      return;
+    }
+    // Unsupported in the menu (knock, reveal_map…) — give a polite
     // line so the player knows the spell is real but not wired up
     // out of combat yet.
     this.feedback = `${sr.spell.name} has no effect outside combat (yet).`;

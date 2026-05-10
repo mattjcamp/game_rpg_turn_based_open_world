@@ -31,24 +31,25 @@ export default function WorldPage() {
   // viewport is shorter than 720px + chrome. The canvas wrapper is
   // `flex-1` + `min-h-0` so it auto-shrinks to fill remaining space, and
   // Phaser's Scale.FIT scales the 960×720 canvas to whatever room it has.
+  //
+  // The page chrome here is intentionally minimal — just a Back link
+  // — because the Phaser scene now owns the only HUD surface (the
+  // bottom-of-canvas log strip painted by `SceneLog`). The "Overworld"
+  // title was misleading once the scene swapped between overworld /
+  // town / dungeon modes; the bottom how-to-play hint duplicated
+  // information players had already learned from the in-canvas log.
   return (
     <main className="mx-auto flex h-screen max-w-5xl flex-col items-center overflow-hidden px-4 py-2">
-      <div className="mb-1 flex w-full shrink-0 items-center justify-between">
+      <div className="mb-1 flex w-full shrink-0 items-center">
         <Link href="/" className="text-sm text-parchment/60 hover:text-parchment">
           &larr; Back
         </Link>
-        <h1 className="font-display text-xl text-parchment">Overworld</h1>
-        <span className="w-16" /> {/* spacer */}
       </div>
       <div className="flex min-h-0 w-full flex-1 items-center justify-center">
         {ready ? <GameCanvas startScene="OverworldScene" /> : (
           <div className="text-parchment/60">Loading the world&hellip;</div>
         )}
       </div>
-      <p className="mt-1 max-w-[960px] shrink-0 text-center text-xs text-parchment/40">
-        Walk around with WASD / arrow keys, or tap a tile next to you. Stepping
-        on a glowing ✦ tile triggers an encounter — defeat the enemies to clear it.
-      </p>
     </main>
   );
 }

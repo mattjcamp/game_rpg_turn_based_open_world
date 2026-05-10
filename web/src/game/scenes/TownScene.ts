@@ -134,18 +134,18 @@ import { installTileEffects } from "../world/TileEffects";
 import {
   advanceClock,
   clockDarknessParams,
-  dateStr,
-  lunarPhaseIndex,
-  lunarPhaseName,
-  timeStr,
 } from "../world/GameTime";
-import { paintMoonPhase, MOON_HUD_SIZE } from "../world/MoonIcon";
+import {
+  installSceneLog,
+  refreshSceneLog,
+  LOG_HEIGHT,
+  type SceneLogHandle,
+} from "../world/SceneLog";
 import { withBase, dataPath } from "../world/Module";
 import { gameState, npcKey } from "../state";
 import { rememberScene, save as saveGame } from "../save";
 
 const TILE = 32;
-const HUD_HEIGHT = 56;
 
 interface TownSceneData {
   townName: string;
@@ -187,11 +187,10 @@ export class TownScene extends Phaser.Scene {
    *  destroy the giver's glow + sprite without scanning. */
   private questGiverOverlays: Map<string, { glow: PulsingGlowHandle; sprite: Phaser.GameObjects.GameObject }> = new Map();
   private busy = false;
-  private status!: Phaser.GameObjects.Text;
-  private hpSummary!: Phaser.GameObjects.Text;
-  private hint!: Phaser.GameObjects.Text;
-  private clockText!: Phaser.GameObjects.Text;
-  private moonIcon!: Phaser.GameObjects.Graphics;
+  /** Bottom-of-viewport log strip — same helper every map scene
+   *  uses, so the player has a single consistent place to read time
+   *  and moon phase regardless of which map they're standing on. */
+  private sceneLog?: SceneLogHandle;
   /** Set of darkness rectangles drawn one per tile, indexed by `${col},${row}`. */
   private darkness = new Map<string, Phaser.GameObjects.Rectangle>();
   /** Per-tile tint rectangles for active party-light effects (Infravision /
@@ -1041,79 +1040,26 @@ export class TownScene extends Phaser.Scene {
   }
 
   private drawHud(): void {
-    this.add
-      .rectangle(0, 0, 960, HUD_HEIGHT, 0x161629, 0.92)
-      .setOrigin(0)
-      .setScrollFactor(0)
-      .setStrokeStyle(1, 0x2a2a3a);
-
-    this.status = this.add
-      .text(16, 12, "", {
-        fontFamily: "Georgia, serif",
-        fontSize: "16px",
-        color: "#f6efd6",
-      })
-      .setScrollFactor(0);
-
-    this.hpSummary = this.add
-      .text(16, 32, "", {
-        fontFamily: "monospace",
-        fontSize: "12px",
-        color: "#bdb38a",
-      })
-      .setScrollFactor(0);
-
-    this.hint = this.add
-      .text(960 - 16, 4, "WASD / arrows / tap to move  ·  Space = wait  ·  tap an NPC to talk", {
-        fontFamily: "monospace",
-        fontSize: "12px",
-        color: "#bdb38a",
-      })
-      .setOrigin(1, 0)
-      .setScrollFactor(0);
-
-    this.clockText = this.add
-      .text(960 - 16, 22, "", {
-        fontFamily: "monospace",
-        fontSize: "12px",
-        color: "#dcdcc8",
-      })
-      .setOrigin(1, 0)
-      .setScrollFactor(0);
-    this.moonIcon = this.add.graphics().setDepth(1).setScrollFactor(0);
+    // Single shared bottom log strip — see OverworldScene.drawHud for
+    // the rationale (one consistent log surface across every map
+    // scene, replacing the per-scene top HUD bar).
+    this.sceneLog = installSceneLog(this);
   }
 
   private refreshHud(): void {
-    const tileName = tileDef(this.tileMap.getTile(this.playerCol, this.playerRow)).name;
-    this.status.setText(`${this.town.name}  ·  (${this.playerCol}, ${this.playerRow})  ·  ${tileName}`);
-    const partyText = gameState.party
-      .map((c) => `${c.name} ${c.hp}/${c.maxHp}`)
-      .join("   ");
-    this.hpSummary.setText(partyText);
-    this.refreshClockHud();
-  }
-
-  /** Mirror of OverworldScene.refreshClockHud — see that copy for notes. */
-  private refreshClockHud(): void {
-    const c = gameState.clock;
-    this.clockText.setText(`${dateStr(c)} ${timeStr(c)} · ${lunarPhaseName(c)}`);
-    const r = MOON_HUD_SIZE / 2;
-    const cx = (960 - 16) - this.clockText.width - r - 6;
-    const cy = 22 + this.clockText.height / 2;
-    paintMoonPhase(this.moonIcon, cx, cy, r, lunarPhaseIndex(c));
+    if (this.sceneLog) refreshSceneLog(this.sceneLog, gameState.clock);
   }
 
   private installCamera(): void {
-    // Bounds extended upward by HUD_HEIGHT so the camera always has
-    // headroom to scroll the world strictly below the HUD bar. Without
-    // this, when the player stands at row 0 the camera clamps scrollY
-    // to 0 and the top tiles render under the HUD (and the player
-    // marker disappears behind party HP text).
+    // Bounds extended downward by LOG_HEIGHT so the camera can scroll
+    // the bottom row of tiles above the log strip pinned to the
+    // viewport's bottom edge. See `OverworldScene.installCamera` for
+    // the canonical version of this rationale.
     this.cameras.main.setBounds(
       0,
-      -HUD_HEIGHT,
+      0,
       this.town.width * TILE,
-      this.town.height * TILE + HUD_HEIGHT
+      this.town.height * TILE + LOG_HEIGHT
     );
     this.cameras.main.startFollow(this.player, true, 0.2, 0.2);
   }
