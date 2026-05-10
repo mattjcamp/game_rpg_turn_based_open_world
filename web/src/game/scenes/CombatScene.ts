@@ -301,6 +301,18 @@ export class CombatScene extends Phaser.Scene {
   private movePointsText!: Phaser.GameObjects.Text;
   private actionTexts: Phaser.GameObjects.Text[] = [];
   private actionRowHandles: Phaser.GameObjects.Rectangle[] = [];
+  /**
+   * Static decorations created during create() — panel backgrounds,
+   * the "BATTLE" header label, "PARTY" subheader, party-card frames,
+   * HP/MP bar backgrounds, dividers, the log frame. None of these
+   * have natural per-cell tracking like `bodies` or `monsterHpBars`,
+   * so they used to leak between scene boots when Phaser's shutdown
+   * raced with a fast scene-start (the same race that produced
+   * phantom HP bars and the "all action options look dim" report).
+   * `track()` pushes everything here so `init()` can destroy them
+   * defensively before the next create() rebuilds the layout.
+   */
+  private staticDecor: Phaser.GameObjects.GameObject[] = [];
   private actionCursor = 0;
 
   // Sub-mode + picker state
@@ -394,6 +406,14 @@ export class CombatScene extends Phaser.Scene {
     this.actionTexts.length = 0;
     for (const h of this.actionRowHandles) h?.destroy();
     this.actionRowHandles.length = 0;
+    // Static panels / labels / dividers — every nearly-opaque
+    // rectangle the layout creates AND the title/header text. Untracked
+    // panels were the cause of the "every action row looks dim" bug:
+    // a phantom 0.96-alpha panel from the previous combat layered on
+    // top of the new action menu, washing every row to the disabled
+    // tone regardless of actual playerTurn state.
+    for (const obj of this.staticDecor) obj?.destroy();
+    this.staticDecor.length = 0;
     this.mode = "default";
     this.pendingAction = null;
     this.throwOptions = [];
@@ -657,16 +677,30 @@ export class CombatScene extends Phaser.Scene {
 
   // ── Static panels ───────────────────────────────────────────────
 
+  /** Push every GameObject onto `staticDecor` and return it so the
+   *  call site can keep chaining. The init() pass destroys them all
+   *  before the next create() rebuilds the layout — without this,
+   *  fast scene swaps that interrupted Phaser's shutdown left the
+   *  old panel rectangles layered on top of the new ones. */
+  private track<T extends Phaser.GameObjects.GameObject>(obj: T): T {
+    this.staticDecor.push(obj);
+    return obj;
+  }
+
   private panel(x: number, y: number, w: number, h: number, alpha = 0.96): void {
-    this.add
-      .rectangle(x, y, w, h, C.panel, alpha)
-      .setOrigin(0)
-      .setStrokeStyle(2, C.panelEdge);
+    this.track(
+      this.add
+        .rectangle(x, y, w, h, C.panel, alpha)
+        .setOrigin(0)
+        .setStrokeStyle(2, C.panelEdge),
+    );
   }
 
   private drawHeader(): void {
     this.panel(0, 0, 960, HEADER_H);
-    this.add.text(960 / 2, 6, "BATTLE", FONT_TITLE()).setOrigin(0.5, 0);
+    this.track(
+      this.add.text(960 / 2, 6, "BATTLE", FONT_TITLE()).setOrigin(0.5, 0),
+    );
   }
 
   private drawArena(): void {
@@ -717,7 +751,7 @@ export class CombatScene extends Phaser.Scene {
     let cy = HUD_Y + 12;
 
     // PARTY header + mini cards
-    this.add.text(HUD_X + 14, cy, "PARTY", FONT_HEAD());
+    this.track(this.add.text(HUD_X + 14, cy, "PARTY", FONT_HEAD()));
     cy += 24;
     const cardH = 60;
     const cardW = HUD_W - 24;
@@ -728,15 +762,21 @@ export class CombatScene extends Phaser.Scene {
     }
 
     cy += 8;
-    this.add
-      .rectangle(HUD_X + 12, cy, HUD_W - 24, 1, C.panelEdge)
-      .setOrigin(0);
+    this.track(
+      this.add
+        .rectangle(HUD_X + 12, cy, HUD_W - 24, 1, C.panelEdge)
+        .setOrigin(0),
+    );
     cy += 10;
 
     // -- Name'S TURN --
-    this.turnText = this.add.text(HUD_X + 14, cy, "", FONT_HEAD()).setOrigin(0, 0);
+    this.turnText = this.track(
+      this.add.text(HUD_X + 14, cy, "", FONT_HEAD()).setOrigin(0, 0),
+    );
     cy += 22;
-    this.movePointsText = this.add.text(HUD_X + 14, cy, "", FONT_MONO()).setOrigin(0, 0);
+    this.movePointsText = this.track(
+      this.add.text(HUD_X + 14, cy, "", FONT_MONO()).setOrigin(0, 0),
+    );
     cy += 24;
 
     // Action menu
@@ -763,21 +803,27 @@ export class CombatScene extends Phaser.Scene {
   private drawPartyCard(
     c: Combatant, x: number, y: number, w: number, h: number,
   ): void {
-    this.add
-      .rectangle(x, y, w, h, 0x1c1c2a, 1)
-      .setOrigin(0)
-      .setStrokeStyle(1, C.panelEdge);
+    // Card frame.
+    this.track(
+      this.add
+        .rectangle(x, y, w, h, 0x1c1c2a, 1)
+        .setOrigin(0)
+        .setStrokeStyle(1, C.panelEdge),
+    );
     // Avatar
     const avatar = 44;
     if (c.sprite && this.textures.exists(c.sprite)) {
       const img = this.add.image(x + 8, y + 8, c.sprite).setOrigin(0);
       img.setDisplaySize(avatar, avatar);
+      this.track(img);
     } else {
       const colorHex = Phaser.Display.Color.GetColor(...c.color);
-      this.add.rectangle(x + 8, y + 8, avatar, avatar, colorHex).setOrigin(0);
+      this.track(
+        this.add.rectangle(x + 8, y + 8, avatar, avatar, colorHex).setOrigin(0),
+      );
     }
     const tx = x + avatar + 16;
-    this.add.text(tx, y + 4, c.name, FONT_BODY());
+    this.track(this.add.text(tx, y + 4, c.name, FONT_BODY()));
 
     // HP bar (always present). Inner fill width = barW - 2 to leave a
     // 1px panel-edge frame on either side. Stored as fullBarW so
@@ -785,8 +831,10 @@ export class CombatScene extends Phaser.Scene {
     const barW = w - (tx - x) - 12;
     const fullBarW = barW - 2;
     const hpBarY = y + 22;
-    this.add.rectangle(tx, hpBarY, barW, 8, 0x1c1c2a, 1).setOrigin(0)
-      .setStrokeStyle(1, C.panelEdge);
+    this.track(
+      this.add.rectangle(tx, hpBarY, barW, 8, 0x1c1c2a, 1).setOrigin(0)
+        .setStrokeStyle(1, C.panelEdge),
+    );
     const hpBar = this.add
       .rectangle(tx + 1, hpBarY + 1, fullBarW, 6, C.hpFull, 1)
       .setOrigin(0);
@@ -802,8 +850,10 @@ export class CombatScene extends Phaser.Scene {
     const member = this.memberByCombatantId(c.id);
     if (member && member.maxMp != null) {
       const mpBarY = y + 44;
-      this.add.rectangle(tx, mpBarY, barW, 8, 0x1c1c2a, 1).setOrigin(0)
-        .setStrokeStyle(1, C.panelEdge);
+      this.track(
+        this.add.rectangle(tx, mpBarY, barW, 8, 0x1c1c2a, 1).setOrigin(0)
+          .setStrokeStyle(1, C.panelEdge),
+      );
       mpBar = this.add
         .rectangle(tx + 1, mpBarY + 1, fullBarW, 6, C.mp, 1)
         .setOrigin(0);
@@ -813,18 +863,23 @@ export class CombatScene extends Phaser.Scene {
         .setOrigin(1, 0);
     }
 
+    // hpBar / hpText / mpBar / mpText are tracked via partyCards
+    // (their map already gets defensively destroyed in init()), so
+    // they don't need to go on staticDecor.
     this.partyCards.set(c.id, { hpBar, hpText, mpBar, mpText, fullBarW });
   }
 
   private drawLog(): void {
     this.panel(LOG_X, LOG_Y, LOG_W, LOG_H);
-    this.logText = this.add.text(LOG_X + 14, LOG_Y + 10, "", {
-      fontFamily: "monospace",
-      fontSize: "12px",
-      color: hex(C.body),
-      lineSpacing: 2,
-      wordWrap: { width: LOG_W - 28, useAdvancedWrap: true },
-    });
+    this.logText = this.track(
+      this.add.text(LOG_X + 14, LOG_Y + 10, "", {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color: hex(C.body),
+        lineSpacing: 2,
+        wordWrap: { width: LOG_W - 28, useAdvancedWrap: true },
+      }),
+    );
   }
 
   // ── Combatants ───────────────────────────────────────────────────

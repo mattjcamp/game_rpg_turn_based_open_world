@@ -184,13 +184,30 @@ export class DungeonScene extends Phaser.Scene {
     this.overworldRow = data?.overworldRow ?? 0;
     this.levels = [];
     this.currentLevel = 0;
+    // Defensive cleanup — same Phaser shutdown race that bit the
+    // combat HP bars. `init()` runs every time the scene boots,
+    // including re-entries from combat / overworld → dungeon. If
+    // Phaser's shutdown didn't fire cleanly (which can happen on
+    // fast scene-stops mid-tween), the previous run's GameObjects
+    // are still parented to the scene's display list — and just
+    // replacing the Map orphans the references without destroying
+    // them, leaving "walk-through" phantom sprites the player can
+    // pass through. Walk every map and explicitly destroy its
+    // values before swapping in a fresh Map.
+    for (const row of this.tileSprites) for (const obj of row) obj?.destroy();
     this.tileSprites = [];
+    for (const obj of this.decorSprites.values()) obj?.destroy();
     this.decorSprites = new Map();
+    for (const obj of this.monsterSprites.values()) obj?.destroy();
     this.monsterSprites = new Map();
+    for (const r of this.darknessRects.values()) r?.destroy();
     this.darknessRects = new Map();
+    for (const r of this.tintRects.values()) r?.destroy();
     this.tintRects = new Map();
     this.busy = false;
+    this.message?.destroy();
     this.message = undefined;
+    this.messageTimer?.remove();
     this.messageTimer = undefined;
     for (const h of this.artifactGlows.values()) h.destroy();
     this.artifactGlows = new Map();
