@@ -230,6 +230,86 @@ export function attemptHerbalistDiscovery(
   return out;
 }
 
+// ── Passive overworld herbalism ─────────────────────────────────
+//
+// `attemptHerbalistDiscovery` (above) runs ONCE per zoomed-in tile
+// — the dedicated Examine flow. The walk-while-foraging variant
+// below runs once per overworld step, on each qualifying herbalist
+// independently, and is gated by a higher DC so the find rate
+// stays in the "occasional pleasant surprise" 5-10% band rather
+// than a faucet. Tied to `d20 + INT mod ≥ 20`, the probabilities
+// shake out as:
+//
+//   INT 10 (+0):   5%   (only a natural 20)
+//   INT 12 (+1):  10%
+//   INT 14 (+2):  15%
+//   INT 16 (+3):  20%
+//   INT 18 (+4):  25%
+//
+// Multiple herbalists each roll independently — a party with two
+// Rangers and an Alchemist gets three chances per step, but each
+// success still drops just one reagent.
+//
+// Foraging is also tile-gated: only grass / forest / sand / path
+// support the roll, mirroring `EXAMINE_LOOT` so the player doesn't
+// pluck Moonpetals out of mountain stone or water.
+
+/** DC for the per-step overworld save. Higher than the tile-examine
+ *  DC (13) by design: this fires every move tick, so the bar has
+ *  to be steeper to keep the find rate in the 5-10% window. */
+const OVERWORLD_HERBALISM_DC = 20;
+
+/** Tile ids where reagents can be foraged passively while walking.
+ *  Matches the keys in `EXAMINE_LOOT` — anywhere else (water,
+ *  mountain, dungeons, towns) the roll is skipped. */
+const OVERWORLD_HERBALISM_TILES: ReadonlySet<number> = new Set([
+  TILE_GRASS,
+  TILE_FOREST,
+  TILE_SAND,
+  TILE_PATH,
+]);
+
+/**
+ * True when the tile at `(col, row)` can host a passive herbalism
+ * roll. Public so the scene can early-exit without paying for an
+ * INT save on stone or water tiles. Accepts a tile id directly to
+ * stay decoupled from TileMap.
+ */
+export function isForageableTile(tileId: number): boolean {
+  return OVERWORLD_HERBALISM_TILES.has(tileId);
+}
+
+/**
+ * Per-step herbalism roll for every alive Ranger / Alchemist.
+ * Each qualifying member rolls `d20 + INT modifier vs DC 20`; on
+ * success a random reagent from `FORAGE_REAGENTS` is added to the
+ * party stash and a `HerbalistDiscovery` entry is returned so the
+ * scene can float a "X found Moonpetal!" message above the avatar.
+ *
+ * Returns an empty array when no herbalist is present, when none
+ * of them rolled high enough, or when the caller already gated on
+ * `isForageableTile`. The helper is deliberately pure — the scene
+ * owns the tile-gate decision so save/load/replay paths can reroll
+ * deterministically with a seeded RNG.
+ */
+export function attemptOverworldHerbalism(
+  party: Party,
+  members: PartyMember[],
+  rng: () => number = Math.random,
+): HerbalistDiscovery[] {
+  const out: HerbalistDiscovery[] = [];
+  for (const m of members) {
+    if (m.hp <= 0) continue;
+    if (!HERBALIST_CLASSES.has(m.class.toLowerCase())) continue;
+    const roll = randInt(rng, 1, 20) + statMod(m.intelligence);
+    if (roll < OVERWORLD_HERBALISM_DC) continue;
+    const reagent = FORAGE_REAGENTS[Math.floor(rng() * FORAGE_REAGENTS.length)];
+    party.inventory.push({ item: reagent });
+    out.push({ member: m.name, reagent });
+  }
+  return out;
+}
+
 /**
  * Serialise a layout for `gameState.examineLayouts`. Maps don't
  * survive a JSON.stringify, so we flatten to plain objects keyed by

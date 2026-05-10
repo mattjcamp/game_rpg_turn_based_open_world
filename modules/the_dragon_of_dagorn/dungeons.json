@@ -26,9 +26,9 @@
     "description": "Salt-warped trees grow inland from the western shore, their roots fed on something that should have stayed buried. The wood remembers, and pulls at travellers who come too close.",
     "mode": "procedural",
     "dungeon_style": "forest",
-    "num_levels": 1,
-    "difficulty": "easy",
-    "level_size": "small",
+    "num_levels": 4,
+    "difficulty": "normal",
+    "level_size": "medium",
     "torch_density": "abundant",
     "locked_doors": "off",
     "levels": [

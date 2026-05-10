@@ -36,6 +36,7 @@ import { installTileEffects } from "../world/TileEffects";
 import {
   advanceClock,
   clockDarknessParams,
+  clockFromDate,
 } from "../world/GameTime";
 import {
   installSceneLog,
@@ -60,7 +61,7 @@ import {
 } from "../data/monsters";
 import { TILE_GRASS, TILE_PATH, TILE_WATER, TILE_BOAT } from "../world/Tiles";
 import { classifyBoatMove } from "../world/Boats";
-import { dataPath } from "../world/Module";
+import { dataPath, loadModuleConfig } from "../world/Module";
 import { defaultRng } from "../rng";
 import { tickGaladrielsLight } from "../world/PartyActions";
 import { activeMembers, loadParty } from "../world/Party";
@@ -79,11 +80,16 @@ import {
   openQuestDialog as buildQuestDialog,
   closeQuestDialog as destroyQuestDialog,
   flashQuestMessage,
+  flashSignMessage,
   openQuestLog,
   openVictoryModal,
   showQuestAcceptedCallout,
   type QuestDialogHandles,
 } from "../world/QuestDialog";
+import {
+  attemptOverworldHerbalism,
+  isForageableTile,
+} from "../world/Examine";
 import {
   attachPulsingGlow,
   QUEST_GIVER_COLOR,
@@ -249,12 +255,28 @@ export class OverworldScene extends Phaser.Scene {
     // (overview_map.json) on the first overworld boot of this session.
     // Subsequent boots — re-entry from a town, dungeon return, etc. —
     // keep whatever position the player has walked to; the flag stops
-    // us re-snapping to the map start every time.
-    if (!gameState.partyPosInitialized && this.tileMap.partyStart) {
-      gameState.playerPos = {
-        col: this.tileMap.partyStart.col,
-        row: this.tileMap.partyStart.row,
-      };
+    // us re-snapping to the map start every time. The same flag also
+    // gates the module-time seed below, so saved games (where the
+    // flag is already true at hydration time) skip both seeds and
+    // keep their persisted position + clock.
+    if (!gameState.partyPosInitialized) {
+      if (this.tileMap.partyStart) {
+        gameState.playerPos = {
+          col: this.tileMap.partyStart.col,
+          row: this.tileMap.partyStart.row,
+        };
+      }
+      // Seed the game clock from the module's `settings.start_time`
+      // block. `loadModuleConfig` swallows fetch/parse errors and
+      // returns an empty config in that case, so missing or malformed
+      // module.json leaves the clock at its default epoch (year 1,
+      // Jan 1 SUN 12:00 PM) instead of crashing the boot. The Dragon
+      // of Dagorn module ships year 10 / June 1 / noon, so a fresh
+      // adventure now opens with that calendar reading on the HUD.
+      const config = await loadModuleConfig();
+      if (config.settings.startTime) {
+        gameState.clock = clockFromDate(config.settings.startTime);
+      }
       gameState.partyPosInitialized = true;
     }
 
@@ -878,6 +900,14 @@ export class OverworldScene extends Phaser.Scene {
         if (gameState.partyData) {
           tickGaladrielsLight(gameState.partyData);
         }
+        // Passive herbalism — every Ranger / Alchemist gets an INT
+        // saving throw against DC 20 on each overworld step over a
+        // forageable tile (grass / forest / sand / path). On a
+        // success a reagent lands in the stash and a "Name found
+        // Moonpetal!" label floats up from the party, mirroring the
+        // sign-read float so the cue feels like part of the world
+        // rather than a HUD pop.
+        this.runHerbalismStep(nc, nr);
         this.refreshHud();
         this.refreshDarkness();
         this.tickQuestGiverWander();
@@ -1073,6 +1103,41 @@ export class OverworldScene extends Phaser.Scene {
         this.tileMap.setTile(c, r, TILE_GRASS);
       }
     }
+  }
+
+  /**
+   * Roll the per-step Herbalism passive for any Ranger / Alchemist
+   * in the active party. Skipped on non-forageable tiles (water,
+   * mountain, town/dungeon entrances) so the player doesn't pluck
+   * Moonpetals out of stone. Each successful find drops a reagent
+   * in the stash and floats a "Name found Reagent" label above the
+   * party — same visual treatment a sign read uses, so the cue
+   * lives in the world layer rather than the HUD strip.
+   *
+   * Multiple herbalists firing in the same step are stacked
+   * vertically (16 px apart) so the labels don't collide.
+   */
+  private runHerbalismStep(col: number, row: number): void {
+    if (!gameState.partyData) return;
+    const tileId = this.tileMap.getTile(col, row);
+    if (!isForageableTile(tileId)) return;
+    const members = activeMembers(gameState.partyData);
+    const finds = attemptOverworldHerbalism(
+      gameState.partyData,
+      members,
+      defaultRng,
+    );
+    if (finds.length === 0) return;
+    const playerX = col * TILE + TILE / 2;
+    const playerY = row * TILE + TILE / 2;
+    finds.forEach((find, i) => {
+      flashSignMessage(
+        this,
+        `${find.member} found ${find.reagent}`,
+        playerX,
+        playerY - i * 16,
+      );
+    });
   }
 
   /**

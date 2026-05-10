@@ -176,8 +176,12 @@ const DEFS: Record<number, TileDef> = {
   [TILE_SPAWN_CAMPFIRE]: { color: [200, 120, 30], walkable: true, name: "Campfire" },
   [TILE_SPAWN_GRAVEYARD]: { color: [120, 115, 105], walkable: true, name: "Graveyard" },
   [TILE_ENCOUNTER]: { color: [180, 60, 140], walkable: true,  name: "Encounter" },
-  [TILE_FOREST_ARCHWAY_UP]:   { color: [80, 120, 60], walkable: true, name: "Forest Archway" },
-  [TILE_FOREST_ARCHWAY_DOWN]: { color: [40, 55, 35],  walkable: true, name: "Forest Archway" },
+  // Forest archways — bright, distinct fallback colours so a portal
+  // still reads as a portal against forest foliage even before the
+  // sprite PNG loads. The canonical art is in
+  // `assets/dungeon/forest_archway_*.png`; these are the safety net.
+  [TILE_FOREST_ARCHWAY_UP]:   { color: [220, 180, 90],  walkable: true, name: "Forest Archway" },
+  [TILE_FOREST_ARCHWAY_DOWN]: { color: [100, 120, 210], walkable: true, name: "Forest Archway" },
 };
 
 /** Path to the player avatar sprite. */

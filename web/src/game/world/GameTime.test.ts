@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   makeClock,
   advanceClock,
+  clockFromDate,
   hour,
   minute,
   dayIndex,
@@ -167,5 +168,87 @@ describe("clockDarknessParams", () => {
     const p = clockDarknessParams(clockAtHour(22));
     expect(p?.tint).toBe(0);
     expect(p?.maxAlpha).toBe(1.0);
+  });
+});
+
+describe("clockFromDate", () => {
+  it("seeds the epoch when called with no fields", () => {
+    const c = clockFromDate({});
+    expect(c.totalMinutes).toBe(0);
+    expect(hour(c)).toBe(12);
+    expect(minute(c)).toBe(0);
+    expect(year(c)).toBe(1);
+    expect(monthAbbrev(c)).toBe("JAN");
+    expect(dayOfMonth(c)).toBe(1);
+  });
+
+  it("round-trips a module's start_time block", () => {
+    // The Dragon of Dagorn ships year 10, month 6 (June), day 1, noon.
+    const c = clockFromDate({ year: 10, month: 6, day: 1, hour: 12, minute: 0 });
+    expect(year(c)).toBe(10);
+    expect(monthAbbrev(c)).toBe("JUN");
+    expect(dayOfMonth(c)).toBe(1);
+    expect(hour(c)).toBe(12);
+    expect(minute(c)).toBe(0);
+  });
+
+  it("honours mid-day hour + minute", () => {
+    // Year 2 / Jan 1 — comfortably past the year-1 epoch so 9:30 AM
+    // is representable. Year 1's first day starts at the noon epoch
+    // and clamps anything before it; downstream tests / authors are
+    // expected to specify start dates after that boundary.
+    const c = clockFromDate({ year: 2, month: 1, day: 1, hour: 9, minute: 30 });
+    expect(hour(c)).toBe(9);
+    expect(minute(c)).toBe(30);
+    expect(timeStr(c)).toBe("9:30AM");
+  });
+
+  it("handles midnight and end-of-day rollover", () => {
+    // Year 1 day 1 only spans noon→midnight (game epoch); pick day 2
+    // so midnight on that day is fully representable in the clock.
+    const cMidnight = clockFromDate({ year: 1, month: 1, day: 2, hour: 0, minute: 0 });
+    expect(hour(cMidnight)).toBe(0);
+    expect(timeStr(cMidnight)).toBe("12:00AM");
+    const cLate = clockFromDate({ year: 1, month: 1, day: 1, hour: 23, minute: 59 });
+    expect(hour(cLate)).toBe(23);
+    expect(minute(cLate)).toBe(59);
+  });
+
+  it("rolls month boundaries correctly", () => {
+    // Month 12, day 28 = last day of year. Make sure the calendar
+    // getters resolve back to that.
+    const c = clockFromDate({ year: 2, month: 12, day: 28, hour: 12, minute: 0 });
+    expect(year(c)).toBe(2);
+    expect(monthAbbrev(c)).toBe("DEC");
+    expect(dayOfMonth(c)).toBe(28);
+  });
+
+  it("clamps out-of-range fields rather than crashing", () => {
+    const c = clockFromDate({ year: 1, month: 99, day: 99, hour: 99, minute: 99 });
+    // month clamps to 12, day to 28, hour to 23, minute to 59.
+    expect(monthAbbrev(c)).toBe("DEC");
+    expect(dayOfMonth(c)).toBe(28);
+    expect(hour(c)).toBe(23);
+    expect(minute(c)).toBe(59);
+  });
+
+  it("clamps below-minimum fields to the legal range", () => {
+    // Field-level clamping pulls each value into its legal range.
+    // The combined date (year 1, day 1, midnight) sits before the
+    // game's noon epoch and is therefore unrepresentable — the clock
+    // pins to the epoch (year 1, Jan 1 SUN, 12:00 PM) rather than
+    // crashing. That's the intentional fallback for any time the
+    // author specified before the epoch.
+    const c = clockFromDate({ year: 0, month: 0, day: 0, hour: -1, minute: -1 });
+    expect(year(c)).toBe(1);
+    expect(monthAbbrev(c)).toBe("JAN");
+    expect(dayOfMonth(c)).toBe(1);
+    expect(c.totalMinutes).toBe(0);
+    expect(hour(c)).toBe(12); // clamped to epoch noon (not midnight)
+  });
+
+  it("year 1 / Jan 1 / noon matches the epoch exactly", () => {
+    const c = clockFromDate({ year: 1, month: 1, day: 1, hour: 12, minute: 0 });
+    expect(c.totalMinutes).toBe(0);
   });
 });

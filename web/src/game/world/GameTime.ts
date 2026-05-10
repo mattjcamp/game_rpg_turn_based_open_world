@@ -66,6 +66,68 @@ export function advanceClock(c: GameClock, minutes = MINUTES_PER_STEP): void {
   c.totalMinutes += Math.max(0, minutes);
 }
 
+/** Calendar-style start date a module can specify. All fields are
+ *  optional and missing ones default to the epoch start (year 1,
+ *  Jan 1, 12:00 PM). `year`, `month`, and `day` are 1-indexed —
+ *  matches how module authors think about dates and the shape used
+ *  in `module.json:settings.start_time`. */
+export interface CalendarDate {
+  year?: number;
+  /** 1..12 (1 = January). */
+  month?: number;
+  /** 1..28 (the game's calendar uses 28-day months). */
+  day?: number;
+  /** 0..23. */
+  hour?: number;
+  /** 0..59. */
+  minute?: number;
+}
+
+/**
+ * Convert a calendar date into a `GameClock`. Used to seed the game
+ * clock from a module's `settings.start_time` block. Out-of-range
+ * fields are clamped rather than rejected so a hand-edited
+ * module.json can't crash the boot — month 13 becomes month 12,
+ * day 0 becomes day 1, etc.
+ *
+ * **Epoch boundary.** The clock's epoch is year 1 / Jan 1 / 12:00 PM
+ * (a.k.a. `totalMinutes = 0`). Any combination that would resolve
+ * before that point (e.g. year 1 / day 1 / 9:00 AM) is mathematically
+ * unrepresentable and pins to the epoch instead. Real modules
+ * specify start dates well past year 1 (Dragon of Dagorn opens
+ * year 10 / June 1), so this only matters for authoring on the
+ * very first day of the world.
+ *
+ * The math mirrors the inverse of `year`/`monthIndex`/`dayOfMonth`/
+ * `hour`/`minute`: each component is shifted to its 0-indexed form,
+ * multiplied by the appropriate unit, then summed. The epoch offset
+ * (`START_HOUR * 60`) baked into `abs()` is subtracted out so the
+ * resulting `totalMinutes` reads back through the existing getters
+ * as the requested calendar fields.
+ */
+export function clockFromDate(date: CalendarDate): GameClock {
+  const year = Math.max(1, Math.floor(date.year ?? 1));
+  const month = clampInt(date.month ?? 1, 1, MONTHS_PER_YEAR);
+  const day = clampInt(date.day ?? 1, 1, DAYS_PER_MONTH);
+  const hour = clampInt(date.hour ?? START_HOUR, 0, 23);
+  const minute = clampInt(date.minute ?? 0, 0, 59);
+  const days = (year - 1) * DAYS_PER_YEAR + (month - 1) * DAYS_PER_MONTH + (day - 1);
+  // `abs(c) = totalMinutes + START_HOUR * 60` (see `abs()` below).
+  // We want hour:minute to read back as `hour:minute` via
+  // `hour(c) = floor((abs % MINUTES_PER_DAY) / 60)`, so we set
+  // `abs = days * MINUTES_PER_DAY + hour*60 + minute` and back out
+  // the START_HOUR offset to get `totalMinutes`.
+  const abs = days * MINUTES_PER_DAY + hour * 60 + minute;
+  const totalMinutes = Math.max(0, abs - START_HOUR * 60);
+  return makeClock(totalMinutes);
+}
+
+function clampInt(n: number, lo: number, hi: number): number {
+  const i = Math.floor(n);
+  if (!Number.isFinite(i)) return lo;
+  return Math.max(lo, Math.min(hi, i));
+}
+
 function abs(c: GameClock): number {
   return c.totalMinutes + START_HOUR * 60;
 }

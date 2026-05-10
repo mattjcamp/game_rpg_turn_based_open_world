@@ -3,6 +3,8 @@ import {
   hasHerbalist,
   generateExamineLayout,
   attemptHerbalistDiscovery,
+  attemptOverworldHerbalism,
+  isForageableTile,
   freezeLayout,
   thawLayout,
   themeTileFor,
@@ -151,6 +153,96 @@ describe("attemptHerbalistDiscovery", () => {
     p.roster[3].hp = 0;
     const out = attemptHerbalistDiscovery(p, activeMembers(p), () => 0.99);
     expect(out).toEqual([]);
+  });
+});
+
+describe("isForageableTile", () => {
+  it("accepts grass / forest / sand / path", () => {
+    expect(isForageableTile(TILE_GRASS)).toBe(true);
+    expect(isForageableTile(TILE_FOREST)).toBe(true);
+    expect(isForageableTile(TILE_SAND)).toBe(true);
+    expect(isForageableTile(TILE_PATH)).toBe(true);
+  });
+
+  it("rejects water and other non-walkable wilds", () => {
+    expect(isForageableTile(TILE_WATER)).toBe(false);
+    // Any tile id outside the foraging set is rejected.
+    expect(isForageableTile(9999)).toBe(false);
+  });
+});
+
+describe("attemptOverworldHerbalism (passive per-step roll)", () => {
+  it("returns no finds without a Ranger or Alchemist", () => {
+    const p = partyFromRaw({
+      gold: 0,
+      roster: [
+        { name: "Solo", class: "Fighter", race: "Human", level: 1, hp: 12, intelligence: 18 },
+      ],
+      active_party: [0],
+    });
+    const out = attemptOverworldHerbalism(p, activeMembers(p), () => 0.99);
+    expect(out).toEqual([]);
+    expect(p.inventory).toEqual([]);
+  });
+
+  it("requires d20 + INT mod ≥ 20 — Ranger at INT 14 needs a nat 18+", () => {
+    // INT 14 → +2 mod. DC 20 means raw d20 must be ≥ 18 (rolls 18, 19, 20
+    // succeed). randInt uses `floor(rng() * 20) + 1`, so rng = 0.85 →
+    // d20 = 18, the lowest passing roll.
+    const p = makeParty();
+    p.roster[3].hp = 0; // remove Alchemist so only the Ranger rolls
+    const rng = seqRng([0.85, 0.0]); // nat 18 + Moonpetal pick
+    const out = attemptOverworldHerbalism(p, activeMembers(p), rng);
+    expect(out).toEqual([{ member: "Brom", reagent: "Moonpetal" }]);
+    expect(p.inventory.map((i) => i.item)).toEqual(["Moonpetal"]);
+  });
+
+  it("skips a roll that falls just short — nat 17 + INT mod 2 = 19 < DC 20", () => {
+    const p = makeParty();
+    p.roster[3].hp = 0;
+    const rng = seqRng([0.80]); // floor(0.80 * 20) + 1 = 17 → 17 + 2 = 19
+    const out = attemptOverworldHerbalism(p, activeMembers(p), rng);
+    expect(out).toEqual([]);
+    expect(p.inventory).toEqual([]);
+  });
+
+  it("rolls independently for each herbalist on the same step", () => {
+    const p = makeParty();
+    // Ranger (INT 14, +2 mod): nat 18 succeeds; pick Moonpetal (rng 0.0).
+    // Alchemist (INT 16, +3 mod): nat 17 succeeds (17 + 3 = 20); pick
+    //   Glowcap Mushroom (rng 0.20 → idx 1).
+    const rng = seqRng([0.85, 0.0, 0.80, 0.20]);
+    const out = attemptOverworldHerbalism(p, activeMembers(p), rng);
+    expect(out).toEqual([
+      { member: "Brom",   reagent: "Moonpetal" },
+      { member: "Selina", reagent: "Glowcap Mushroom" },
+    ]);
+    expect(p.inventory.map((i) => i.item)).toEqual(["Moonpetal", "Glowcap Mushroom"]);
+  });
+
+  it("ignores downed herbalists", () => {
+    const p = makeParty();
+    p.roster[2].hp = 0; // Ranger down
+    p.roster[3].hp = 0; // Alchemist down
+    // Even a nat 20 wouldn't matter — they shouldn't roll at all.
+    const out = attemptOverworldHerbalism(p, activeMembers(p), () => 0.99);
+    expect(out).toEqual([]);
+  });
+
+  it("uses an INT 10 baseline that only crits — exactly 5% find rate", () => {
+    const p = partyFromRaw({
+      gold: 0,
+      roster: [
+        { name: "Idris", class: "Ranger", race: "Human", level: 1, hp: 14, intelligence: 10 },
+      ],
+      active_party: [0],
+    });
+    // INT 10 → +0 mod, DC 20 → only a natural 20 hits. Anything below
+    // 0.95 in rng → d20 ≤ 19 → miss.
+    const miss = attemptOverworldHerbalism(p, activeMembers(p), seqRng([0.94]));
+    expect(miss).toEqual([]);
+    const hit = attemptOverworldHerbalism(p, activeMembers(p), seqRng([0.95, 0.0]));
+    expect(hit).toEqual([{ member: "Idris", reagent: "Moonpetal" }]);
   });
 });
 

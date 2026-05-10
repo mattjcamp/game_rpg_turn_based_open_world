@@ -87,3 +87,80 @@ export function assetUrl(path: string): string {
   if (path.startsWith("/")) return withBase(path);
   return withBase(`/assets/${path}`);
 }
+
+// ── Module config loader ───────────────────────────────────────────
+//
+// The web port has historically only read individual JSONs the
+// active module ships (overview, towns, dungeons, quests…). The
+// `module.json` file itself was untouched at runtime — the
+// /new-game page reads it for the intro text, but the game loop
+// never had to. As we layer in module-wide settings (starting
+// date/time, climate flags, etc.) we route them through a single
+// cached `ModuleConfig` so callers don't each open module.json.
+
+/** Calendar fields a module can specify for the campaign's start. */
+export interface ModuleStartTime {
+  year?: number;
+  month?: number;
+  day?: number;
+  hour?: number;
+  minute?: number;
+}
+
+/** Subset of `module.json` the runtime currently cares about. */
+export interface ModuleConfig {
+  metadata: {
+    id?: string;
+    name?: string;
+    description?: string;
+    version?: string;
+  };
+  settings: {
+    /** Wall-clock date/time the adventure begins. Optional — when
+     *  absent the game clock stays at its epoch default (year 1,
+     *  Jan 1 SUN 12:00 PM). */
+    startTime?: ModuleStartTime;
+  };
+}
+
+interface RawModuleJson {
+  metadata?: ModuleConfig["metadata"];
+  settings?: {
+    start_time?: ModuleStartTime;
+  };
+}
+
+let _moduleConfigCache: ModuleConfig | null = null;
+
+/**
+ * Fetch and parse the active module's `module.json`. Cached for the
+ * lifetime of the page so subsequent calls (Overworld, Town, etc.)
+ * don't re-hit the network. On failure (404 / malformed JSON) returns
+ * a config with empty defaults so callers can degrade gracefully.
+ */
+export async function loadModuleConfig(): Promise<ModuleConfig> {
+  if (_moduleConfigCache) return _moduleConfigCache;
+  try {
+    const res = await fetch(modulePath("module.json"));
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const raw = (await res.json()) as RawModuleJson;
+    _moduleConfigCache = {
+      metadata: raw.metadata ?? {},
+      settings: {
+        startTime: raw.settings?.start_time,
+      },
+    };
+  } catch {
+    // Network/parse failure — return an empty config so the caller
+    // doesn't have to special-case it. Game continues with defaults.
+    _moduleConfigCache = { metadata: {}, settings: {} };
+  }
+  return _moduleConfigCache;
+}
+
+/** Test-only: drop the cached module config so a re-fetch hits the
+ *  network/mocked fetch again. Mirrors the cache-reset helpers other
+ *  loaders expose. */
+export function _clearModuleConfigCache(): void {
+  _moduleConfigCache = null;
+}

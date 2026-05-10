@@ -1036,18 +1036,44 @@ export class DungeonScene extends Phaser.Scene {
     }
     if (_ASCEND_TILES.has(id)) {
       const k = `${dp.col},${dp.row}`;
+      const forest = this.level.style === "forest";
       if (this.level.overworldExits.has(k)) {
-        this.showMessage("Exit to the surface! Press ESC to leave.", 2000);
+        this.showMessage(
+          forest
+            ? "A path leads back out of the woods. Press ESC to leave."
+            : "Exit to the surface! Press ESC to leave.",
+          2000,
+        );
       } else if (this.currentLevel > 0) {
-        this.showMessage("Stairs up! Press ESC to ascend.", 1800);
+        // "Up" inside a forest dungeon = back toward the edge of the
+        // woods. The golden archway sprite is the visual cue; this
+        // banner reinforces the metaphor.
+        this.showMessage(
+          forest
+            ? "A path winds back toward the edge of the woods. Press ESC to head back."
+            : "Stairs up! Press ESC to ascend.",
+          1800,
+        );
       } else {
-        this.showMessage("Stairs up! Press ESC to leave.", 1800);
+        this.showMessage(
+          forest
+            ? "A path leads back out of the woods. Press ESC to leave."
+            : "Stairs up! Press ESC to leave.",
+          1800,
+        );
       }
       return;
     }
     if (_DESCEND_TILES.has(id)) {
       if (this.currentLevel < this.levels.length - 1) {
-        this.showMessage("Stairs leading down... press ESC to descend.", 1800);
+        // "Down" inside a forest dungeon = farther into the woods.
+        // The blue archway sprite signals the magical step inward.
+        this.showMessage(
+          this.level.style === "forest"
+            ? "A path leads deeper into the woods. Press ESC to go deeper."
+            : "Stairs leading down... press ESC to descend.",
+          1800,
+        );
       }
       return;
     }
@@ -1438,9 +1464,15 @@ export class DungeonScene extends Phaser.Scene {
     }
     if (_DESCEND_TILES.has(id)) {
       if (this.currentLevel < this.levels.length - 1) { this.descend(); return; }
-      // Bottom floor descent stairs are inert — same as the Python
-      // game's "stairs leading down…" feedback.
-      this.showMessage("Stairs leading down...", 1500);
+      // Bottom floor descent stairs are inert — keep the dead-end
+      // feedback flavour-matched to the dungeon style so the player
+      // doesn't see "stairs" inside a forest.
+      this.showMessage(
+        this.level.style === "forest"
+          ? "The path twists in on itself — nowhere deeper to go."
+          : "Stairs leading down...",
+        1500,
+      );
       return;
     }
     this.showMessage("Find the exit to escape!", 1500);
@@ -1477,7 +1509,14 @@ export class DungeonScene extends Phaser.Scene {
     // previous visit to this same floor.
     this.attemptTrapDetection();
     this.refreshDetectedTrapMarks();
-    this.showMessage(`You ascend... (Floor ${this.currentLevel + 1}/${this.levels.length})`, 1800);
+    const total = this.levels.length;
+    const depth = this.currentLevel + 1;
+    this.showMessage(
+      this.level.style === "forest"
+        ? `You head back toward the edge of the woods... (${depth}/${total})`
+        : `You ascend... (Floor ${depth}/${total})`,
+      1800,
+    );
   }
 
   private descend(): void {
@@ -1505,7 +1544,14 @@ export class DungeonScene extends Phaser.Scene {
     // previous visit to this same floor.
     this.attemptTrapDetection();
     this.refreshDetectedTrapMarks();
-    this.showMessage(`You descend... (Floor ${this.currentLevel + 1}/${this.levels.length})`, 1800);
+    const total = this.levels.length;
+    const depth = this.currentLevel + 1;
+    this.showMessage(
+      this.level.style === "forest"
+        ? `You push deeper into the woods... (${depth}/${total})`
+        : `You descend... (Floor ${depth}/${total})`,
+      1800,
+    );
   }
 
   private findDescendStair(): { col: number; row: number } | null {
