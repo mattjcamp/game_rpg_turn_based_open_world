@@ -50,6 +50,7 @@ import {
   findQuest,
   activeKillStepsForLocation,
   activeCollectStepsForLocation,
+  rosterFor,
   creditKills,
   creditCollect,
   summariseUnlocks,
@@ -120,6 +121,7 @@ import {
   spriteManifest,
   tileSpriteKey,
   populateRuntimeDefs,
+  findArtifactTileId,
   TILE_PATH,
 } from "../world/Tiles";
 import {
@@ -1080,7 +1082,49 @@ export class TownScene extends Phaser.Scene {
       entryCol: this.entryCol,
       entryRow: this.entryRow,
     });
-    gameState.interiorMonsters.set(this.townName, placed);
+    // Add the town/building's authored encounters too — Sea Shrine's
+    // Citadel 4 ships a Troll Den at (11, 11), Citadel 2 a Dragon
+    // Cultists patrol, etc. Without this the player only saw the
+    // quest guardian and the rest of the building was empty even
+    // though the JSON listed combat encounters at fixed cells.
+    const withAuthored = this.appendAuthoredEncounters(placed);
+    gameState.interiorMonsters.set(this.townName, withAuthored);
+  }
+
+  /**
+   * Append every entry from `town.encounters` (combat type only) to
+   * the placed monster list, skipping any already on the map (we
+   * key by stable id so re-entries don't double-spawn). Defeating an
+   * authored encounter removes its entry by id via the same
+   * CombatScene-side filter every other interior monster goes through.
+   */
+  private appendAuthoredEncounters(
+    placed: import("../state").InteriorMonster[],
+  ): import("../state").InteriorMonster[] {
+    if (!this.encounterTable) return placed;
+    const list = [...placed];
+    const knownIds = new Set(list.map((m) => m.id));
+    for (const enc of this.town.encounters) {
+      if (enc.encounterType !== "combat") continue;
+      const id = `auth-${this.town.name}-${enc.col}-${enc.row}-${enc.name}`;
+      if (knownIds.has(id)) continue;
+      const tmpl = rosterFor(this.encounterTable, enc.name);
+      if (!tmpl || tmpl.monsters.length === 0) continue;
+      list.push({
+        id,
+        col: enc.col,
+        row: enc.row,
+        name: tmpl.monsterPartyTile,
+        encounterNames: [...tmpl.monsters],
+        encounterName: tmpl.name,
+        // Sentinel quest metadata: the cleanup-on-quest-complete pass
+        // skips entries whose `questName` isn't in moduleQuestStates,
+        // so authored encounters survive correctly until killed.
+        questName: "__authored",
+        stepIdx: -1,
+      });
+    }
+    return list;
   }
 
   /**
@@ -1167,11 +1211,12 @@ export class TownScene extends Phaser.Scene {
 
   /**
    * Draw the quest collect artifact for every item placed on this
-   * map, with a cyan halo to match the dungeon's artifact glow. We
-   * use the same `assets/dungeon/artifact.png` sprite the dungeon
-   * uses; if Phaser hasn't finished loading it yet (cold-boot race),
-   * fall back to a yellow diamond so the player still sees something
-   * to walk into.
+   * map, with a cyan halo to match the dungeon's artifact glow.
+   * Resolves the per-item tile id (Sun Sword → tile 44, Seal of
+   * Binding → tile 65, Veyron scroll → tile 73 …) so the artifact
+   * shows up as the right object instead of a generic chest.
+   * Falls back to the dungeon's generic artifact sprite, then to a
+   * yellow diamond when neither texture is in the Phaser cache.
    */
   private drawInteriorQuestItems(): void {
     if (!this.isInterior) return;
@@ -1179,8 +1224,15 @@ export class TownScene extends Phaser.Scene {
     for (const it of list) {
       const x = this.tileX(it.col);
       const y = this.tileY(it.row);
+      // Per-item lookup: scan the runtime tile defs for an artifact
+      // tile whose name matches this collect item, then render its
+      // tile sprite. Same lookup the dungeon scene uses.
+      const tid = findArtifactTileId(it.itemName);
+      const perItemKey = tid !== null ? tileSpriteKey(tid) : null;
       let obj: Phaser.GameObjects.GameObject;
-      if (this.textures.exists(QUEST_ITEM_SPRITE_KEY)) {
+      if (perItemKey && this.textures.exists(perItemKey)) {
+        obj = this.add.image(x, y, perItemKey).setOrigin(0.5).setDepth(8);
+      } else if (this.textures.exists(QUEST_ITEM_SPRITE_KEY)) {
         obj = this.add.image(x, y, QUEST_ITEM_SPRITE_KEY).setDepth(8);
       } else {
         obj = this.add

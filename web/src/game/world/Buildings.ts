@@ -81,6 +81,9 @@ export function buildingFromRaw(raw: RawBuilding): Building {
       entry_row: s.entry_row,
       tile_properties: s.tile_properties,
       npcs: s.npcs as Parameters<typeof townFromRaw>[0]["npcs"],
+      // Authored encounters (Sea Shrine's Troll Den, Dark Patrol, …)
+      // — same shape as raw town encounters so we cast through.
+      encounters: s.encounters as Parameters<typeof townFromRaw>[0]["encounters"],
     });
     return Object.assign(town, { buildingName: name });
   });

@@ -52,6 +52,24 @@ export interface NpcDef {
   _questName?: string;
 }
 
+/**
+ * Authored fixed-position encounter pinned to a town/building space.
+ * The Python module editor writes these for every "Auto" combat the
+ * author drops into a building (Sea Shrine's Troll Den, Dark Patrol,
+ * etc.). The web port spawns one InteriorMonster per entry on scene
+ * boot so the player can engage them like any other floor monster.
+ */
+export interface AuthoredEncounter {
+  /** Encounter name — must match an `encounters.json` entry whose
+   *  roster supplies the monster names handed to CombatScene. */
+  name: string;
+  /** "combat" or "scripted" — only "combat" is honoured in v1. */
+  encounterType: string;
+  col: number;
+  row: number;
+  description: string;
+}
+
 export interface Town {
   name: string;
   width: number;
@@ -63,6 +81,11 @@ export interface Town {
   npcs: NpcDef[];
   /** Per-tile properties dict, same shape as overworld TileMap. */
   tileProperties: Record<string, unknown>;
+  /** Authored fixed-position encounters from the module's town /
+   *  building data. Building spaces use these heavily — Sea Shrine's
+   *  Citadel 4 has a Troll Den at (11, 11) the spawn pass turns into
+   *  an engageable monster on entry. Empty for plain towns. */
+  encounters: AuthoredEncounter[];
   /**
    * Building interiors that live inside this town. Each interior is
    * structurally identical to a Town (same tile dict, npcs, tile_properties)
@@ -84,6 +107,14 @@ interface RawNpc {
   shop_type?: string;
 }
 
+interface RawEncounter {
+  name?: string;
+  encounter_type?: string;
+  col?: number;
+  row?: number;
+  description?: string;
+}
+
 interface RawTown {
   name?: string;
   width?: number;
@@ -93,6 +124,7 @@ interface RawTown {
   entry_row?: number;
   npcs?: RawNpc[];
   tile_properties?: Record<string, unknown>;
+  encounters?: RawEncounter[];
   interiors?: RawTown[];
 }
 
@@ -278,6 +310,18 @@ export function townFromRaw(raw: RawTown): Town {
   // interiors-of-interiors today (none in the data); a too-deep nest
   // would just be parsed but unreachable via the path resolver.
   const interiors: Town[] = (raw.interiors ?? []).map(townFromRaw);
+  const encounters: AuthoredEncounter[] = (raw.encounters ?? [])
+    .filter((e): e is RawEncounter =>
+      !!e && typeof e === "object" && typeof e.name === "string"
+        && typeof e.col === "number" && typeof e.row === "number",
+    )
+    .map((e) => ({
+      name: e.name ?? "",
+      encounterType: e.encounter_type ?? "combat",
+      col: e.col ?? 0,
+      row: e.row ?? 0,
+      description: e.description ?? "",
+    }));
   return {
     name: raw.name ?? "Unknown",
     width: w,
@@ -286,6 +330,7 @@ export function townFromRaw(raw: RawTown): Town {
     entry: { col: raw.entry_col ?? 0, row: raw.entry_row ?? 0 },
     npcs,
     tileProperties: (raw.tile_properties ?? {}) as Record<string, unknown>,
+    encounters,
     interiors,
   };
 }

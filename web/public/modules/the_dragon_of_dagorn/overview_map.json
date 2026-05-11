@@ -859,7 +859,7 @@
       7,
       0,
       0,
-      1,
+      0,
       0,
       0,
       0,
@@ -1298,8 +1298,8 @@
       "walkable": "yes (override)"
     },
     "37,1": {
-      "walkable": "inherit (no)",
-      "effect": "rising_smoke"
+      "effect": "rising_smoke",
+      "walkable": true
     },
     "38,1": {
       "walkable": "yes (override)",

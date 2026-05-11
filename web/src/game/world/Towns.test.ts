@@ -135,6 +135,39 @@ describe("townFromRaw", () => {
   it("throws on missing width/height", () => {
     expect(() => townFromRaw({ name: "X", tiles: {} })).toThrow();
   });
+
+  it("parses authored encounters from the raw payload", () => {
+    const t = townFromRaw({
+      ...sample,
+      encounters: [
+        { name: "Troll Den", encounter_type: "combat", col: 11, row: 11, description: "Auto" },
+        { name: "Dark Patrol", encounter_type: "combat", col: 8, row: 3, description: "" },
+      ],
+    });
+    expect(t.encounters).toHaveLength(2);
+    expect(t.encounters[0]).toMatchObject({
+      name: "Troll Den", encounterType: "combat", col: 11, row: 11,
+    });
+    expect(t.encounters[1].name).toBe("Dark Patrol");
+  });
+
+  it("defaults encounters to an empty list when the field is missing", () => {
+    const t = townFromRaw(sample);
+    expect(t.encounters).toEqual([]);
+  });
+
+  it("skips malformed encounter entries (missing name or coords)", () => {
+    const t = townFromRaw({
+      ...sample,
+      encounters: [
+        { name: "Good", encounter_type: "combat", col: 1, row: 1 },
+        { encounter_type: "combat", col: 2, row: 2 },             // no name
+        { name: "Bad", encounter_type: "combat" },                // no coords
+        null as unknown as { name: string },                      // entirely bad
+      ],
+    });
+    expect(t.encounters.map((e) => e.name)).toEqual(["Good"]);
+  });
 });
 
 describe("tileMapForTown", () => {

@@ -112,6 +112,14 @@ import {
   type SceneLogHandle,
 } from "../world/SceneLog";
 import { brightnessAt, type LightSource } from "../world/Lighting";
+import {
+  isLockedAt, unlockAt,
+  buildLockOptions, attemptLockpick, attemptKnock,
+  consumeLockpick, findLockpicker, findKnockCaster,
+  type LockOption,
+} from "../world/Lock";
+import { loadSpells, type Spell } from "../world/Spells";
+import { TileMap } from "../world/TileMap";
 import { roamStep } from "../world/SpawnPoints";
 import {
   loadMonsters,
@@ -187,6 +195,22 @@ export class DungeonScene extends Phaser.Scene {
    *  wait until the scene is drawn so it stacks on top. Mirrors the
    *  same pattern in TownScene. */
   private pendingStepCallouts: QuestStepCallout[] = [];
+  /** Pick-lock / Knock dialog sub-mode state. Set when the party
+   *  bumps a locked dungeon door; the host scene's normal movement
+   *  inputs gate themselves on `this.lock` being undefined. Mirrors
+   *  TownScene's `lock` field. */
+  private lock?: {
+    col: number;
+    row: number;
+    options: LockOption[];
+    cursor: number;
+    objects: Phaser.GameObjects.GameObject[];
+    message: string;
+  };
+  /** Spell catalog cache — needed so the lock dialog can offer Knock.
+   *  Loaded once on scene create; null when the catalog hasn't loaded
+   *  yet or doesn't ship a `knock` entry. */
+  private knockSpell: Spell | null = null;
   private player!: Phaser.GameObjects.Image;
   /** Bottom-of-viewport log strip — same helper every map scene
    *  uses, so the player has a single consistent place to read time
@@ -239,6 +263,10 @@ export class DungeonScene extends Phaser.Scene {
     for (const h of this.questMonsterGlows.values()) h.destroy();
     this.questMonsterGlows = new Map();
     this.pendingStepCallouts = [];
+    if (this.lock) {
+      for (const obj of this.lock.objects) obj?.destroy();
+      this.lock = undefined;
+    }
     this.questLogClose = undefined;
   }
 
@@ -326,6 +354,16 @@ export class DungeonScene extends Phaser.Scene {
       this.encounterTable = await loadEncounters();
     } catch {
       this.encounterTable = null;
+    }
+
+    // Spell catalog — needed so the lock dialog can offer Knock when
+    // bumping a TILE_LOCKED_DOOR. Failure leaves `knockSpell = null`,
+    // which `buildLockOptions` handles by hiding the Knock row.
+    try {
+      const spells = await loadSpells();
+      this.knockSpell = spells.find((s) => s.id === "knock") ?? null;
+    } catch {
+      this.knockSpell = null;
     }
 
     // Load the monster catalog and queue any sprites the BUILTIN
@@ -806,6 +844,21 @@ export class DungeonScene extends Phaser.Scene {
 
   private installInput(): void {
     this.input.keyboard?.on("keydown", (ev: KeyboardEvent) => {
+      // Lock dialog gates everything else — its arrow keys move the
+      // option cursor, Enter/Space confirms, Escape leaves. Inputs
+      // unrelated to the dialog (party / quest log) still pass
+      // through so the player can check inventory mid-decision.
+      if (this.lock) {
+        if (ev.key === "p" || ev.key === "P") { this.openParty(); return; }
+        if (ev.key === "Escape") { this.closeLockDialog(); return; }
+        if (ev.key === "Enter" || ev.key === " ") { this.confirmLockOption(); return; }
+        const dir = directionForKey(ev.key);
+        if (dir) {
+          if (dir.dr !== 0) this.moveLockCursor(dir.dr);
+          return;
+        }
+        return;
+      }
       // Party screen overlay — pause this scene so movement keys don't
       // fire while the inventory is up. PartyScene resumes us on close.
       if (ev.key === "p" || ev.key === "P") { this.openParty(); return; }
@@ -845,8 +898,13 @@ export class DungeonScene extends Phaser.Scene {
     if (nc < 0 || nc >= this.level.width || nr < 0 || nr >= this.level.height) return;
     if (!this.isWalkable(nc, nr)) {
       const t = this.level.tiles[nr][nc];
-      if (t === TILE_LOCKED_DOOR) {
-        this.showMessage("The door is locked.", 1500);
+      if (t === TILE_LOCKED_DOOR && !this.lock) {
+        // Open the lock-pick / Knock dialog instead of just the
+        // "door is locked" flash. Mirrors TownScene's bump-to-lock
+        // flow — without this the player had no way to open dungeon
+        // locked doors at all (the Goblin Stronghold's first door
+        // would block progression).
+        this.openLockDialog(nc, nr);
       }
       return;
     }
@@ -1500,6 +1558,218 @@ export class DungeonScene extends Phaser.Scene {
     this.level.tiles[row][col] = floor;
     this.replaceTileSprite(col, row);
     this.refreshHud();
+  }
+
+  // ── Locked doors (lockpick / Knock dialog) ─────────────────────
+
+  /**
+   * Wrap the current dungeon level as a TileMap so the Lock helpers
+   * (`isLockedAt`, `unlockAt`) — which target the overworld/town map
+   * shape — work over the dungeon's tile array. The helpers mutate
+   * via the same `tiles[r][c]` storage we render from, so the unlock
+   * lands on the live level.
+   */
+  private lockTileMap(): TileMap {
+    return new TileMap(
+      this.level.width,
+      this.level.height,
+      this.level.tiles,
+      { tileProperties: this.level.tileProperties },
+    );
+  }
+
+  /**
+   * Open the lock-pick / Knock dialog for the door at (col, row).
+   * Mirrors `TownScene.openLockDialog`. Without this, the dungeon's
+   * tryMove only flashed "The door is locked." and the player had no
+   * way to engage their Thief / Knock spell against it.
+   */
+  private openLockDialog(col: number, row: number): void {
+    if (!gameState.partyData) return;
+    const tm = this.lockTileMap();
+    if (!isLockedAt(tm, col, row)) return;
+    const members = activeMembers(gameState.partyData);
+    const options = buildLockOptions({
+      party: gameState.partyData,
+      members,
+      knockSpell: this.knockSpell,
+    });
+    this.lock = {
+      col, row, options, cursor: 0,
+      objects: [], message: "The door is locked.",
+    };
+    this.renderLockDialog();
+  }
+
+  private moveLockCursor(delta: number): void {
+    if (!this.lock) return;
+    const n = this.lock.options.length;
+    this.lock.cursor = ((this.lock.cursor + delta) % n + n) % n;
+    this.renderLockDialog();
+  }
+
+  private confirmLockOption(): void {
+    if (!this.lock || !gameState.partyData) return;
+    const opt = this.lock.options[this.lock.cursor];
+    const party = gameState.partyData;
+    const members = activeMembers(party);
+    const { col, row } = this.lock;
+    if (opt.id === "leave" || opt.id === "no_thief") {
+      this.closeLockDialog();
+      return;
+    }
+    if (opt.id === "no_picks") {
+      const thief = findLockpicker(members);
+      this.lock.message = `${thief?.name ?? "Thief"} has no lockpicks left!`;
+      this.renderLockDialog();
+      return;
+    }
+    if (opt.id === "no_knock_mp") {
+      const caster = this.knockSpell ? findKnockCaster(members, this.knockSpell) : null;
+      this.lock.message = `${caster?.name ?? "Caster"} doesn't have enough MP to cast Knock.`;
+      this.renderLockDialog();
+      return;
+    }
+    if (opt.id === "pick") {
+      const thief = findLockpicker(members);
+      if (!thief) {
+        this.closeLockDialog();
+        return;
+      }
+      consumeLockpick(party);
+      const result = attemptLockpick(thief);
+      if (result.success) {
+        this.lock.message =
+          `${thief.name} picked the lock! ` +
+          `(d20:${result.roll}+${result.mod}=${result.total} vs DC ${result.dc})`;
+        this.renderLockDialog();
+        this.time.delayedCall(900, () => {
+          this.applyLockUnlock(col, row);
+          this.closeLockDialog();
+        });
+      } else {
+        this.lock.message =
+          `${thief.name} fumbled the lock. ` +
+          `(d20:${result.roll}+${result.mod}=${result.total} vs DC ${result.dc})`;
+        this.lock.options = buildLockOptions({
+          party, members, knockSpell: this.knockSpell,
+        });
+        this.lock.cursor = Math.min(this.lock.cursor, this.lock.options.length - 1);
+        this.renderLockDialog();
+      }
+      return;
+    }
+    if (opt.id === "knock") {
+      if (!this.knockSpell) return;
+      const caster = findKnockCaster(members, this.knockSpell);
+      if (!caster) {
+        this.closeLockDialog();
+        return;
+      }
+      const result = attemptKnock(caster, this.knockSpell);
+      caster.mp = Math.max(0, (caster.mp ?? 0) - result.mpCost);
+      if (result.success) {
+        this.lock.message =
+          `${caster.name} casts Knock — the lock clicks open! ` +
+          `(d20:${result.roll}+${result.mod}=${result.total} vs DC ${result.dc})`;
+        this.renderLockDialog();
+        this.time.delayedCall(900, () => {
+          this.applyLockUnlock(col, row);
+          this.closeLockDialog();
+        });
+      } else {
+        this.lock.message =
+          `${caster.name}'s Knock fizzles. ` +
+          `(d20:${result.roll}+${result.mod}=${result.total} vs DC ${result.dc})`;
+        this.lock.options = buildLockOptions({
+          party, members, knockSpell: this.knockSpell,
+        });
+        this.lock.cursor = Math.min(this.lock.cursor, this.lock.options.length - 1);
+        this.renderLockDialog();
+      }
+    }
+  }
+
+  /** Apply the unlock to the dungeon level. The Lock helper mutates
+   *  the tile id (TILE_LOCKED_DOOR → TILE_DDOOR); we then re-render
+   *  the cell so the sprite swap is immediate. */
+  private applyLockUnlock(col: number, row: number): void {
+    const tm = this.lockTileMap();
+    const newId = unlockAt(tm, col, row);
+    if (newId !== null) {
+      this.replaceTileSprite(col, row);
+    }
+    this.refreshDarkness();
+  }
+
+  private closeLockDialog(): void {
+    if (!this.lock) return;
+    for (const obj of this.lock.objects) obj.destroy();
+    this.lock = undefined;
+  }
+
+  private renderLockDialog(): void {
+    if (!this.lock) return;
+    for (const obj of this.lock.objects) obj.destroy();
+    this.lock.objects = [];
+
+    const w = 380;
+    const rowH = 22;
+    const headerH = 38;
+    const msgH = this.lock.message ? 36 : 0;
+    const h = headerH + this.lock.options.length * rowH + msgH + 18;
+    const x = (960 - w) / 2;
+    const y = (720 - h) / 2;
+    const bg = this.add
+      .rectangle(x, y, w, h, 0x161629, 0.96)
+      .setOrigin(0)
+      .setScrollFactor(0)
+      .setStrokeStyle(1, 0x4a4a8c)
+      .setDepth(50);
+    this.lock.objects.push(bg);
+
+    const title = this.add
+      .text(x + 12, y + 10, "Locked Door", {
+        fontFamily: "Georgia, serif",
+        fontSize: "16px",
+        color: "#f6efd6",
+      })
+      .setScrollFactor(0)
+      .setDepth(51);
+    this.lock.objects.push(title);
+
+    let cy = y + headerH;
+    for (let i = 0; i < this.lock.options.length; i++) {
+      const opt = this.lock.options[i];
+      const selected = i === this.lock.cursor;
+      const color = selected ? "#ffd470"
+                  : (opt.id === "leave" ? "#bdb38a"
+                  : (opt.id === "pick" || opt.id === "knock" ? "#dcdcc8" : "#7a7a96"));
+      const prefix = selected ? "▶ " : "  ";
+      const t = this.add
+        .text(x + 18, cy, `${prefix}${opt.label}`, {
+          fontFamily: "monospace",
+          fontSize: "13px",
+          color,
+        })
+        .setScrollFactor(0)
+        .setDepth(51);
+      this.lock.objects.push(t);
+      cy += rowH;
+    }
+
+    if (this.lock.message) {
+      const msg = this.add
+        .text(x + 12, cy + 6, this.lock.message, {
+          fontFamily: "monospace",
+          fontSize: "12px",
+          color: "#bdb38a",
+          wordWrap: { width: w - 24 },
+        })
+        .setScrollFactor(0)
+        .setDepth(51);
+      this.lock.objects.push(msg);
+    }
   }
 
   // ── Stairs / exit ───────────────────────────────────────────────
