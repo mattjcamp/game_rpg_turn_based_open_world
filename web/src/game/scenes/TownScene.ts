@@ -132,7 +132,7 @@ import {
   PARTY_LIGHT_RADIUS,
   type LightSource,
 } from "../world/Lighting";
-import { partyLightRadius, partyLightTint, tickGaladrielsLight } from "../world/PartyActions";
+import { partyLightRadius, tickGaladrielsLight } from "../world/PartyActions";
 import { activeMembers } from "../world/Party";
 import { loadSpells, type Spell } from "../world/Spells";
 import {
@@ -232,9 +232,6 @@ export class TownScene extends Phaser.Scene {
   private sceneLog?: SceneLogHandle;
   /** Set of darkness rectangles drawn one per tile, indexed by `${col},${row}`. */
   private darkness = new Map<string, Phaser.GameObjects.Rectangle>();
-  /** Per-tile tint rectangles for active party-light effects (Infravision /
-   *  Galadriel's Light). Drawn above darkness, below the player. */
-  private tintRects = new Map<string, Phaser.GameObjects.Rectangle>();
   /** Light sources collected once per scene from map + tile_defs.
    *  Named `mapLights` to avoid colliding with Phaser.Scene's built-in
    *  `lights: LightsManager`. */
@@ -353,7 +350,6 @@ export class TownScene extends Phaser.Scene {
     this.interiorItemGlows = new Map();
     this.pendingStepCallouts = [];
     this.darkness = new Map();
-    this.tintRects = new Map();
     this.tileSprites = new Map();
     this.mapLights = [];
     this.dark = false;
@@ -736,12 +732,16 @@ export class TownScene extends Phaser.Scene {
         .setDepth(7);
     }
 
-    // Pre-create one darkness rectangle per cell at depth 9 + a tint
-    // rectangle per cell at depth 9.5. Both sit above tiles + NPCs
-    // but below the player marker. The mesh always exists now (so the
-    // game clock can darken outdoor towns at dusk/night even though
-    // they have no baked light_source tiles); per-cell alpha is set
-    // in refreshDarkness based on whichever darkness source is active.
+    // Pre-create one darkness rectangle per cell at depth 9. Sits above
+    // tiles + NPCs but below the player marker. The mesh always exists
+    // (so the game clock can darken outdoor towns at dusk/night even
+    // though they have no baked light_source tiles); per-cell alpha is
+    // set in refreshDarkness based on whichever darkness source is
+    // active. No tint pass — lights reveal tiles but don't recolour
+    // them (used to be a depth-9.5 coloured rectangle keyed off
+    // `partyLightTint`; the recolour made the maps look washed-out and
+    // was removed). Tiles inside the light pool now render at their
+    // native colours.
     for (let row = 0; row < this.town.height; row++) {
       for (let col = 0; col < this.town.width; col++) {
         const d = this.add
@@ -749,11 +749,6 @@ export class TownScene extends Phaser.Scene {
           .setOrigin(0)
           .setDepth(9);
         this.darkness.set(`${col},${row}`, d);
-        const t = this.add
-          .rectangle(col * TILE, row * TILE, TILE, TILE, 0xffffff, 0)
-          .setOrigin(0)
-          .setDepth(9.5);
-        this.tintRects.set(`${col},${row}`, t);
       }
     }
   }
@@ -776,15 +771,12 @@ export class TownScene extends Phaser.Scene {
     this.litCells = new Set();
     if (!this.dark) {
       // Outdoor / lit map. The only darkness here comes from the game
-      // clock (dawn/dusk/night). The party-light tint layer never
-      // applies outdoors — it's an interior-darkness affordance.
+      // clock (dawn/dusk/night).
       const clockParams = clockDarknessParams(gameState.clock);
       for (let row = 0; row < this.town.height; row++) {
         for (let col = 0; col < this.town.width; col++) {
           const rect = this.darkness.get(`${col},${row}`);
           if (!rect) continue;
-          const tintRect = this.tintRects.get(`${col},${row}`);
-          if (tintRect) tintRect.setFillStyle(0xffffff, 0);
           if (!clockParams) {
             rect.setFillStyle(0x000000, 0);
             continue;
@@ -814,16 +806,18 @@ export class TownScene extends Phaser.Scene {
     }
     // Active party effects (Infravision, Galadriel's Light) act as a
     // party-carried light source — they bump the radius up from the
-    // default 2 tiles to 8/5 respectively, and they also paint a
-    // colour tint over visible tiles (red for infrared, pale blue
-    // for moonlight). The Python game wires the same predicate via
-    // `interior_lighting.party_has_light` and the matching tint via
-    // the `TintEffect` enum in `lighting.py`.
+    // default 2 tiles to 8/5 respectively. They USED to also paint a
+    // coloured tint (red for infrared, pale blue for moonlight, warm
+    // orange for torches) over the visible pool — that recolour was
+    // dropped because it made the maps look washed-out. Lights now
+    // just *reveal* the tiles; the tiles themselves render at their
+    // native colours regardless of which effect is burning. The Python
+    // game still does the tint via the `TintEffect` enum in
+    // `lighting.py`; the two ports have intentionally diverged here.
     const partyData = gameState.partyData;
     const radius = partyData
       ? partyLightRadius(partyData, PARTY_LIGHT_RADIUS)
       : PARTY_LIGHT_RADIUS;
-    const tint = partyData ? partyLightTint(partyData) : null;
     for (let row = 0; row < this.town.height; row++) {
       for (let col = 0; col < this.town.width; col++) {
         const rect = this.darkness.get(`${col},${row}`);
@@ -836,18 +830,6 @@ export class TownScene extends Phaser.Scene {
         // make out tile shapes in the gloom.
         const alpha = Math.max(0, Math.min(0.92, (1 - b) * 0.92));
         rect.setFillStyle(0x000000, alpha);
-        // Tint layer — coloured rect above the darkness, alpha
-        // proportional to brightness so the colour wash fades to
-        // nothing at the edge of the party's range. No tint when
-        // no effect is equipped (alpha 0).
-        const tintRect = this.tintRects.get(`${col},${row}`);
-        if (tintRect) {
-          if (tint && b > 0) {
-            tintRect.setFillStyle(tint.color, b * tint.alphaScale);
-          } else {
-            tintRect.setFillStyle(0xffffff, 0);
-          }
-        }
       }
     }
   }

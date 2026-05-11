@@ -265,23 +265,24 @@ export function summariseActiveEffects(
  * Light, the Light spell, and a lit torch each act as a light
  * source. Returns the larger of the boost and the supplied default.
  *
- * Numbers picked to match the pygame version:
- *   - Infravision: 8 tiles (effectively floods a small interior)
- *   - Galadriel's Light: 5 tiles (warm, more local pool)
- *   - Light spell / lit torch: 4 tiles (matches Python
- *                                       PARTY_LIT_RADIUS in
- *                                       interior_lighting.py —
- *                                       burns down with steps)
- *   - default: whatever the caller passed in
+ * All four sources currently share the SAME 8-tile boost. The earlier
+ * pygame-style tiering (Infravision 8 / Galadriel's 5 / Torch + Light
+ * 4) made the lesser sources feel almost useless once the player got
+ * used to Infravision's reach, so the radii were levelled up to keep
+ * every source equally worth carrying. The duration / consumable
+ * difference (Torch and Light spell burn down with steps, Galadriel's
+ * burns down with steps, Infravision lasts as long as it stays
+ * equipped) is what now differentiates them.
  */
+const PARTY_LIGHT_BOOST = 8;
 export function partyLightRadius(party: Party, defaultRadius: number): number {
-  if (partyHasEffect(party, "infravision")) return Math.max(defaultRadius, 8);
-  if (partyHasEffect(party, "galadriels_light")) return Math.max(defaultRadius, 5);
-  // Light spell and physical torch are the same radius — both are
-  // close-range warm orbs. Either being active is enough; their
-  // counters tick independently in the dark-scene move handlers.
+  if (partyHasEffect(party, "infravision")) return Math.max(defaultRadius, PARTY_LIGHT_BOOST);
+  if (partyHasEffect(party, "galadriels_light")) return Math.max(defaultRadius, PARTY_LIGHT_BOOST);
+  // Light spell and physical torch share the boost — both are
+  // illumination orbs. Either being active is enough; their counters
+  // tick independently in the dark-scene move handlers.
   if (party.magicLightSteps > 0 || party.torchSteps > 0) {
-    return Math.max(defaultRadius, 4);
+    return Math.max(defaultRadius, PARTY_LIGHT_BOOST);
   }
   return defaultRadius;
 }
@@ -1251,8 +1252,10 @@ export function consumeCampingSupplies(party: Party): UseItemResult {
 /**
  * Consume one Torch from the stash and add 150 light-steps to the
  * party's torch counter. Steps tick down inside dark scenes (town
- * interiors / future dungeons); while they're > 0 the party emits a
- * 3-tile warm pool via `partyLightRadius` / `partyLightTint`.
+ * interiors / future dungeons); while they're > 0 the party emits an
+ * 8-tile light pool via `partyLightRadius`. (No tint — see
+ * `refreshDarkness` in TownScene / DungeonScene; the per-effect
+ * recolour was dropped because it washed the maps out.)
  *
  * Stacks with an already-burning torch — using a second torch tops
  * the counter back up rather than starting a fresh one. (Same effect

@@ -1094,13 +1094,31 @@ describe("partyHasEffect / partyLightRadius", () => {
     expect(partyLightRadius(p, 2)).toBe(8);
   });
 
-  it("partyLightRadius bumps less for Galadriel's Light", () => {
+  it("partyLightRadius bumps the same 8 tiles for Galadriel's Light", () => {
+    // All four party-light sources (Infravision, Galadriel's, Light
+    // spell, lit torch) currently share the same 8-tile boost so no
+    // one source feels objectively worse to carry than the others.
     const p = makeParty();
     p.partyEffects.effect_1 = "galadriels_light";
-    expect(partyLightRadius(p, 2)).toBe(5);
+    expect(partyLightRadius(p, 2)).toBe(8);
+  });
+
+  it("partyLightRadius bumps the same 8 tiles for a lit torch", () => {
+    const p = makeParty();
+    p.torchSteps = 40;
+    expect(partyLightRadius(p, 2)).toBe(8);
+  });
+
+  it("partyLightRadius bumps the same 8 tiles for an active Light spell", () => {
+    const p = makeParty();
+    p.magicLightSteps = 100;
+    expect(partyLightRadius(p, 2)).toBe(8);
   });
 
   it("Infravision wins over Galadriel's Light when both are equipped", () => {
+    // The pick is still order-deterministic — both produce 8 today,
+    // but if these ever re-tier the early-return in partyLightRadius
+    // keeps Infravision's value first.
     const p = makeParty();
     p.partyEffects.effect_1 = "galadriels_light";
     p.partyEffects.effect_2 = "infravision";
@@ -1109,7 +1127,7 @@ describe("partyHasEffect / partyLightRadius", () => {
 
   it("never shrinks below the supplied default radius", () => {
     const p = makeParty();
-    p.partyEffects.effect_1 = "galadriels_light"; // boost = 5
+    p.partyEffects.effect_1 = "galadriels_light"; // boost = 8
     expect(partyLightRadius(p, 9)).toBe(9);       // already brighter, keep it
   });
 

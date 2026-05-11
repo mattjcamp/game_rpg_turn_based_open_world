@@ -7,18 +7,19 @@ python3 main.py
 - Link to other page to show Python and editor version since that is really a challenging process for people to use. In the figure, I will build a cleaner version of this along with a module sharing feature.
 
 ## Bugs
-- When I left the Sun Sword building, I ended up in the wrong part of the map. Check the linking for that.
-- THe last Dragon quest had no other encounters
-- The Sun Sword Building had no other encounters
+- THe last Dragon quest had no other encounters. Double check before trying to fix.
 
 ## Polish
-- remove the dev characters from the roster or replace with easier characters to play. Human, original.
+- Do another run through of the quest system
+- Do a full playthrough with the debug party
+- Do a full playthrough with Level 1 characters
 
 # V2
 
 ## Polish
 - Make the Fire Breath look more like fire
 - When the party completes the last quest, the game should end
+- Audit the quest system and test how encounters are applied. Add a feature to quest steps that allows us to specify what floor of the dungeon the step occurs. Item retrieval quest may have that I think this issue is mainly for procedural dungeons.
 
 ## Web V2 Refactor Items
 - Curate the data model and remove attributes that are unused
@@ -27,10 +28,8 @@ python3 main.py
 - Replace the generic looking swordsman as the party avatar and replace with the graphic used for Gimli
 
 ## V2 Features
-- Consider making the various Light effects simply use the real colors of the tiles. The red , yellow, and washed out effects just don't look good. Infravision should act more like normal vision, just with all tiles displayed with a red tint, the range of infravision should match the other lighting effects
 - create outline for random lore generation. Make a user control that lists out things like cultures, races, lost civilizations, events, epics, names, gods, current people. A user control could generate this content (outline first) and lore will be saved to data files so the user can make minor changes. The lore will be used in the content creation in some way.
 - Add books feature to add a way to communicate content
-- Note that experience level is different in the game vs the manual, once we decide on which way to go we need to make sure they are in sync
-
+- Make sure that the manual is in sync with the game, character creation screens, etc
 
 

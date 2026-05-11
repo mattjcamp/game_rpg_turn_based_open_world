@@ -96,7 +96,6 @@ import {
 } from "../world/Party";
 import {
   partyLightRadius,
-  partyLightTint,
   partyHasEffect,
   statMod,
   tickGaladrielsLight,
@@ -178,11 +177,6 @@ export class DungeonScene extends Phaser.Scene {
   private decorSprites: Map<string, Phaser.GameObjects.GameObject> = new Map();
   private monsterSprites: Map<string, Phaser.GameObjects.GameObject> = new Map();
   private darknessRects: Map<string, Phaser.GameObjects.Rectangle> = new Map();
-  /** Coloured tint layer above darkness — picks up the party-carried
-   *  light's hue (warm orange for torches, pale blue for Galadriel's,
-   *  red for Infravision) and washes lit cells with it. Mirrors the
-   *  same pair of rectangles TownScene maintains for interior darkness. */
-  private tintRects: Map<string, Phaser.GameObjects.Rectangle> = new Map();
   /** Per-cell red-X overlay drawn over traps the party has spotted via
    *  the Detect Traps effect. Keyed by "col,row" — torn down on
    *  scene shutdown / floor change so phantom markers don't survive
@@ -249,8 +243,6 @@ export class DungeonScene extends Phaser.Scene {
     this.monsterSprites = new Map();
     for (const r of this.darknessRects.values()) r?.destroy();
     this.darknessRects = new Map();
-    for (const r of this.tintRects.values()) r?.destroy();
-    this.tintRects = new Map();
     for (const g of this.detectedTrapMarks.values()) g?.destroy();
     this.detectedTrapMarks = new Map();
     this.busy = false;
@@ -559,8 +551,6 @@ export class DungeonScene extends Phaser.Scene {
     this.questMonsterGlows.clear();
     for (const r of this.darknessRects.values()) r.destroy();
     this.darknessRects.clear();
-    for (const r of this.tintRects.values()) r.destroy();
-    this.tintRects.clear();
     for (const g of this.detectedTrapMarks.values()) g.destroy();
     this.detectedTrapMarks.clear();
 
@@ -599,10 +589,13 @@ export class DungeonScene extends Phaser.Scene {
     // Quest-artifact halos — cyan glow over every TILE_ARTIFACT on
     // this floor. Disposed when the player picks an artifact up.
     this.spawnArtifactGlows();
-    // Per-cell darkness overlay (depth 9 — above monsters, below player)
-    // plus a tint pass at depth 9.5 that washes lit cells with the
-    // party-light colour (warm/blue/red). Both meshes always exist;
-    // refreshDarkness sets per-cell alphas every step.
+    // Per-cell darkness overlay (depth 9 — above monsters, below player).
+    // The mesh always exists; refreshDarkness sets per-cell alphas every
+    // step. No tint pass — lights reveal tiles but don't recolour them
+    // (used to be a depth-9.5 coloured rectangle keyed off
+    // `partyLightTint`; the recolour washed the maps out and was
+    // removed). Tiles inside the party's light pool render at their
+    // native colours regardless of which effect is burning.
     for (let row = 0; row < this.level.height; row++) {
       for (let col = 0; col < this.level.width; col++) {
         const d = this.add
@@ -610,11 +603,6 @@ export class DungeonScene extends Phaser.Scene {
           .setOrigin(0)
           .setDepth(9);
         this.darknessRects.set(`${col},${row}`, d);
-        const t = this.add
-          .rectangle(col * TILE, row * TILE, TILE, TILE, 0xffffff, 0)
-          .setOrigin(0)
-          .setDepth(9.5);
-        this.tintRects.set(`${col},${row}`, t);
       }
     }
   }
@@ -769,12 +757,18 @@ export class DungeonScene extends Phaser.Scene {
   private refreshDarkness(): void {
     const dp = gameState.dungeonPos!;
     const partyR = this.partyData ? partyLightRadius(this.partyData, 2) : 2;
-    const tint = this.partyData ? partyLightTint(this.partyData) : null;
     // Wall-torch radiance contribution from tile_defs.flags.light_source
     // and the party-carried light pool are independent: the dungeon
     // owns its torches (driven by `torch_density`), and the party adds
     // their own pool on top. Both go through `brightnessAt`, which
     // takes the brighter of the two contributions per cell.
+    //
+    // No tint pass — lights reveal tiles but do not recolour them. The
+    // earlier implementation washed the visible pool with red (infrared)
+    // / pale blue (Galadriel's) / warm orange (Torch + Light spell)
+    // tints; that recolouring made the maps look washed-out and was
+    // removed. The Python game keeps the tint (see `TintEffect` in
+    // `lighting.py`); the two ports intentionally diverge here.
     const lights = this.collectLights();
     // Dungeon-flavoured LOS blocker. Walls / closed doors / non-
     // walkable cells block; tiles flagged `transparent` (water,
@@ -794,18 +788,8 @@ export class DungeonScene extends Phaser.Scene {
     for (let row = 0; row < this.level.height; row++) {
       for (let col = 0; col < this.level.width; col++) {
         const rect = this.darknessRects.get(`${col},${row}`);
-        const tintRect = this.tintRects.get(`${col},${row}`);
-        if (!rect || !tintRect) continue;
-        // ── Combined brightness ──
+        if (!rect) continue;
         const b = brightnessAt(col, row, lights, { col: dp.col, row: dp.row }, partyR, blocks);
-        // ── Party-only brightness (drives the tint wash) ──
-        // The tint is a property of what the PARTY carries, so we don't
-        // want a wall torch to look red just because the party has
-        // Infravision — the wash should only paint cells the party's
-        // light actually reaches. Compute partyB by passing an empty
-        // lights array (still LOS-gated so the wash doesn't bleed
-        // through walls either).
-        const partyB = brightnessAt(col, row, [], { col: dp.col, row: dp.row }, partyR, blocks);
         if (b > 0) {
           this.level.exploredTiles.add(`${col},${row}`);
           rect.setFillStyle(0x000000, Math.max(0, Math.min(0.92, (1 - b) * 0.92)));
@@ -813,16 +797,6 @@ export class DungeonScene extends Phaser.Scene {
           rect.setFillStyle(0x000000, SEEN_DIM);
         } else {
           rect.setFillStyle(0x000000, 1);
-        }
-        // Tint wash: only on cells the party's own light reaches, and
-        // only when an effect that should colour the world is active
-        // (Torch / Galadriel's / Infravision). Outside the party pool
-        // the wash is fully transparent so wall-torch-lit cells keep
-        // their natural look.
-        if (tint && partyB > 0) {
-          tintRect.setFillStyle(tint.color, partyB * tint.alphaScale);
-        } else {
-          tintRect.setFillStyle(0xffffff, 0);
         }
       }
     }
