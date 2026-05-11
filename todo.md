@@ -11,6 +11,9 @@ python3 main.py
 - THe last Dragon quest had no other encounters
 - The Sun Sword Building had no other encounters
 
+## Polish
+- remove the dev characters from the roster or replace with easier characters to play. Human, original.
+
 # V2
 
 ## Polish

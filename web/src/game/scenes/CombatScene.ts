@@ -46,6 +46,10 @@ import {
   MONSTER_SPRITES,
 } from "../data/monsters";
 import { gameState } from "../state";
+import {
+  isAuthoredEncounterId,
+  authoredDefeatKey,
+} from "../world/InteriorSpawn";
 import { tileSpriteKey, populateRuntimeDefs, spriteManifest } from "../world/Tiles";
 import { assetUrl, dataPath } from "../world/Module";
 import { loadItems, type Item } from "../world/Items";
@@ -3569,6 +3573,19 @@ export class CombatScene extends Phaser.Scene {
           if (engaged?.isGuardian) {
             const qstate = gameState.moduleQuestStates.get(engaged.questName);
             if (qstate) qstate.guardianDefeated[engaged.stepIdx] = true;
+          }
+          // Authored encounters (fixed-position entries from
+          // town.encounters) need their defeat recorded in the run-
+          // wide set, otherwise re-entering the floor would re-run
+          // `appendAuthoredEncounters`, find the id missing from the
+          // freshly-filtered list, and spawn it back — the Citadel 4
+          // Troll Den respawn loop. Guardians and quest-step monsters
+          // have their own per-step bookkeeping above, so we only
+          // touch the authored set here.
+          if (engaged && isAuthoredEncounterId(engaged.id)) {
+            gameState.defeatedAuthoredEncounters.add(
+              authoredDefeatKey(this.interiorPath, engaged.id),
+            );
           }
           gameState.interiorMonsters.set(
             this.interiorPath,

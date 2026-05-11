@@ -50,7 +50,6 @@ import {
   findQuest,
   activeKillStepsForLocation,
   activeCollectStepsForLocation,
-  rosterFor,
   creditKills,
   creditCollect,
   summariseUnlocks,
@@ -65,6 +64,7 @@ import {
 import {
   placeQuestInteriorMonsters,
   placeQuestInteriorItems,
+  appendAuthoredEncounters,
   reachableFrom,
   snapToWalkable,
   tileMapWalk,
@@ -1065,10 +1065,14 @@ export class TownScene extends Phaser.Scene {
     }
 
     const existing = gameState.interiorMonsters.get(this.townName) ?? [];
-    if (rows.length === 0 && existing.length === 0) {
-      gameState.interiorMonsters.set(this.townName, []);
-      return;
-    }
+    // Note: we no longer early-return when both lists are empty. The
+    // floor still owes the player its authored encounters (Sea Shrine
+    // Main Hall / Citadel 2 / Citadel 3 host no Sun Sword quest rows,
+    // but they each ship a pair of combat encounters in the building
+    // data). The old early-return swallowed those entirely. The
+    // placement helper handles `rows.length === 0` gracefully and just
+    // returns the existing list, so the appendAuthored pass below is
+    // the only call we need to keep alive on quiet floors.
 
     const reserved: Array<readonly [number, number]> = [
       [this.entryCol, this.entryRow] as const,
@@ -1087,44 +1091,20 @@ export class TownScene extends Phaser.Scene {
     // Cultists patrol, etc. Without this the player only saw the
     // quest guardian and the rest of the building was empty even
     // though the JSON listed combat encounters at fixed cells.
-    const withAuthored = this.appendAuthoredEncounters(placed);
+    // Encounters whose defeat was persisted in a prior visit are
+    // filtered out by the helper — that's the fix for Citadel 4's
+    // Troll Den respawning on every re-entry.
+    const withAuthored = appendAuthoredEncounters(
+      placed,
+      this.town.encounters,
+      this.encounterTable,
+      {
+        spaceName: this.town.name,
+        defeated: gameState.defeatedAuthoredEncounters,
+        interiorPath: this.townName,
+      },
+    );
     gameState.interiorMonsters.set(this.townName, withAuthored);
-  }
-
-  /**
-   * Append every entry from `town.encounters` (combat type only) to
-   * the placed monster list, skipping any already on the map (we
-   * key by stable id so re-entries don't double-spawn). Defeating an
-   * authored encounter removes its entry by id via the same
-   * CombatScene-side filter every other interior monster goes through.
-   */
-  private appendAuthoredEncounters(
-    placed: import("../state").InteriorMonster[],
-  ): import("../state").InteriorMonster[] {
-    if (!this.encounterTable) return placed;
-    const list = [...placed];
-    const knownIds = new Set(list.map((m) => m.id));
-    for (const enc of this.town.encounters) {
-      if (enc.encounterType !== "combat") continue;
-      const id = `auth-${this.town.name}-${enc.col}-${enc.row}-${enc.name}`;
-      if (knownIds.has(id)) continue;
-      const tmpl = rosterFor(this.encounterTable, enc.name);
-      if (!tmpl || tmpl.monsters.length === 0) continue;
-      list.push({
-        id,
-        col: enc.col,
-        row: enc.row,
-        name: tmpl.monsterPartyTile,
-        encounterNames: [...tmpl.monsters],
-        encounterName: tmpl.name,
-        // Sentinel quest metadata: the cleanup-on-quest-complete pass
-        // skips entries whose `questName` isn't in moduleQuestStates,
-        // so authored encounters survive correctly until killed.
-        questName: "__authored",
-        stepIdx: -1,
-      });
-    }
-    return list;
   }
 
   /**

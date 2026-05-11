@@ -82,6 +82,7 @@ interface RawSave {
   pendingKilledMonsters: string[];
   interiorMonsters: Array<[string, InteriorMonster[]]>;
   interiorItems: Array<[string, InteriorQuestItem[]]>;
+  defeatedAuthoredEncounters: string[];
   shopInventories: Array<[string, string[]]>;
   party_combat: Combatant[];
   lastScene: LastSceneSnapshot | null;
@@ -173,6 +174,7 @@ function toRaw(s: GameState): RawSave {
     pendingKilledMonsters: [...s.pendingKilledMonsters],
     interiorMonsters: [...s.interiorMonsters.entries()],
     interiorItems: [...s.interiorItems.entries()],
+    defeatedAuthoredEncounters: [...s.defeatedAuthoredEncounters],
     shopInventories: [...s.shopInventories.entries()],
     party_combat: s.party,
     lastScene: s.lastScene ?? null,
@@ -221,6 +223,11 @@ function fromRaw(raw: RawSave, target: GameState): void {
   target.pendingKilledMonsters = raw.pendingKilledMonsters ?? [];
   target.interiorMonsters = new Map(raw.interiorMonsters ?? []);
   target.interiorItems = new Map(raw.interiorItems ?? []);
+  // Backward-compat: saves written before authored-encounter defeat
+  // tracking won't carry this field. Default to empty — the worst
+  // case is a one-time respawn of an already-cleared encounter when
+  // loading an older save, identical to today's bug.
+  target.defeatedAuthoredEncounters = new Set(raw.defeatedAuthoredEncounters ?? []);
   target.shopInventories = new Map(raw.shopInventories ?? []);
   target.party = raw.party_combat ?? [];
   target.lastScene = raw.lastScene ?? null;

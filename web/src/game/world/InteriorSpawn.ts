@@ -15,6 +15,7 @@ import type { TileMap } from "./TileMap";
 import type { EncounterTemplate } from "./Encounters";
 import type { QuestStep } from "./Quests";
 import { rosterFor } from "./Quests";
+import type { AuthoredEncounter } from "./Towns";
 import type { InteriorMonster, InteriorQuestItem } from "../state";
 
 /** RNG hook — defaults to `Math.random`. Tests inject a deterministic
@@ -276,6 +277,113 @@ export function placeQuestInteriorItems(
     });
   }
   return placed;
+}
+
+/**
+ * Stable id stamped onto an authored-encounter InteriorMonster. Format
+ * is `auth-<spaceName>-<col>-<row>-<encName>` — encodes everything we
+ * need to recognise the same encounter across re-entries without
+ * keying on the InteriorMonster object itself. Exported so the defeat-
+ * tracker in CombatScene can compose the same key without duplicating
+ * the format string.
+ */
+export function authoredEncounterId(
+  spaceName: string,
+  enc: { col: number; row: number; name: string },
+): string {
+  return `auth-${spaceName}-${enc.col}-${enc.row}-${enc.name}`;
+}
+
+/**
+ * Global (across-floors) defeat key for an authored encounter. We
+ * prefix with the interior path so two buildings that happen to share
+ * a space name (e.g. two modules both authoring a "Citadel 4") don't
+ * cross-talk. Mirrors the `${path}|${authId}` shape `gameState
+ * .defeatedAuthoredEncounters` uses.
+ */
+export function authoredDefeatKey(
+  interiorPath: string,
+  authId: string,
+): string {
+  return `${interiorPath}|${authId}`;
+}
+
+/**
+ * Append every `town.encounters` entry (combat-typed only) onto the
+ * placed-monster list, skipping any already on the floor (by stable
+ * id) and any whose defeat was previously persisted. Returns a new
+ * array; the input is left untouched.
+ *
+ * Two fixes ride on this helper:
+ *
+ *   - Floors with no active quest step now still get their authored
+ *     encounters spawned. The previous "early return when nothing
+ *     active to spawn" branch in TownScene meant that on the Sea
+ *     Shrine's Main Hall / Citadel 2 / Citadel 3 (none of which host
+ *     a Sun Sword quest row) the authored Dark Patrol / Troll &
+ *     Wolves / Lone Ogre etc. encounters were silently dropped on
+ *     entry, even though the module data listed them.
+ *
+ *   - Authored encounters defeated in a previous visit stay defeated.
+ *     Before, the CombatScene-side filter only stripped the slain
+ *     entry from `interiorMonsters`; the next time the player walked
+ *     onto that floor `appendAuthoredEncounters` saw the missing id
+ *     in `knownIds` and re-spawned it, producing the "this fight
+ *     keeps coming back no matter how many times I beat it"
+ *     player report on Citadel 4's Troll Den.
+ */
+export function appendAuthoredEncounters(
+  placed: ReadonlyArray<InteriorMonster>,
+  encounters: ReadonlyArray<AuthoredEncounter>,
+  encounterTable: Record<string, EncounterTemplate[]>,
+  opts: {
+    /** Display / catalog name of the current space — used as part of
+     *  the stable auth id. */
+    spaceName: string;
+    /** Per-run defeat memory. Authored encounters whose key is in this
+     *  set are skipped entirely on this entry. */
+    defeated: ReadonlySet<string>;
+    /** Interior path used by `defeatedAuthoredEncounters` to disambiguate
+     *  same-named spaces across buildings. Combined with the auth id
+     *  to form the lookup key. */
+    interiorPath: string;
+  },
+): InteriorMonster[] {
+  const list: InteriorMonster[] = [...placed];
+  const knownIds = new Set(list.map((m) => m.id));
+  for (const enc of encounters) {
+    if (enc.encounterType !== "combat") continue;
+    const id = authoredEncounterId(opts.spaceName, enc);
+    if (knownIds.has(id)) continue;
+    if (opts.defeated.has(authoredDefeatKey(opts.interiorPath, id))) continue;
+    const tmpl = rosterFor(encounterTable, enc.name);
+    if (!tmpl || tmpl.monsters.length === 0) continue;
+    list.push({
+      id,
+      col: enc.col,
+      row: enc.row,
+      name: tmpl.monsterPartyTile,
+      encounterNames: [...tmpl.monsters],
+      encounterName: tmpl.name,
+      // Sentinel quest metadata: the cleanup-on-quest-complete pass
+      // skips entries whose `questName` isn't in moduleQuestStates,
+      // so authored encounters survive correctly until killed.
+      questName: "__authored",
+      stepIdx: -1,
+    });
+    knownIds.add(id);
+  }
+  return list;
+}
+
+/**
+ * True when the given InteriorMonster id is the stable id stamped by
+ * `appendAuthoredEncounters`. CombatScene uses this to decide whether
+ * a victory should record an authored-encounter defeat in
+ * `gameState.defeatedAuthoredEncounters`.
+ */
+export function isAuthoredEncounterId(id: string): boolean {
+  return id.startsWith("auth-");
 }
 
 /**

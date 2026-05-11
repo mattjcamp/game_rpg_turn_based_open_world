@@ -150,6 +150,21 @@ export interface GameState {
    */
   interiorItems: Map<string, InteriorQuestItem[]>;
   /**
+   * Stable ids of authored interior encounters the party has already
+   * defeated this run. Keyed as `${interiorPath}|${authId}` where the
+   * auth id is the same one `appendAuthoredEncounters` stamps onto the
+   * placed InteriorMonster (`auth-<spaceName>-<col>-<row>-<encName>`).
+   *
+   * Authored encounters are pinned to fixed cells in `town.encounters`
+   * and would otherwise re-spawn on every re-entry to the floor — the
+   * Sea Shrine player report ("the Troll Den keeps coming back no
+   * matter how many times I beat it") was exactly that loop. Tracking
+   * defeats here lets the placement pass skip already-cleared cells
+   * for the rest of the run, matching how `destroyedSpawns` handles
+   * overworld monster-spawn tiles.
+   */
+  defeatedAuthoredEncounters: Set<string>;
+  /**
    * Per-shop-instance inventory, keyed by `${townName}|${shopType}`.
    * Each value is the list of item names currently in stock at that
    * counter. Seeded lazily from `counters.json` on first visit, then
@@ -270,6 +285,7 @@ function makeFreshState(): GameState {
     pendingKilledMonsters: [],
     interiorMonsters: new Map(),
     interiorItems: new Map(),
+    defeatedAuthoredEncounters: new Set(),
     shopInventories: new Map(),
     pickpocketedNpcs: new Set(),
     lastScene: null,
@@ -306,6 +322,7 @@ export function resetGameState(): void {
   gameState.pendingKilledMonsters = fresh.pendingKilledMonsters;
   gameState.interiorMonsters = fresh.interiorMonsters;
   gameState.interiorItems = fresh.interiorItems;
+  gameState.defeatedAuthoredEncounters = fresh.defeatedAuthoredEncounters;
   gameState.shopInventories = fresh.shopInventories;
   gameState.pickpocketedNpcs = fresh.pickpocketedNpcs;
   gameState.lastScene = fresh.lastScene;

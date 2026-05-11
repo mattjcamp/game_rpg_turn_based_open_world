@@ -4,10 +4,15 @@ import {
   placeQuestInteriorItems,
   reachableFrom,
   snapToWalkable,
+  appendAuthoredEncounters,
+  authoredEncounterId,
+  authoredDefeatKey,
+  isAuthoredEncounterId,
   type QuestKillRow,
   type QuestCollectRow,
   type WalkOracle,
 } from "./InteriorSpawn";
+import type { AuthoredEncounter } from "./Towns";
 import type { EncounterTemplate } from "./Encounters";
 import type { QuestStep } from "./Quests";
 import type { InteriorMonster, InteriorQuestItem } from "../state";
@@ -398,5 +403,195 @@ describe("placeQuestInteriorItems", () => {
     // Pinned cell was occupied by the guardian → fell back to first
     // walkable non-occupied cell (0, 1) under deterministic rng.
     expect([out[0].col, out[0].row]).toEqual([1, 0]);
+  });
+});
+
+describe("appendAuthoredEncounters", () => {
+  // The Sea Shrine's Citadel 4 ships a single Troll Den encounter at
+  // (11, 11) — we use it as the canonical authored entry across these
+  // tests because the bug we're fixing was reported there. The
+  // encounter table re-uses the "Cellar Rats" template so we don't
+  // need a fresh roster definition.
+  const TROLL_DEN: AuthoredEncounter = {
+    name: "Cellar Rats",
+    encounterType: "combat",
+    col: 11,
+    row: 11,
+    description: "Auto (hard, lvl 5)",
+  };
+  const DARK_PATROL: AuthoredEncounter = {
+    name: "Cursed Battalion",
+    encounterType: "combat",
+    col: 8,
+    row: 3,
+    description: "Auto (normal, lvl 3)",
+  };
+
+  it("appends an authored entry that isn't already on the floor", () => {
+    const out = appendAuthoredEncounters(
+      [],
+      [TROLL_DEN],
+      ENCOUNTERS,
+      {
+        spaceName: "Citadel 4",
+        defeated: new Set(),
+        interiorPath: "building:Sea Shrine:Citadel 4",
+      },
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].col).toBe(11);
+    expect(out[0].row).toBe(11);
+    expect(out[0].questName).toBe("__authored");
+    expect(out[0].stepIdx).toBe(-1);
+    expect(out[0].id).toBe("auth-Citadel 4-11-11-Cellar Rats");
+  });
+
+  it("skips an entry whose stable id is already in the placed list", () => {
+    const existing = appendAuthoredEncounters(
+      [], [TROLL_DEN], ENCOUNTERS,
+      {
+        spaceName: "Citadel 4",
+        defeated: new Set(),
+        interiorPath: "building:Sea Shrine:Citadel 4",
+      },
+    );
+    // Second pass — should be a no-op, mirroring a re-entry where the
+    // monster was carried over in interiorMonsters.
+    const out = appendAuthoredEncounters(
+      existing, [TROLL_DEN], ENCOUNTERS,
+      {
+        spaceName: "Citadel 4",
+        defeated: new Set(),
+        interiorPath: "building:Sea Shrine:Citadel 4",
+      },
+    );
+    expect(out).toHaveLength(1);
+    expect(out).toEqual(existing);
+  });
+
+  it("skips an entry whose defeat is recorded — the Citadel 4 respawn bug", () => {
+    // Simulate the post-victory state: the slain Troll Den has been
+    // filtered out of interiorMonsters, and its auth id is in the
+    // defeated set. The next entry shouldn't re-spawn it.
+    const authId = authoredEncounterId("Citadel 4", TROLL_DEN);
+    const defeated = new Set([
+      authoredDefeatKey("building:Sea Shrine:Citadel 4", authId),
+    ]);
+    const out = appendAuthoredEncounters(
+      [], [TROLL_DEN], ENCOUNTERS,
+      {
+        spaceName: "Citadel 4",
+        defeated,
+        interiorPath: "building:Sea Shrine:Citadel 4",
+      },
+    );
+    expect(out).toEqual([]);
+  });
+
+  it("still spawns authored encounters on floors with no quest rows", () => {
+    // Bug #1 from the Sea Shrine report: floors with no active quest
+    // step (Main Hall, Citadel 2, Citadel 3) used to skip authored
+    // spawns entirely because the placement pass early-returned when
+    // both `rows` and `existing` were empty. The helper itself is
+    // independent of quest rows, so calling it with an empty `placed`
+    // list must still produce the authored entries.
+    const out = appendAuthoredEncounters(
+      [], [DARK_PATROL, TROLL_DEN], ENCOUNTERS,
+      {
+        spaceName: "Main Hall",
+        defeated: new Set(),
+        interiorPath: "building:Sea Shrine:Main Hall",
+      },
+    );
+    expect(out).toHaveLength(2);
+    expect(out.map((m) => `${m.col},${m.row}`).sort()).toEqual(["11,11", "8,3"]);
+  });
+
+  it("ignores non-combat encounter entries", () => {
+    const scripted: AuthoredEncounter = {
+      name: "Cellar Rats",
+      encounterType: "scripted",
+      col: 4, row: 4,
+      description: "n/a",
+    };
+    const out = appendAuthoredEncounters(
+      [], [scripted], ENCOUNTERS,
+      {
+        spaceName: "Main Hall",
+        defeated: new Set(),
+        interiorPath: "building:Sea Shrine:Main Hall",
+      },
+    );
+    expect(out).toEqual([]);
+  });
+
+  it("drops entries whose encounter name isn't in the table", () => {
+    const phantom: AuthoredEncounter = {
+      name: "Mythical Yeti",
+      encounterType: "combat",
+      col: 4, row: 4,
+      description: "Auto",
+    };
+    const out = appendAuthoredEncounters(
+      [], [phantom], ENCOUNTERS,
+      {
+        spaceName: "Main Hall",
+        defeated: new Set(),
+        interiorPath: "building:Sea Shrine:Main Hall",
+      },
+    );
+    expect(out).toEqual([]);
+  });
+
+  it("preserves quest-step entries already in the placed list", () => {
+    const guardian: InteriorMonster = {
+      id: "g-Sun Sword-0-0",
+      col: 7, row: 7,
+      name: "Skeleton Knight",
+      encounterNames: ["Skeleton Knight"],
+      encounterName: "Cursed Battalion",
+      questName: "Sun Sword",
+      stepIdx: 0,
+      isGuardian: true,
+    };
+    const out = appendAuthoredEncounters(
+      [guardian], [TROLL_DEN], ENCOUNTERS,
+      {
+        spaceName: "Citadel 4",
+        defeated: new Set(),
+        interiorPath: "building:Sea Shrine:Citadel 4",
+      },
+    );
+    expect(out).toHaveLength(2);
+    expect(out[0]).toEqual(guardian);
+    expect(out[1].id).toBe("auth-Citadel 4-11-11-Cellar Rats");
+  });
+
+  it("defeat keys are namespaced by interior path", () => {
+    // Two buildings happen to share a space name and an encounter at
+    // the same coords. Defeating the encounter in one must NOT mark
+    // it defeated in the other.
+    const authId = authoredEncounterId("Citadel 4", TROLL_DEN);
+    const defeated = new Set([
+      authoredDefeatKey("building:Sea Shrine:Citadel 4", authId),
+    ]);
+    const out = appendAuthoredEncounters(
+      [], [TROLL_DEN], ENCOUNTERS,
+      {
+        spaceName: "Citadel 4",
+        defeated,
+        // Different building, same space name.
+        interiorPath: "building:Other Tower:Citadel 4",
+      },
+    );
+    expect(out).toHaveLength(1);
+  });
+});
+
+describe("isAuthoredEncounterId", () => {
+  it("matches authored ids and rejects quest-step ids", () => {
+    expect(isAuthoredEncounterId("auth-Citadel 4-11-11-Troll Den")).toBe(true);
+    expect(isAuthoredEncounterId("q-Sun Sword-0-3")).toBe(false);
+    expect(isAuthoredEncounterId("g-Veyron Heirloom-0-7")).toBe(false);
   });
 });
