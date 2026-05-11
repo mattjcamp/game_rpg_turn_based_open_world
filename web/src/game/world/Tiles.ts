@@ -127,6 +127,14 @@ export interface TileDef {
    * spawn template.
    */
   interactionData?: string;
+  /**
+   * Editor-side category — `"overworld"`, `"town"`, `"dungeon"`,
+   * `"spawns"`, `"artifacts"`, … . The dungeon's quest-collect
+   * placement scans for `context: "artifacts"` to find the per-item
+   * tile id (Sealstone, Sun Sword, Veyron Scroll) so the artifact
+   * shows up as the right object instead of a generic chest.
+   */
+  context?: string;
 }
 
 const FALLBACK: TileDef = { color: [60, 60, 60], walkable: false, name: "Unknown" };
@@ -207,6 +215,8 @@ interface RawTileDef {
   flags?: TileFlags;
   interaction_type?: string;
   interaction_data?: string;
+  /** Editor-side category — see TileDef.context. */
+  context?: string;
 }
 
 /**
@@ -243,6 +253,7 @@ export function populateRuntimeDefs(raw: Record<string, RawTileDef>): void {
       flags: v.flags,
       interactionType: v.interaction_type,
       interactionData: v.interaction_data,
+      context: v.context,
     };
   }
 }
@@ -326,6 +337,40 @@ export function tileSpriteKey(id: number): string | null {
 /** Test-only: clear the runtime cache so tests stay isolated. */
 export function _clearRuntimeTileDefs(): void {
   for (const k of Object.keys(_runtimeDefs)) delete _runtimeDefs[Number(k)];
+}
+
+/**
+ * Look up the tile id whose runtime def has `context: "artifacts"` and
+ * whose `name` matches `itemName` (case-insensitive). Used by the
+ * dungeon's quest-artifact placement so the Sealstone shows up as a
+ * sealstone tile and the Sun Sword shows up as a sword, instead of
+ * every collect step rendering the generic TILE_ARTIFACT chest icon.
+ *
+ * Returns null when no artifact tile matches — caller should fall
+ * back to TILE_ARTIFACT (id 27), which is what the previous behavior
+ * always did.
+ */
+export function findArtifactTileId(itemName: string): number | null {
+  if (!itemName) return null;
+  const want = itemName.trim().toLowerCase();
+  for (const [idStr, def] of Object.entries(_runtimeDefs)) {
+    if (def.context !== "artifacts") continue;
+    if ((def.name ?? "").toLowerCase() === want) {
+      const id = Number(idStr);
+      if (Number.isFinite(id)) return id;
+    }
+  }
+  return null;
+}
+
+/** True for any tile id whose runtime def is in the "artifacts" context.
+ *  The dungeon's pickup detection now fires for these — without this,
+ *  the per-quest tile (e.g. Seal of Binding, id 65) would render but
+ *  walking onto it would do nothing because the old check looked only
+ *  for TILE_ARTIFACT (id 27). */
+export function isArtifactTile(tileId: number): boolean {
+  const def = _runtimeDefs[tileId];
+  return def?.context === "artifacts";
 }
 
 /** Tiles that should kick off a combat encounter when stepped on. */

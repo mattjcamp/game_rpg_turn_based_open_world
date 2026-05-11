@@ -116,6 +116,27 @@ export function _clearSpawnPointsCache(): void {
   _cache = null;
 }
 
+/**
+ * True when the tile id should kick off a boss encounter. Combines
+ * the hardcoded TRIGGER_IDS set (legacy 66/67/68/69 spawn families
+ * exposed via `isEncounterTrigger`) with whatever ids the loaded
+ * `spawn_points.json` introduces — Wyvern (71), Man Eater (75), and
+ * any future module additions.
+ *
+ * Without folding the catalog in, walking onto a Man Eater spawn
+ * tile near the Seat of the Realm did nothing: the spawn loop kept
+ * shedding roamers, but combat never started, so the player had no
+ * way to destroy the lair.
+ */
+export function isSpawnTrigger(
+  tileId: number,
+  spawnPoints: ReadonlyMap<number, SpawnPoint>,
+  isLegacyTrigger: (id: number) => boolean,
+): boolean {
+  if (isLegacyTrigger(tileId)) return true;
+  return spawnPoints.has(tileId);
+}
+
 // ── Pure helpers ───────────────────────────────────────────────────
 
 export interface PartyPos { col: number; row: number }

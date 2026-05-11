@@ -317,21 +317,38 @@ function drawTileEffect(
  * every scene UPDATE event. Returns a teardown function; the helper
  * also auto-cleans on the scene's SHUTDOWN event so callers usually
  * don't need to keep the handle.
+ *
+ * `opts.isVisible(col, row)`, when supplied, is consulted each frame
+ * per animated tile — returning false skips the draw entirely. The
+ * dungeon scene uses this to gate torch/fire flames behind the
+ * party's current line of sight, so torches in chambers the player
+ * has explored but isn't currently lighting stop flickering. Without
+ * the gate, animated flames bleed straight through the fog-of-war
+ * dim layer and look fully bright through walls.
  */
+export interface TileEffectOptions {
+  /** Per-tile visibility filter. Returning false skips the draw for
+   *  this tile this frame. Defaults to "always visible". */
+  isVisible?: (col: number, row: number) => boolean;
+}
+
 export function installTileEffects(
   scene: Phaser.Scene,
   tileMap: TileMap,
   tileSize: number,
   depth: number,
   items?: Map<string, Item>,
+  opts?: TileEffectOptions,
 ): () => void {
   const tiles = collectAnimatedTiles(tileMap, items);
   if (tiles.length === 0) return () => {};
   const g = scene.add.graphics().setDepth(depth);
+  const isVisible = opts?.isVisible;
   const handler = (time: number) => {
     g.clear();
     const t = time * 0.001;
     for (const a of tiles) {
+      if (isVisible && !isVisible(a.col, a.row)) continue;
       drawTileEffect(
         g, a.effect,
         a.col * tileSize, a.row * tileSize, tileSize,

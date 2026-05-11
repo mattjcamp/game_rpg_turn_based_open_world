@@ -166,13 +166,19 @@ export function hasLineOfSight(
  * is always treated as a light source so the player is never standing
  * in pitch black.
  *
- * `isBlocking`, when supplied, enforces line-of-sight: each light's
- * contribution is dropped when an intermediate tile blocks the
- * Bresenham line from light to target. Without it (back-compat for
- * tests that don't care), all lights illuminate radially. Apply this
- * uniformly to map lights AND the party pool — a wall between the
- * party and a tile blocks the party's own pool too, which is what
- * "respects LOS" means in conventional roguelike lighting.
+ * `isBlocking`, when supplied, enforces line-of-sight in two passes:
+ *   1. Light → target — dropped when a wall lies between the light
+ *      source and the cell. Stops a torch's pool from leaking through
+ *      a wall into an adjacent corridor.
+ *   2. Party → target — dropped when a wall lies between the PARTY
+ *      and the cell. Stops a torch in a far chamber from "lighting
+ *      up" tiles the party can't actually see, which would otherwise
+ *      make distant rooms read as fully lit through stone walls.
+ * Both checks are direction-symmetric, so the order doesn't matter.
+ * The party's own pool is naturally gated by (2) too — passing
+ * `isBlocking` is what unlocks the conventional roguelike "you see
+ * what you light + what's in your line of sight to existing lights"
+ * model.
  */
 export function brightnessAt(
   col: number,
@@ -183,19 +189,23 @@ export function brightnessAt(
   isBlocking?: (col: number, row: number) => boolean,
 ): number {
   let best = 0;
+  // Party LOS to the target — used to gate every light source below
+  // when a blocker is supplied. Computed once per cell so we don't
+  // pay for the Bresenham walk per light.
+  const partyLos = !isBlocking
+    || hasLineOfSight(party.col, party.row, col, row, isBlocking);
   // Party light
   const dPartyC = Math.abs(col - party.col);
   const dPartyR = Math.abs(row - party.row);
   const dParty = Math.max(dPartyC, dPartyR);
-  if (dParty <= partyRadius) {
-    if (!isBlocking || hasLineOfSight(party.col, party.row, col, row, isBlocking)) {
-      best = Math.max(best, 1 - dParty / Math.max(partyRadius, 1));
-    }
+  if (dParty <= partyRadius && partyLos) {
+    best = Math.max(best, 1 - dParty / Math.max(partyRadius, 1));
   }
   for (const L of lights) {
     const d = Math.max(Math.abs(col - L.col), Math.abs(row - L.row));
     if (d > L.radius) continue;
     if (isBlocking && !hasLineOfSight(L.col, L.row, col, row, isBlocking)) continue;
+    if (!partyLos) continue;
     const b = 1 - d / Math.max(L.radius, 1);
     if (b > best) best = b;
   }

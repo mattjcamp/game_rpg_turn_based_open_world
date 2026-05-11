@@ -239,6 +239,12 @@ export class TownScene extends Phaser.Scene {
   private mapLights: LightSource[] = [];
   /** Whether the current map renders with darkness — set by collectLightSources. */
   private dark = false;
+  /** Cells the party can currently see (b > 0). Repopulated each
+   *  `refreshDarkness` so the animated-tile-effects gate skips
+   *  flames in rooms outside the party's LOS — without this the
+   *  Phaser update loop redraws every flame every frame regardless
+   *  of darkness, and they bleed through the SEEN_DIM fog layer. */
+  private litCells: Set<string> = new Set();
 
   // Init context
   private townName = "";
@@ -349,6 +355,7 @@ export class TownScene extends Phaser.Scene {
     this.tileSprites = new Map();
     this.mapLights = [];
     this.dark = false;
+    this.litCells = new Set();
   }
 
   /**
@@ -603,8 +610,17 @@ export class TownScene extends Phaser.Scene {
     // Pass the items catalog so `item: "Torch"` tiles route into the
     // same animated-flame painter as `effect: "torch"` (otherwise the
     // wall sconce in the town renders blank — there's no `effect`
-    // field on those tiles, just the `item` attribute).
-    installTileEffects(this, this.tileMap, TILE, 7, this.itemCatalog);
+    // field on those tiles, just the `item` attribute). The visibility
+    // gate prevents torch flames in walled-off rooms from flickering
+    // straight through the fog-of-war dim layer — the user reported
+    // that those distant flames felt disorienting in dungeons, and the
+    // same problem applies to building-space animated torches.
+    installTileEffects(this, this.tileMap, TILE, 7, this.itemCatalog, {
+      // Outdoor maps render every flame all the time (no LOS gating
+      // outside). Indoor maps gate by the litCells set populated in
+      // refreshDarkness — cells the party can currently see.
+      isVisible: (c, r) => !this.dark || this.litCells.has(`${c},${r}`),
+    });
     // Repair NPC positions before they render. Module data sometimes
     // pins an NPC to a non-walkable cell (Calla in Shanty Town,
     // Laird Marrowen in Seat of the Realm) — the bump-to-talk flow
@@ -751,6 +767,11 @@ export class TownScene extends Phaser.Scene {
     // calls it for every (light, target) pair, but the closure can be
     // shared across the W*H * lights iteration of this method.
     const blocks = tileLightBlocker(this.tileMap);
+    // Rebuild the lit-cell set for the animated-effects gate. Cells
+    // with brightness > 0 are "currently visible to the party" — the
+    // animated torches gate themselves on this, so flames in chambers
+    // the party can't see go quiet rather than bleeding through walls.
+    this.litCells = new Set();
     if (!this.dark) {
       // Outdoor / lit map. The only darkness here comes from the game
       // clock (dawn/dusk/night). The party-light tint layer never
@@ -806,6 +827,7 @@ export class TownScene extends Phaser.Scene {
         const rect = this.darkness.get(`${col},${row}`);
         if (!rect) continue;
         const b = brightnessAt(col, row, this.mapLights, party, radius, blocks);
+        if (b > 0) this.litCells.add(`${col},${row}`);
         // Darkness alpha is the inverse of brightness, with a small
         // ambient floor so even fully-lit tiles read as warm rather
         // than 100% transparent. Cap at 0.92 so the player can still

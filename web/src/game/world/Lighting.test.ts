@@ -213,4 +213,30 @@ describe("brightnessAt with LOS", () => {
     const b = brightnessAt(2, 0, torch, farParty, undefined, noBlock);
     expect(a).toBeCloseTo(b);
   });
+
+  it("a torch in a sealed-off chamber doesn't light up cells the party can't see", () => {
+    // Layout: party at (0, 0). Wall at (5, 0) blocks sight of cell
+    // (6, 0). A torch sits at (6, 0) lighting (7, 0) within its own
+    // chamber. The party→cell LOS gate should drop the torch's
+    // contribution to (7, 0) — without the gate, the torch's pool
+    // would brighten (7, 0) and the player would see the chamber
+    // through stone walls.
+    const torch = [{ col: 6, row: 0, radius: 3 }];
+    const party = { col: 0, row: 0 };
+    const blocker = (c: number, r: number): boolean => c === 5 && r === 0;
+    expect(brightnessAt(7, 0, torch, party, 0, blocker)).toBe(0);
+    // Sanity: without the wall, the same torch DOES brighten (7, 0).
+    const noBlock = (): boolean => false;
+    expect(brightnessAt(7, 0, torch, party, 0, noBlock)).toBeGreaterThan(0);
+  });
+
+  it("a torch the party CAN see still contributes (LOS gate is symmetric)", () => {
+    // Open corridor — no wall between party and torch. Even though
+    // the cell is far from the party's own light pool, the torch's
+    // contribution lands because party→cell LOS is clear.
+    const torch = [{ col: 4, row: 0, radius: 3 }];
+    const party = { col: 0, row: 0 };
+    const noBlock = (): boolean => false;
+    expect(brightnessAt(5, 0, torch, party, 0, noBlock)).toBeGreaterThan(0);
+  });
 });

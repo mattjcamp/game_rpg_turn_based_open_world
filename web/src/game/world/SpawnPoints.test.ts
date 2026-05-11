@@ -3,6 +3,7 @@ import {
   parseSpawnPoints,
   trySpawnMonster,
   roamStep,
+  isSpawnTrigger,
   type SpawnPoint,
   type RoamingMonster,
 } from "./SpawnPoints";
@@ -59,6 +60,37 @@ describe("SpawnPoints — loader", () => {
       spawn_points: { "abc": { name: "X" } },
     });
     expect(m.size).toBe(0);
+  });
+});
+
+describe("isSpawnTrigger", () => {
+  // Stand-in for the legacy hardcoded set (66/67/68/69). The real
+  // helper just delegates to whatever predicate the caller passes.
+  const legacy = (id: number): boolean => id >= 66 && id <= 69;
+
+  it("returns true for legacy hardcoded trigger ids", () => {
+    const empty = new Map<number, SpawnPoint>();
+    for (const id of [66, 67, 68, 69]) {
+      expect(isSpawnTrigger(id, empty, legacy)).toBe(true);
+    }
+  });
+
+  it("returns true for a tile id only present in the loaded catalog", () => {
+    const m = parseSpawnPoints({
+      spawn_points: {
+        "75": { name: "Man Eater Spawn", spawn_monsters: ["Man Eater"] },
+      },
+    });
+    // Tile 75 isn't in the legacy set — without folding the catalog
+    // in, the user's report ("can't attack the Man Eater spawn")
+    // reproduces.
+    expect(isSpawnTrigger(75, m, legacy)).toBe(true);
+  });
+
+  it("returns false for plain tiles that no source recognises", () => {
+    const m = parseSpawnPoints({ spawn_points: {} });
+    expect(isSpawnTrigger(0, m, legacy)).toBe(false);
+    expect(isSpawnTrigger(11, m, legacy)).toBe(false);
   });
 });
 

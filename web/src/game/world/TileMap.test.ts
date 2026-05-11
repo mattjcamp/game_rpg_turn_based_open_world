@@ -17,6 +17,8 @@ import {
   TILE_SPAWN_CAMPFIRE,
   isEncounterTrigger,
   populateRuntimeDefs,
+  findArtifactTileId,
+  isArtifactTile,
   _clearRuntimeTileDefs,
 } from "./Tiles";
 
@@ -414,5 +416,78 @@ describe("TileMap — getSignText", () => {
     } finally {
       _clearRuntimeTileDefs();
     }
+  });
+});
+
+describe("artifact tile lookup", () => {
+  function withArtifactDefs<T>(fn: () => T): T {
+    populateRuntimeDefs({
+      "27": {
+        name: "Artifact",
+        walkable: true,
+        sprite: "dungeon/artifact",
+        context: "artifacts",
+      },
+      "65": {
+        name: "Seal of Binding",
+        walkable: true,
+        sprite: "unique_tiles/seal_of_binding",
+        context: "artifacts",
+      },
+      "73": {
+        name: "scroll",
+        walkable: true,
+        sprite: "items/scroll",
+        context: "artifacts",
+      },
+      // A non-artifact in the same cache, just to prove it doesn't
+      // get false-positives.
+      "100": { name: "Door", walkable: true, sprite: "town/door" },
+    });
+    try {
+      return fn();
+    } finally {
+      _clearRuntimeTileDefs();
+    }
+  }
+
+  it("findArtifactTileId looks up an artifact tile by item name", () => {
+    withArtifactDefs(() => {
+      expect(findArtifactTileId("Seal of Binding")).toBe(65);
+      expect(findArtifactTileId("scroll")).toBe(73);
+      expect(findArtifactTileId("Artifact")).toBe(27);
+    });
+  });
+
+  it("findArtifactTileId is case-insensitive and trims whitespace", () => {
+    withArtifactDefs(() => {
+      expect(findArtifactTileId("SEAL OF BINDING")).toBe(65);
+      expect(findArtifactTileId("  scroll  ")).toBe(73);
+    });
+  });
+
+  it("findArtifactTileId returns null when no match exists", () => {
+    withArtifactDefs(() => {
+      expect(findArtifactTileId("Sun Sword")).toBeNull();
+      expect(findArtifactTileId("")).toBeNull();
+    });
+  });
+
+  it("findArtifactTileId ignores tiles outside the 'artifacts' context", () => {
+    withArtifactDefs(() => {
+      // "Door" exists in the cache but in no context — definitely not
+      // an artifact, so the lookup should miss.
+      expect(findArtifactTileId("Door")).toBeNull();
+    });
+  });
+
+  it("isArtifactTile is true for artifact-context tiles only", () => {
+    withArtifactDefs(() => {
+      expect(isArtifactTile(27)).toBe(true);
+      expect(isArtifactTile(65)).toBe(true);
+      expect(isArtifactTile(73)).toBe(true);
+      expect(isArtifactTile(100)).toBe(false);
+      expect(isArtifactTile(999)).toBe(false);  // unknown
+    });
   });
 });

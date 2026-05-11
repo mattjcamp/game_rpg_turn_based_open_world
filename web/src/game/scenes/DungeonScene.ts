@@ -35,6 +35,8 @@ import {
   spriteManifest,
   tileSpriteKey,
   populateRuntimeDefs,
+  findArtifactTileId,
+  isArtifactTile,
 } from "../world/Tiles";
 import { dataPath } from "../world/Module";
 import {
@@ -55,6 +57,7 @@ import {
   activeKillStepsForLocation,
   rosterFor,
   type QuestDef,
+  type QuestStepCallout,
 } from "../world/Quests";
 import {
   flashQuestMessage,
@@ -177,6 +180,13 @@ export class DungeonScene extends Phaser.Scene {
    *  scene shutdown / floor change so phantom markers don't survive
    *  re-entry. The graphics are pulsed in update(). */
   private detectedTrapMarks: Map<string, Phaser.GameObjects.Graphics> = new Map();
+  /** Step-completion callouts queued by `applyPendingKillCredit()` and
+   *  drained at the end of `create()`. Credit runs BEFORE the spawn
+   *  pass (so the spawn sees fresh `stepKills` and doesn't respawn
+   *  the monster the player just killed) but the banner UI has to
+   *  wait until the scene is drawn so it stacks on top. Mirrors the
+   *  same pattern in TownScene. */
+  private pendingStepCallouts: QuestStepCallout[] = [];
   private player!: Phaser.GameObjects.Image;
   /** Bottom-of-viewport log strip — same helper every map scene
    *  uses, so the player has a single consistent place to read time
@@ -228,6 +238,7 @@ export class DungeonScene extends Phaser.Scene {
     this.artifactGlows = new Map();
     for (const h of this.questMonsterGlows.values()) h.destroy();
     this.questMonsterGlows = new Map();
+    this.pendingStepCallouts = [];
     this.questLogClose = undefined;
   }
 
@@ -373,6 +384,19 @@ export class DungeonScene extends Phaser.Scene {
       gameState.dungeonCache.set(key, cached);
     }
     this.levels = cached;
+    // CRITICAL: credit kills BEFORE the artifact / kill-monster spawn
+    // pass. Otherwise on a return from combat the spawn pass sees stale
+    // `stepKills` (the monster we just killed hasn't been credited yet)
+    // and re-spawns the quest target on top of an already-completed
+    // step — producing the "even though the quest was complete, there
+    // is still a quest encounter roaming" report. The credit-then-
+    // spawn ordering also lets `cleanupCompletedQuestMonsters` (called
+    // inside spawnQuestKillMonstersIfNeeded) sweep monsters belonging
+    // to steps the kill just finished, so a 3-target step doesn't
+    // leave the third spawn glowing. Banner UI for the completion is
+    // queued in `pendingStepCallouts` and drained after the scene is
+    // drawn — TownScene uses the same defer.
+    this.applyPendingKillCredit();
     // Place quest collect artifact(s) on the deepest floor if an
     // active quest's collect step targets this dungeon. Idempotent:
     // re-entries skip placement when an artifact for the same step
@@ -432,35 +456,19 @@ export class DungeonScene extends Phaser.Scene {
       this.showMessage(`You enter ${this.level.name}. ${entryTorchMsg}`, 2400);
     }
 
-    // Credit any quest kill steps satisfied by the combat the party
-    // just returned from. The encounter table is the source of truth
-    // for "monster X is in encounter Y's roster"; both `creditKills`
-    // and the dungeon scene share the same loaded copy.
-    if (
-      gameState.pendingKilledMonsters.length > 0 &&
-      this.encounterTable &&
-      this.questDefs.length > 0
-    ) {
-      const result = creditKills(
-        this.questDefs,
-        gameState.moduleQuestStates,
-        this.encounterTable,
-        gameState.pendingKilledMonsters,
-        gameState.combatLocation,
-      );
-      // One callout per step that just completed. Progress messages
-      // (n/N kills) still go to the console; the centered banner is
-      // reserved for transitions the player needs to notice.
-      for (const c of result.callouts) {
-        showStepCompleteCallout(this, {
-          questName: c.questName,
-          description: c.description,
-          questComplete: c.questComplete,
-        });
-      }
-      for (const m of result.messages) console.log("[quest]", m);
+    // Drain step-completion banners queued by `applyPendingKillCredit`
+    // earlier in create(). Credit ran BEFORE the scene was drawn (so
+    // the spawn pass could see fresh `stepKills`); the UI for it has
+    // to wait until now so the banner stacks on top of the rendered
+    // map. One callout per step that just completed.
+    for (const c of this.pendingStepCallouts) {
+      showStepCompleteCallout(this, {
+        questName: c.questName,
+        description: c.description,
+        questComplete: c.questComplete,
+      });
     }
-    gameState.pendingKilledMonsters = [];
+    this.pendingStepCallouts = [];
 
     // Save snapshot — closing the tab inside the dungeon resumes
     // back into this same dungeon on next launch. The payload
@@ -1030,7 +1038,12 @@ export class DungeonScene extends Phaser.Scene {
       }
       return;
     }
-    if (id === TILE_ARTIFACT) {
+    // Any tile in the "artifacts" context (TILE_ARTIFACT plus
+    // per-item ids like Seal of Binding) triggers the pickup flow.
+    // Without this, painting a per-item tile id (so the Sealstone
+    // looks like a sealstone instead of a generic chest) would also
+    // break the pickup — the old check was a hardcoded `=== 27`.
+    if (id === TILE_ARTIFACT || isArtifactTile(id)) {
       this.pickUpArtifact(dp.col, dp.row);
       return;
     }
@@ -1263,12 +1276,48 @@ export class DungeonScene extends Phaser.Scene {
       console.warn(`[quest] Could not place artifact for "${placement.questName}" — no walkable cell.`);
       return;
     }
-    lvl.tiles[pos.row][pos.col] = TILE_ARTIFACT;
+    // Resolve the per-item tile id so the Sealstone shows up as a
+    // sealstone, the Sun Sword shows up as a sword, etc. Falls back
+    // to the generic TILE_ARTIFACT chest icon when no per-item tile
+    // is registered in tile_defs.json — the previous behaviour.
+    const tid = findArtifactTileId(placement.step.collectItem) ?? TILE_ARTIFACT;
+    lvl.tiles[pos.row][pos.col] = tid;
     lvl.questArtifacts[`${pos.col},${pos.row}`] = {
       questName: placement.questName,
       stepIdx: placement.stepIdx,
       itemName: placement.step.collectItem,
     };
+  }
+
+  /**
+   * Credit any quest kill steps satisfied by the combat the party
+   * just returned from, then clear `pendingKilledMonsters`. Called
+   * BEFORE the spawn / cleanup pass so the spawn pass sees the
+   * up-to-date `stepKills` and doesn't respawn the very monster the
+   * player just killed (the user's "encounter still roaming after
+   * quest complete" report). Step-completion banners are queued in
+   * `pendingStepCallouts` and surfaced once the scene is drawn —
+   * mirrors TownScene.
+   */
+  private applyPendingKillCredit(): void {
+    if (
+      gameState.pendingKilledMonsters.length === 0 ||
+      !this.encounterTable ||
+      this.questDefs.length === 0
+    ) {
+      gameState.pendingKilledMonsters = [];
+      return;
+    }
+    const result = creditKills(
+      this.questDefs,
+      gameState.moduleQuestStates,
+      this.encounterTable,
+      gameState.pendingKilledMonsters,
+      gameState.combatLocation,
+    );
+    this.pendingStepCallouts.push(...result.callouts);
+    for (const m of result.messages) console.log("[quest]", m);
+    gameState.pendingKilledMonsters = [];
   }
 
   /**
@@ -1361,9 +1410,12 @@ export class DungeonScene extends Phaser.Scene {
     for (const k of Object.keys(this.level.questArtifacts)) {
       const [c, r] = k.split(",").map((s) => parseInt(s, 10));
       if (!Number.isFinite(c) || !Number.isFinite(r)) continue;
-      // Sanity: only glow if the tile is still TILE_ARTIFACT — a
-      // partially-saved level might have stale entries.
-      if (this.level.tiles[r][c] !== TILE_ARTIFACT) continue;
+      // Sanity: only glow if the tile is still an artifact — a
+      // partially-saved level might have stale entries. Accept the
+      // generic TILE_ARTIFACT id and any per-item tile (Sealstone,
+      // Sun Sword, …) registered in the artifacts context.
+      const tid = this.level.tiles[r][c];
+      if (tid !== TILE_ARTIFACT && !isArtifactTile(tid)) continue;
       const x = c * TILE + TILE / 2;
       const y = r * TILE + TILE / 2;
       this.artifactGlows.set(

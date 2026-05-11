@@ -16,6 +16,14 @@ import {
   type QuestKillSpawnRow,
 } from "./Dungeon";
 import { TILE_DFLOOR, TILE_PATH, TILE_GRASS, TILE_FOREST_ARCHWAY_UP } from "./Tiles";
+import {
+  ensureQuestStates,
+  acceptQuest,
+  creditKills,
+  activeKillStepsForLocation,
+  type QuestState,
+} from "./Quests";
+import type { EncounterTemplate } from "./Encounters";
 
 const TILE_DDOOR = 26;
 
@@ -746,5 +754,53 @@ describe("cleanupCompletedQuestMonsters", () => {
     const after = lvl.monsters.map((m) => m.id);
     cleanupCompletedQuestMonsters([lvl], new Set(["Q|0"]));
     expect(lvl.monsters.map((m) => m.id)).toEqual(after);
+  });
+
+  it("with credit-then-cleanup ordering, the just-killed step's monsters are swept", () => {
+    // Pins the DungeonScene.create() ordering fix: when the player
+    // returns from combat that just completed a kill step, the credit
+    // pass has to run BEFORE the cleanup. Otherwise cleanup sees a
+    // step still in `activeStepKeys`, leaves the (over-spawned) third
+    // monster on the map, and the user reports "even though the quest
+    // was complete, there's still a quest encounter roaming around."
+    const defs = [{
+      name: "Q",
+      description: "",
+      giverNpc: "G", giverSprite: "", giverLocation: "",
+      giverDialogue: "", giverCol: 0, giverRow: 0,
+      rewardXp: 0, rewardGold: 0, rewardItems: [], rewardWorldUnlocks: [],
+      isFinalQuest: false, victoryText: "",
+      steps: [{
+        description: "Slay them",
+        stepType: "kill" as const,
+        encounter: "Wolves and Goblins",
+        collectItem: "",
+        hasGuardian: false,
+        guardianEncounter: "",
+        spawnLocation: "dungeon:Den",
+        targetCount: 1,
+      }],
+    }];
+    const states = new Map<string, QuestState>();
+    ensureQuestStates(defs, states);
+    acceptQuest(states, "Q");
+    const lvl = levelWithMonsters(
+      { id: "leftover", questName: "Q", stepIdx: 0 },
+    );
+    const encounters: Record<string, EncounterTemplate[]> = {
+      dungeon: [{
+        name: "Wolves and Goblins", level: 1, weight: 1, terrain: "land",
+        monsterPartyTile: "Wolf", monsters: ["Wolf", "Goblin"],
+      }],
+    };
+    // Step 1: credit the kill from "the combat the party just left."
+    creditKills(defs, states, encounters, ["Wolf"], "dungeon:Den");
+    expect(states.get("Q")?.stepProgress[0]).toBe(true);
+    // Step 2: cleanup — step "Q|0" is no longer active because the
+    // credit just completed it, so the leftover monster gets swept.
+    const stillActive = activeKillStepsForLocation(defs, states, "dungeon:Den");
+    const activeKeys = new Set(stillActive.map((s) => `${s.questName}|${s.stepIdx}`));
+    cleanupCompletedQuestMonsters([lvl], activeKeys);
+    expect(lvl.monsters).toHaveLength(0);
   });
 });

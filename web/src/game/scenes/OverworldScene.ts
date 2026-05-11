@@ -51,6 +51,7 @@ import {
   loadSpawnPoints,
   trySpawnMonster,
   roamStep,
+  isSpawnTrigger,
   type SpawnPoint,
   type RoamingMonster,
 } from "../world/SpawnPoints";
@@ -434,7 +435,10 @@ export class OverworldScene extends Phaser.Scene {
         // they read as "active lair" without needing a glyph. Other
         // encounter triggers (the rare TILE_ENCOUNTER without an art
         // asset) still get the ✦ marker so the player can spot them.
-        if (isEncounterTrigger(id)) {
+        // `isSpawnTrigger` folds the hardcoded TRIGGER_IDS in with the
+        // loaded spawn catalog so module-defined ids (Wyvern 71,
+        // Man Eater 75, …) are recognised the same way.
+        if (isSpawnTrigger(id, this.spawnPoints, isEncounterTrigger)) {
           if (this.spawnPoints.has(id)) {
             this.spawnSpawnAnimation(id, x, y);
           } else if (!hasSprite) {
@@ -983,7 +987,7 @@ export class OverworldScene extends Phaser.Scene {
 
   private checkEncounter(col: number, row: number): void {
     const id = this.tileMap.getTile(col, row);
-    if (!isEncounterTrigger(id)) return;
+    if (!isSpawnTrigger(id, this.spawnPoints, isEncounterTrigger)) return;
     const key = triggerKey(col, row);
     if (gameState.consumedTriggers.has(key)) return;
     if (gameState.destroyedSpawns.has(key)) return;

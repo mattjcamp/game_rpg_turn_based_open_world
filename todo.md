@@ -7,11 +7,6 @@ python3 main.py
 - Link to other page to show Python and editor version since that is really a challenging process for people to use. In the figure, I will build a cleaner version of this along with a module sharing feature.
 
 ## Bugs
-- The Veyron Family Heirloom quest is broken, there is no scroll in the abandoned building. This is the first quest with an abandoned building FYI.
-- in Shanty Town, an NPC Quest Giver was outside of the town walls in an impossible location. Seat of the Realm had something similar with the quest giver stuck in the water.
-- The Orc Stronghold looked very strange with lighting. You could see torches even when they were not line of sight. It was very difficult to navigate in that way.
-- I encountered a locked door in the orc stronghold and even though I had a Knock spell I could not use it
-- I was not able to attack the Man Eater spawn to destroy it
 
 ## Polish
 
