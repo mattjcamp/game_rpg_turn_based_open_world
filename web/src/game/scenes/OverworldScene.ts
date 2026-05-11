@@ -78,7 +78,6 @@ import {
   type QuestDef,
 } from "../world/Quests";
 import {
-  reachableFrom,
   snapToWalkable,
   tileMapWalk,
 } from "../world/InteriorSpawn";
@@ -1475,22 +1474,27 @@ export class OverworldScene extends Phaser.Scene {
       // the wander tick last left them at.
       let pos = this.questGiverPositions.get(def.name);
       if (!pos) {
-        // Snap unwalkable / unreachable authored coords to the nearest
-        // tile the player can actually reach. Without this, an author
-        // typo (giver placed on a Water tile, or inside a walled-off
-        // shrine) leaves the NPC clipping through scenery and the
-        // bump-to-talk flow can't engage them.
-        const reachable = reachableFrom(
-          tileMapWalk(this.tileMap),
-          gameState.playerPos.col,
-          gameState.playerPos.row,
-        );
+        // Snap unwalkable authored coords to the nearest walkable tile.
+        // Without this, an author typo (giver placed on a Water tile,
+        // or inside a walled-off shrine) leaves the NPC clipping
+        // through scenery and the bump-to-talk flow can't engage them.
+        //
+        // We deliberately DON'T require the snap target to be reachable
+        // from the player's current position. Overview quest givers
+        // legitimately live on other islands the player only reaches
+        // later (via the ship at (1, 18), or after a quest unlocks a
+        // bridge). If we filtered by current reachability, the spiral
+        // search would teleport an island-bound giver like Lori
+        // (Veyron Heirloom, authored at (5, 22) on the Shanty Town
+        // island) onto the starting island next to the player —
+        // letting the player accept the quest but trapping the
+        // Abandoned Building's basement on an island they still can't
+        // reach, making the quest unwinnable.
         const snapped = snapToWalkable(
           tileMapWalk(this.tileMap),
           def.giverCol,
           def.giverRow,
           {
-            reachable,
             occupied: [...this.questGiverPositions.values()].map(
               (p) => [p.col, p.row] as const,
             ),

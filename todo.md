@@ -20,6 +20,7 @@ python3 main.py
 - Make the Fire Breath look more like fire
 - When the party completes the last quest, the game should end
 - Audit the quest system and test how encounters are applied. Add a feature to quest steps that allows us to specify what floor of the dungeon the step occurs. Item retrieval quest may have that I think this issue is mainly for procedural dungeons.
+- Consider making Infravision behave like the original in that it acts like normal vision but shows all tiles in shades of red. Get screenshot from original game to show Claude. Don't mess with the other lighting system, Infravision will no longer be a typical lighting system.
 
 ## Web V2 Refactor Items
 - Curate the data model and remove attributes that are unused

@@ -192,8 +192,10 @@
         "optional": "no"
       }
     ],
-    "giver_col": 6,
-    "giver_row": 21
+    "giver_col": 5,
+    "giver_row": 22,
+    "is_final_quest": false,
+    "victory_text": ""
   },
   {
     "name": "The Crypt Won't Hold Them",
