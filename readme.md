@@ -1,6 +1,6 @@
 # Realm of Shadow
 
-An Ultima III–inspired and D&D top-down, turn-based RPG built with TypeScript and Phaser. Lead a party of four adventurers through a procedurally generated world of overworld exploration, town visits, dungeon delving, and tactical grid combat.
+An Ultima III  and D&D inspired top-down, turn-based RPG built with TypeScript and Phaser. Lead a party of four adventurers through a procedurally generated world of overworld exploration, town visits, dungeon delving, and tactical grid combat.
 
 You can try [Realm of Shadow](https://mattjcamp.github.io/game_rpg_turn_based_open_world/) here on our website.
 
