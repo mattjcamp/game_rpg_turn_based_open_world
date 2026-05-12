@@ -3466,6 +3466,23 @@ export class CombatScene extends Phaser.Scene {
       if (body instanceof Phaser.GameObjects.Image) body.setTint(0x444466).setAlpha(0.4);
       else if (body) body.setFillStyle(0x2a2a3a).setStrokeStyle(1, 0x444466);
       this.selRings.get(c.id)?.setVisible(false);
+    } else {
+      // HP is back above zero — undo any dead-body tint/alpha that the
+      // branch above might have applied earlier in the encounter.
+      // Without this restore, a character freed alive from a Man Eater's
+      // belly (or revived via Heal / Raise Dead) keeps the dim
+      // 0x444466 + alpha 0.4 cast forever, reading on the arena as a
+      // "dark box" instead of their sprite. Rectangle bodies (the
+      // colour-fallback fighters with no sprite loaded) get their
+      // original `c.color` fill and the regular 2px frame back.
+      const body = this.bodies.get(c.id);
+      if (body instanceof Phaser.GameObjects.Image) {
+        body.clearTint();
+        body.setAlpha(1);
+      } else if (body) {
+        const colorHex = Phaser.Display.Color.GetColor(...c.color);
+        body.setFillStyle(colorHex).setStrokeStyle(2, 0x0a0a14);
+      }
     }
   }
 
