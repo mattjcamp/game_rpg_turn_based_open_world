@@ -555,6 +555,33 @@ export function consumeAmmoFromStash(
 }
 
 /**
+ * Consume one unit of the entry at `index` in an inventory list,
+ * decrementing the stack's `charges` instead of nuking the entry when
+ * the stack holds more than one. Splices the entry out only when it
+ * was a single (`charges` absent / 1 / 0).
+ *
+ * Used by the Throw action — without this helper, picking one Rock
+ * from a stack of 20 splices the whole entry and the player loses all
+ * 20. Works for both the shared stash and a member's personal bag
+ * since both are `InventoryItem[]`. Returns true when something was
+ * consumed, false on an out-of-bounds index.
+ */
+export function consumeOneFromStackAt(
+  list: InventoryItem[],
+  index: number,
+): boolean {
+  if (index < 0 || index >= list.length) return false;
+  const entry = list[index];
+  const remaining = (entry.charges ?? 1) - 1;
+  if (remaining <= 0) {
+    list.splice(index, 1);
+  } else {
+    entry.charges = remaining;
+  }
+  return true;
+}
+
+/**
  * True when the shared stash holds at least one charge of
  * `itemName`. Pure-read variant of `findAmmoInStash` for callers that
  * only need a yes/no (UI gating).

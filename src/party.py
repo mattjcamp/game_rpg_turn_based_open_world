@@ -1982,7 +1982,8 @@ def create_default_party(start_col=None, start_row=None,
     If start_col/start_row are provided they override the JSON values.
 
     When *start_with_equipment* is False, every member starts with only
-    Cloth armor and a Club, and the shared inventory receives 6 Rocks.
+    a Club and Cloth armor, the shared inventory is the basic starter
+    kit (1 Torch, 20 Rocks, 10 Lockpicks), and party gold drops to 50.
     """
     cfg = _load_party_config()
     if start_col is None:
@@ -2047,8 +2048,15 @@ def create_default_party(start_col=None, start_row=None,
             }
             member._sync_legacy_fields()
             member.personal_inventory = []
+        # Reset the shared inventory to the starter kit. inv_add handles
+        # the stack/charges bookkeeping so we don't have to mirror the
+        # exact shape party.json uses for these entries.
         party.shared_inventory = []
-        for _ in range(6):
-            party.shared_inventory.append("Rock")
+        party.inv_add("Torch", charges=1)
+        party.inv_add("Rock", charges=20)
+        party.inv_add("Lockpick", charges=10)
+        # Starting gold is also scaled back to 50 so a fresh roster
+        # can't immediately buy out the local shop.
+        party.gold = 50
 
     return party

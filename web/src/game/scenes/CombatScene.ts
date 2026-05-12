@@ -110,6 +110,7 @@ import { Sfx } from "../audio/Sfx";
 import { Music } from "../audio/Music";
 import type { Combatant, AttackResult } from "../types";
 import type { PartyMember } from "../world/Party";
+import { consumeOneFromStackAt } from "../world/Party";
 
 interface CombatSceneData {
   /** True when launched from the overworld; false for the /combat demo. */
@@ -1987,15 +1988,20 @@ export class CombatScene extends Phaser.Scene {
     this.renderPicker("PICK SPELL", lines, this.pickerCursor);
   }
 
-  /** Splice the picked throw item out of its source list now (so the
-   *  player can't pick it again if the throw misses). */
+  /** Drain one unit of the picked throw item now (so the player can't
+   *  pick it again if the throw misses). When the entry is a stack —
+   *  e.g. `{ item: "Rock", charges: 20 }` — only one charge is
+   *  consumed; the entry is spliced out only when the stack hits zero
+   *  (or had no `charges` field to begin with). Previously this
+   *  splice'd the whole entry, so throwing a single rock from a stack
+   *  of 20 nuked all 20. */
   private consumeThrowItem(opt: typeof this.throwOptions[number]): void {
     const member = this.memberForCurrent();
     const party = gameState.partyData;
     if (opt.source === "personal" && member) {
-      member.inventory.splice(opt.index, 1);
+      consumeOneFromStackAt(member.inventory, opt.index);
     } else if (opt.source === "stash" && party) {
-      party.inventory.splice(opt.index, 1);
+      consumeOneFromStackAt(party.inventory, opt.index);
     }
   }
 

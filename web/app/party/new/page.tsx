@@ -608,7 +608,11 @@ export default function NewCharacterPage() {
       wisdom: eff.wisdom,
       level: 1,
       exp: 0,
-      equipped: { rightHand: null, leftHand: null, body: null, head: null },
+      // Every fresh character ships with the basic starter loadout —
+      // a Club in the main hand and Cloth on the body. Durability stays
+      // null so the lazy-init in PartyActions seeds each slot from the
+      // catalog max the first time it's read.
+      equipped: { rightHand: "Club", leftHand: null, body: "Cloth", head: null },
       equippedDurability: { right_hand: null, left_hand: null, body: null, head: null },
       inventory: [],
       sprite: spriteForMember(spritePathFor(avatar), klass),

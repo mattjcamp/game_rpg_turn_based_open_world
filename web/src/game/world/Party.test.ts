@@ -12,9 +12,11 @@ import {
   mergePartyStackables,
   findAmmoInStash,
   consumeAmmoFromStash,
+  consumeOneFromStackAt,
   partyHasAmmo,
   swapToMeleeIfOutOfAmmo,
 } from "./Party";
+import type { InventoryItem } from "./Party";
 import type { Item } from "./Items";
 
 describe("spriteForMember", () => {
@@ -310,6 +312,49 @@ describe("findAmmoInStash / partyHasAmmo / consumeAmmoFromStash", () => {
   it("consumeAmmoFromStash returns false when no matching stack exists", () => {
     const p = partyFromRaw({ inventory: [] });
     expect(consumeAmmoFromStash(p, "Arrows")).toBe(false);
+  });
+});
+
+describe("consumeOneFromStackAt", () => {
+  // Regression: the Throw action used to splice the whole entry out,
+  // so a single thrown rock destroyed all 20 in the stack. This helper
+  // is the fix — it must decrement charges and leave the stack in
+  // place until the last unit is consumed.
+  it("decrements charges on a stack without removing the entry", () => {
+    const list: InventoryItem[] = [{ item: "Rock", charges: 20 }];
+    expect(consumeOneFromStackAt(list, 0)).toBe(true);
+    expect(list).toEqual([{ item: "Rock", charges: 19 }]);
+  });
+
+  it("removes the entry when the last charge is consumed", () => {
+    const list: InventoryItem[] = [{ item: "Rock", charges: 1 }];
+    expect(consumeOneFromStackAt(list, 0)).toBe(true);
+    expect(list).toEqual([]);
+  });
+
+  it("removes a non-stacked single (no charges field) outright", () => {
+    const list: InventoryItem[] = [{ item: "Dagger" }];
+    expect(consumeOneFromStackAt(list, 0)).toBe(true);
+    expect(list).toEqual([]);
+  });
+
+  it("operates on the entry at the given index, not the first matching item", () => {
+    const list: InventoryItem[] = [
+      { item: "Rock", charges: 5 },
+      { item: "Rock", charges: 20 },
+    ];
+    expect(consumeOneFromStackAt(list, 1)).toBe(true);
+    expect(list).toEqual([
+      { item: "Rock", charges: 5 },
+      { item: "Rock", charges: 19 },
+    ]);
+  });
+
+  it("returns false on an out-of-bounds index", () => {
+    const list: InventoryItem[] = [{ item: "Rock", charges: 5 }];
+    expect(consumeOneFromStackAt(list, 1)).toBe(false);
+    expect(consumeOneFromStackAt(list, -1)).toBe(false);
+    expect(list).toEqual([{ item: "Rock", charges: 5 }]);
   });
 });
 

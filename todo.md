@@ -2,6 +2,7 @@ cd /Users/matthewcampbell/Projects/game_rpg_turn_based_open_world/web
 npm run dev
 python3 main.py
 
+
 ## Marketing
 - Make Github site simpler and focus on web version
 - Link to other page to show Python and editor version since that is really a challenging process for people to use. In the figure, I will build a cleaner version of this along with a module sharing feature.
@@ -13,6 +14,7 @@ python3 main.py
 - Do another run through of the quest system
 - Do a full playthrough with the debug party
 - Do a full playthrough with Level 1 characters
+- Make starting party have small number of items and gold
 
 # V2
 
