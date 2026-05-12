@@ -2664,9 +2664,11 @@
             "link_y": "26"
           },
           "7,13": {
-            "walkable": "inherit (yes)",
+            "walkable": "yes (override)",
             "linked": true,
-            "link_map": "overworld"
+            "link_map": "overworld",
+            "link_x": "12",
+            "link_y": "26"
           },
           "1,12": {
             "walkable": "yes (override)",
