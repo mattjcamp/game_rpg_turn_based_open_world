@@ -82,6 +82,7 @@ import {
   getSlotDurability,
   consumeCampingSupplies,
   consumeTorch,
+  refreshItemGrantedEffects,
 } from "../world/PartyActions";
 import {
   loadItems,
@@ -345,6 +346,11 @@ export class PartyScene extends Phaser.Scene {
       this.effects = await loadEffects();
       this.spells = await loadSpells();
       this.items = await loadItems();
+      // Now that both `party` and `items` are loaded, seed the
+      // item-granted-effects cache so the HUD readout picks up auras
+      // (Sun Sword Aura, etc.) on this scene's first frame instead of
+      // waiting for an equip/unequip action to refresh it.
+      if (this.party) refreshItemGrantedEffects(this.party, this.items);
       // Potion recipes back the Alchemist's BREW row. Loaded once
       // per scene boot; the recipe picker re-queries availability
       // against the live stash on each open. A missing/empty file
@@ -648,6 +654,7 @@ export class PartyScene extends Phaser.Scene {
       const r = unequipSlot(m, sel.slot, this.items);
       this.feedback = r.message;
       this.clampDetailCursor(m);
+      if (this.party) refreshItemGrantedEffects(this.party, this.items);
       this.render();
       return;
     }
@@ -676,6 +683,7 @@ export class PartyScene extends Phaser.Scene {
     const r = equipItemFromInventory(m, sel.index, this.items);
     this.feedback = r.message;
     this.clampDetailCursor(m);
+    if (this.party) refreshItemGrantedEffects(this.party, this.items);
     this.render();
   }
 
@@ -695,6 +703,7 @@ export class PartyScene extends Phaser.Scene {
     this.pendingEquipSlots = [];
     this.mode = "detail";
     this.clampDetailCursor(m);
+    if (this.party) refreshItemGrantedEffects(this.party, this.items);
     this.render();
   }
 
@@ -733,6 +742,7 @@ export class PartyScene extends Phaser.Scene {
     // live so it stays correct without this call, but `this.rows` is
     // a snapshot built by buildRows() and stays stale until refreshed.
     this.buildRows();
+    if (this.party) refreshItemGrantedEffects(this.party, this.items);
     this.render();
   }
 

@@ -173,7 +173,49 @@ export interface ActiveEffectReadout {
 const LIGHT_EFFECT_IDS: ReadonlySet<string> = new Set([
   "infravision",
   "galadriels_light",
+  // Sun Sword's "warm golden light" aura — surfaces via the
+  // item-granted lane (grants_effect on the equipped Sun Sword), not
+  // a manual party-effect slot. Listing it here flags it as a light
+  // source so `partyLightRadius` boosts the overlay and the HUD
+  // readout sorts it with the other lights.
+  "sun_sword_aura",
 ]);
+
+/**
+ * Recompute `party.itemGrantedEffectIds` from the currently-equipped
+ * gear of every alive active member. Mirrors the Python game's
+ * `Party.get_item_granted_effects`:
+ *
+ *   - Walks each alive member's four equipment slots.
+ *   - Pulls `grantsEffect` off the item def for each filled slot.
+ *   - Dedupes across members so two characters wielding the same
+ *     magic weapon don't double-stack the aura in the HUD.
+ *
+ * Call this after any equip / unequip / swap action, and once when
+ * a scene mounts and binds party + items. The HUD readout in
+ * `summariseActiveEffects` reads the cached list directly.
+ */
+export function refreshItemGrantedEffects(
+  party: Party,
+  items: Map<string, Item>,
+): void {
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const idx of party.activeParty) {
+    const m = party.roster[idx];
+    if (!m || m.hp <= 0) continue;
+    for (const slot of ["rightHand", "leftHand", "body", "head"] as const) {
+      const itemName = m.equipped[slot];
+      if (!itemName) continue;
+      const def = items.get(itemName);
+      const eid = def?.grantsEffect;
+      if (!eid || seen.has(eid)) continue;
+      seen.add(eid);
+      ids.push(eid);
+    }
+  }
+  party.itemGrantedEffectIds = ids;
+}
 
 /** Display-name fallback for the handful of partyEffects ids the
  *  game ships with. Matches `data/effects.json` so a scene that
@@ -245,6 +287,22 @@ export function summariseActiveEffects(
       charges = party.galadrielsLightSteps;
     }
     out.push({ id, name: nameFor(id), isLight, charges });
+  }
+
+  // Item-granted effects — Sun Sword Aura while the Sun Sword is
+  // equipped, etc. Walked separately from `partyEffects` so they
+  // don't consume one of the four manual slots; deduped against
+  // anything already in the readout (so toggling a slotted effect
+  // ON while the same id is also item-granted doesn't double-render).
+  const seenIds = new Set(out.map((o) => o.id).filter((id) => id !== ""));
+  for (const id of party.itemGrantedEffectIds ?? []) {
+    if (seenIds.has(id)) continue;
+    seenIds.add(id);
+    out.push({
+      id,
+      name: nameFor(id),
+      isLight: LIGHT_EFFECT_IDS.has(id),
+    });
   }
 
   // Sort: lights first, then alpha by name. Inside the lights group,

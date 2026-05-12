@@ -115,6 +115,17 @@ export interface Party {
    * counter rolls over. Undefined = the party has never tinkered.
    */
   lastTinkerDay?: number;
+  /**
+   * Cached union of effect ids granted by magic items currently
+   * equipped on any alive active member — Sun Sword Aura while the
+   * Sun Sword is wielded, etc. Lives in a SEPARATE lane from
+   * `partyEffects` so item auras don't consume one of the four
+   * manual slots (mirrors `Party.get_item_granted_effects` in
+   * src/party.py). Recomputed by `refreshItemGrantedEffects` after
+   * any equip/unequip/swap; the HUD readout in `summariseActiveEffects`
+   * reads it for the lighting + permanent-effect lines.
+   */
+  itemGrantedEffectIds?: readonly string[];
 }
 
 interface RawEquipped {

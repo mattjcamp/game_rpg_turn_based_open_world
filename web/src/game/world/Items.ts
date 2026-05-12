@@ -103,6 +103,15 @@ export interface Item {
    * Python game's `damage_type` field.
    */
   damageType?: string;
+  /**
+   * Effect id this item confers on the party while equipped — Sun
+   * Sword grants `"sun_sword_aura"`, etc. The granted effect is
+   * looked up against effects.json and surfaces in the HUD's active-
+   * effects readout (and any lighting/buff helpers that read effect
+   * ids) for as long as the item stays in a slot. Mirrors the Python
+   * game's `grants_effect` field.
+   */
+  grantsEffect?: string;
 }
 
 interface RawItem {
@@ -129,6 +138,7 @@ interface RawItem {
   icon?: string;
   bonus_damage?: string | number;
   damage_type?: string;
+  grants_effect?: string;
 }
 
 interface RawItems {
@@ -173,6 +183,7 @@ function itemFromRaw(name: string, category: Item["category"], r: RawItem): Item
     icon: r.icon,
     bonusDamage: r.bonus_damage,
     damageType: r.damage_type,
+    grantsEffect: r.grants_effect,
   };
 }
 

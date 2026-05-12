@@ -44,7 +44,7 @@ import {
   LOG_HEIGHT,
   type SceneLogHandle,
 } from "../world/SceneLog";
-import { partyLightRadius } from "../world/PartyActions";
+import { partyLightRadius, refreshItemGrantedEffects } from "../world/PartyActions";
 import { gameState, triggerKey } from "../state";
 import { rememberScene } from "../save";
 import {
@@ -307,6 +307,13 @@ export class OverworldScene extends Phaser.Scene {
     // renders, just without the type-specific glyph.
     try { this.items = await loadItems(); }
     catch { /* items catalog missing — fall back to ★ */ }
+    // Now that `items` is loaded (and partyData has already been
+    // bound earlier in init), seed the item-granted-effects cache so
+    // any aura conferred by currently-equipped magic gear (Sun Sword
+    // Aura, etc.) shows up in the HUD on this scene's first frame.
+    if (gameState.partyData && this.items.size > 0) {
+      refreshItemGrantedEffects(gameState.partyData, this.items);
+    }
 
     // Lift any TILE_BOAT cells into gameState.boatPositions and
     // overwrite the underlying data with water — boats are rendered

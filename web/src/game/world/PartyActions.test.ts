@@ -32,6 +32,7 @@ import {
   useEquippedDurability,
   consumeCampingSupplies,
   consumeTorch,
+  refreshItemGrantedEffects,
 } from "./PartyActions";
 import { memberFromRaw } from "./Party";
 import { partyFromRaw, type Party, activeMembers } from "./Party";
@@ -1483,5 +1484,101 @@ describe("summariseActiveEffects", () => {
     const items = summariseActiveEffects(p);
     expect(items[0].name).toBe("future_effect_xyz");
     expect(items[0].isLight).toBe(false);
+  });
+
+  it("surfaces item-granted effects (Sun Sword Aura) when set on the party", () => {
+    const p = makeParty();
+    p.itemGrantedEffectIds = ["sun_sword_aura"];
+    const items = summariseActiveEffects(p);
+    const aura = items.find((e) => e.id === "sun_sword_aura");
+    expect(aura).toBeDefined();
+    expect(aura!.name).toBe("Sun Sword Aura");
+    expect(aura!.isLight).toBe(true);
+  });
+
+  it("does not double-render an effect that is both slotted and item-granted", () => {
+    const p = makeParty();
+    p.partyEffects.effect_1 = "galadriels_light";
+    p.galadrielsLightSteps = 30;
+    p.itemGrantedEffectIds = ["galadriels_light"];
+    const items = summariseActiveEffects(p);
+    const matches = items.filter((e) => e.id === "galadriels_light");
+    expect(matches).toHaveLength(1);
+  });
+});
+
+// ── refreshItemGrantedEffects ────────────────────────────────────────
+
+function makeItemsCatalog(): Map<string, Item> {
+  const items = new Map<string, Item>();
+  const sword: Item = {
+    name: "Sun Sword",
+    category: "weapons",
+    description: "",
+    slots: ["right_hand", "left_hand"],
+    characterCanEquip: true,
+    partyCanEquip: false,
+    usable: false,
+    effect: null,
+    power: 20,
+    grantsEffect: "sun_sword_aura",
+    bonusDamage: "1d6",
+    damageType: "fire",
+  };
+  items.set("Sun Sword", sword);
+  // A second magic item granting the SAME aura — used to verify dedup.
+  items.set("Sun Shield", {
+    name: "Sun Shield",
+    category: "armors",
+    description: "",
+    slots: ["left_hand"],
+    characterCanEquip: true,
+    partyCanEquip: false,
+    usable: false,
+    effect: null,
+    grantsEffect: "sun_sword_aura",
+  });
+  return items;
+}
+
+describe("refreshItemGrantedEffects", () => {
+  it("populates Sun Sword Aura when any active member wields the Sun Sword", () => {
+    const p = makeParty();
+    p.roster[0].equipped.rightHand = "Sun Sword";
+    refreshItemGrantedEffects(p, makeItemsCatalog());
+    expect(p.itemGrantedEffectIds).toEqual(["sun_sword_aura"]);
+  });
+
+  it("clears the aura when the granting item is unequipped", () => {
+    const p = makeParty();
+    p.roster[0].equipped.rightHand = "Sun Sword";
+    refreshItemGrantedEffects(p, makeItemsCatalog());
+    expect(p.itemGrantedEffectIds).toEqual(["sun_sword_aura"]);
+    p.roster[0].equipped.rightHand = null;
+    refreshItemGrantedEffects(p, makeItemsCatalog());
+    expect(p.itemGrantedEffectIds).toEqual([]);
+  });
+
+  it("deduplicates when two members both grant the same effect", () => {
+    const p = makeParty();
+    p.roster[0].equipped.rightHand = "Sun Sword";
+    p.roster[1].equipped.leftHand = "Sun Shield";
+    refreshItemGrantedEffects(p, makeItemsCatalog());
+    expect(p.itemGrantedEffectIds).toEqual(["sun_sword_aura"]);
+  });
+
+  it("skips dead members so their gear stops radiating effects", () => {
+    const p = makeParty();
+    p.roster[0].equipped.rightHand = "Sun Sword";
+    p.roster[0].hp = 0;
+    refreshItemGrantedEffects(p, makeItemsCatalog());
+    expect(p.itemGrantedEffectIds).toEqual([]);
+  });
+
+  it("ignores items not in the catalog rather than crashing", () => {
+    const p = makeParty();
+    p.roster[0].equipped.rightHand = "Phantom Glaive";
+    refreshItemGrantedEffects(p, makeItemsCatalog());
+    expect(p.itemGrantedEffectIds).toEqual([]);
   });
 });
