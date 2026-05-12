@@ -28,3 +28,9 @@ python3 main.py
 - Make sure that the manual is in sync with the game, character creation screens, etc
 
 
+
+# V2 Editor 
+
+## Built in Editor Checks
+
+- Remember the Sea Shrine that were I forgot to add the coordinates, we should consider a type check for the editing process when linking tiles.
