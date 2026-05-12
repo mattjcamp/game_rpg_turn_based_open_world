@@ -1183,8 +1183,10 @@ export function classifyMenuCast(spell: Spell): MenuCastKind {
 
 // ── Party-wide consumables ────────────────────────────────────────
 
-/** Default torch burn-time when a torch entry doesn't carry an
- *  explicit `charges` field — matches `data/items.json` ("Torch": 150). */
+/** Number of light-steps a single torch provides when lit. Each
+ *  Torch stash entry's `charges` field is the *stack count* (how many
+ *  torches the party is carrying) — not the duration. Lighting one
+ *  consumes one charge and adds this many steps to `party.torchSteps`. */
 const TORCH_DEFAULT_STEPS = 150;
 
 export interface UseItemResult {
@@ -1250,12 +1252,21 @@ export function consumeCampingSupplies(party: Party): UseItemResult {
 }
 
 /**
- * Consume one Torch from the stash and add 150 light-steps to the
- * party's torch counter. Steps tick down inside dark scenes (town
- * interiors / future dungeons); while they're > 0 the party emits an
- * 8-tile light pool via `partyLightRadius`. (No tint — see
- * `refreshDarkness` in TownScene / DungeonScene; the per-effect
- * recolour was dropped because it washed the maps out.)
+ * Light a torch — pull one charge off the Torch stack in the stash
+ * and add `TORCH_DEFAULT_STEPS` light-steps to `party.torchSteps`.
+ * Steps tick down inside dark scenes (town interiors / dungeons);
+ * while they're > 0 the party emits an 8-tile light pool via
+ * `partyLightRadius`. (No tint — see `refreshDarkness` in TownScene
+ * / DungeonScene; the per-effect recolour was dropped because it
+ * washed the maps out.)
+ *
+ * Torches are stackable — the entry's `charges` is the **count** of
+ * torches in the stack (e.g. `charges: 20` = twenty unlit torches),
+ * NOT a duration. Each call consumes exactly one torch (charges -= 1)
+ * and adds a fresh `TORCH_DEFAULT_STEPS` to the burn counter. When
+ * the stack hits zero the entry is spliced so the stash doesn't grow
+ * zero-count tombstones. This mirrors the Rock / Lockpick / Arrows
+ * stacking model the rest of the inventory uses.
  *
  * Stacks with an already-burning torch — using a second torch tops
  * the counter back up rather than starting a fresh one. (Same effect
@@ -1267,14 +1278,18 @@ export function consumeTorch(party: Party): UseItemResult {
     return { ok: false, message: "No torches in the stash." };
   }
   const entry = party.inventory[idx];
-  // Each Torch entry represents one whole torch. If it carries a
-  // partial `charges` value (an editor or save-state may set one),
-  // honour that as the steps remaining; otherwise default to 150.
-  const steps = entry.charges ?? TORCH_DEFAULT_STEPS;
-  party.torchSteps = Math.max(party.torchSteps, 0) + steps;
-  party.inventory.splice(idx, 1);
+  // `charges` is the stack count — entries without it represent a
+  // single torch. Decrement by one; splice the entry when the stack
+  // empties so the stash doesn't accumulate zero-count rows.
+  const remaining = (entry.charges ?? 1) - 1;
+  if (remaining <= 0) {
+    party.inventory.splice(idx, 1);
+  } else {
+    entry.charges = remaining;
+  }
+  party.torchSteps = Math.max(party.torchSteps, 0) + TORCH_DEFAULT_STEPS;
   return {
     ok: true,
-    message: `Torch lit. ${steps} steps of light.`,
+    message: `Torch lit. ${TORCH_DEFAULT_STEPS} steps of light.`,
   };
 }

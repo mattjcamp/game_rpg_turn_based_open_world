@@ -872,7 +872,7 @@
       "icon": "torch",
       "item_type": "torch",
       "stackable": true,
-      "charges": 150,
+      "charges": 1,
       "buy": 5,
       "sell": 2,
       "party_can_equip": true,

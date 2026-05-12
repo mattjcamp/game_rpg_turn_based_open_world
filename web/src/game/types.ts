@@ -38,6 +38,15 @@ export interface Combatant {
    *  Read by Backstab (the dagger gate). Null when fighting unarmed;
    *  undefined for monsters and legacy fixtures. */
   weaponName?: string | null;
+  /** Extra damage dice the equipped weapon adds on hit — Sun Sword's
+   *  1d6 fire, etc. Accepts the same int / "NdM" forms as the
+   *  items.json `bonus_damage` field. Crits double the dice count.
+   *  Absent for ordinary weapons. */
+  weaponBonusDamage?: string | number;
+  /** Damage school the equipped weapon deals — "fire", "cold", …
+   *  Surfaced in the combat log so the player sees the magical flavor.
+   *  Treated as "physical" when absent. */
+  weaponDamageType?: string;
   /** Full ability scores carried over from the PartyMember (or
    *  monster spec). Optional because legacy fixtures and some of the
    *  combat tests omit them — combat helpers default each to 10

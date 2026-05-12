@@ -93,6 +93,45 @@ export function rollDamage(
   return Math.max(1, damage);
 }
 
+/**
+ * Roll a magic-item `bonus_damage` spec — Sun Sword's `"1d6"`, an
+ * Elixir-of-Power weapon's flat `+3`, etc. Mirrors the Python game's
+ * `_roll_bonus_damage`:
+ *
+ *   - Number → flat extra damage. Crits double the value.
+ *   - "NdM" string → roll N d-sided dice (N defaults to 1 when the
+ *     part before "d" is empty, so "d4" works as "1d4"). Crits double
+ *     the dice count, not the per-die maximum.
+ *   - "N" string (no "d") → parsed as a flat number, doubled on crit.
+ *   - Anything unparseable → 0 (bad data shouldn't crash a swing).
+ *
+ * Returns the extra damage to add on top of the base weapon roll —
+ * deliberately *not* min-clamped to 1, because a zero result here just
+ * means "the magic part of the weapon didn't add anything this swing"
+ * and the base roll already covers the "minimum 1 on a hit" rule.
+ */
+export function rollBonusDamage(
+  spec: string | number,
+  critical = false,
+  rng: RNG = defaultRng,
+): number {
+  const multiplier = critical ? 2 : 1;
+  if (typeof spec === "number") {
+    return Math.max(0, Math.floor(spec) * multiplier);
+  }
+  const trimmed = spec.trim().toLowerCase();
+  if (trimmed.includes("d")) {
+    const [nStr, mStr] = trimmed.split("d", 2);
+    const n = nStr === "" ? 1 : parseInt(nStr, 10);
+    const m = parseInt(mStr, 10);
+    if (!Number.isFinite(n) || !Number.isFinite(m) || n <= 0 || m <= 0) return 0;
+    return rollDice(n * multiplier, m, rng);
+  }
+  const flat = parseInt(trimmed, 10);
+  if (!Number.isFinite(flat)) return 0;
+  return Math.max(0, flat * multiplier);
+}
+
 /** Format a modifier as +N or -N. Zero formats as "+0". */
 export function formatModifier(mod: number): string {
   return mod >= 0 ? `+${mod}` : String(mod);

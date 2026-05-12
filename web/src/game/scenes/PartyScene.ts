@@ -726,6 +726,13 @@ export class PartyScene extends Phaser.Scene {
       this.feedback = r.message;
     }
     this.clampDetailCursor(m);
+    // The transfer just mutated `party.inventory` — without rebuilding
+    // the cached row list, ESCing back to inventory mode (or jumping
+    // between characters in detail mode) would still render the
+    // pre-transfer stash. The detail panel itself reads `m.inventory`
+    // live so it stays correct without this call, but `this.rows` is
+    // a snapshot built by buildRows() and stays stale until refreshed.
+    this.buildRows();
     this.render();
   }
 
@@ -1098,6 +1105,13 @@ export class PartyScene extends Phaser.Scene {
     }
     if (this.mode === "detail") {
       this.mode = "inventory";
+      // Safety net: detail-mode actions (unequip, return-to-stash,
+      // give-from-character) mutate party.inventory and member
+      // inventories. Each of those handlers should call buildRows()
+      // itself, but rebuilding on the way back to inventory mode
+      // guarantees the cached stash list always matches the live
+      // party state by the time the user sees it.
+      this.buildRows();
       this.render();
       return;
     }

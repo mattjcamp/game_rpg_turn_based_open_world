@@ -87,6 +87,22 @@ export interface Item {
    * ammo (e.g. Rock — the weapon IS the projectile).
    */
   ammo?: string;
+  /**
+   * Extra damage dice rolled on top of the base weapon roll for magic
+   * weapons (e.g. Sun Sword's `1d6` fire damage). Accepts either a
+   * flat number (`3`) or a dice string (`"1d6"`, `"2d4"`). Crits
+   * double the dice count the same way base damage does. Mirrors the
+   * Python game's `bonus_damage` weapon field.
+   */
+  bonusDamage?: string | number;
+  /**
+   * Damage school for the weapon — `"fire"`, `"cold"`, `"lightning"`,
+   * etc. Used for log flavor today (e.g. "12 dmg (fire)") and for
+   * future resist/vulnerable scaling against monsters. Missing /
+   * `"physical"` is the default and is never scaled. Mirrors the
+   * Python game's `damage_type` field.
+   */
+  damageType?: string;
 }
 
 interface RawItem {
@@ -111,6 +127,8 @@ interface RawItem {
   charges?: number;
   ammo?: string;
   icon?: string;
+  bonus_damage?: string | number;
+  damage_type?: string;
 }
 
 interface RawItems {
@@ -153,6 +171,8 @@ function itemFromRaw(name: string, category: Item["category"], r: RawItem): Item
     charges: r.charges,
     ammo: r.ammo,
     icon: r.icon,
+    bonusDamage: r.bonus_damage,
+    damageType: r.damage_type,
   };
 }
 

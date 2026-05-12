@@ -9,8 +9,10 @@ python3 main.py
 
 ## Bugs
 - THe last Dragon quest had no other encounters. Double check before trying to fix.
+- Monsters in the heirloom quest buiding respawned after I defeated them
 
 ## Polish
+- Add more items to the shops, they are too scarce
 - Do another run through of the quest system
 - Do a full playthrough with the debug party
 - Do a full playthrough with Level 1 characters

@@ -36,7 +36,7 @@ import {
   type Direction,
   type GridPos,
 } from "./Arena";
-import { getModifier, rollAttack, rollD20, rollDamage, rollInitiative } from "./engine";
+import { getModifier, rollAttack, rollBonusDamage, rollD20, rollDamage, rollInitiative } from "./engine";
 import {
   sumBuff,
   tickBuffs,
@@ -462,6 +462,7 @@ export class Combat {
       }
     }
     let damage = 0;
+    let bonusDamage = 0;
     if (roll.hit) {
       // `damage_bonus` buffs (Elixir of Strength) add a flat amount on
       // top of the weapon's dice + base bonus. Critical hits double
@@ -475,6 +476,14 @@ export class Combat {
         critical,
         this.rng
       );
+      // Magic-item bonus damage — Sun Sword's 1d6 fire, etc. Rolled
+      // separately so the dice spec can be either flat ("3") or
+      // "NdM" ("1d6"). Crits double the dice the same way base
+      // damage does. Mirrors the Python game's `_roll_bonus_damage`.
+      if (attacker.weaponBonusDamage != null) {
+        bonusDamage = rollBonusDamage(attacker.weaponBonusDamage, critical, this.rng);
+        damage += bonusDamage;
+      }
       target.hp = Math.max(0, target.hp - damage);
       this.applyOnHitEffects(attacker, target);
     }
@@ -489,12 +498,18 @@ export class Combat {
     // Detailed log line — mirrors the Python game's "(d20:N+M=T vs ACX)"
     // format so the player can see the math behind each swing. The
     // bonus shown is the effective one so a Blessed attacker visibly
-    // adds the +2.
+    // adds the +2. Magic weapons append a damage-type tag so the
+    // player can see Sun Sword's fire damage at a glance.
     const bonusStr = effAtk >= 0 ? `+${effAtk}` : `${effAtk}`;
     const dice = `d20:${roll.roll}${bonusStr}=${roll.total} vs AC${effAc}`;
+    const dmgType = attacker.weaponDamageType;
+    const typeSuffix = dmgType && dmgType !== "physical" ? ` (${dmgType})` : "";
+    const dmgBreakdown = bonusDamage > 0
+      ? ` — ${damage} dmg${typeSuffix} [${damage - bonusDamage}+${bonusDamage} bonus]`
+      : ` — ${damage} dmg${typeSuffix}`;
     this.log.push(
       roll.hit
-        ? `${attacker.name} ${critical ? "crits" : "hits"} ${target.name} (${dice}) — ${damage} dmg${killed ? ", defeated!" : "."}`
+        ? `${attacker.name} ${critical ? "crits" : "hits"} ${target.name} (${dice})${dmgBreakdown}${killed ? ", defeated!" : "."}`
         : `${attacker.name} swings at ${target.name} (${dice}) — miss.`
     );
     return {

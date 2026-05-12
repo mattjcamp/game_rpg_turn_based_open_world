@@ -156,6 +156,13 @@ export function combatantFromMember(
   const stats = combatStatsFor(member, items);
   const tpl = classes?.get(member.class.toLowerCase());
   const baseMoveRange = tpl ? tpl.range : DEFAULT_MOVE_RANGE;
+  // Pull the magic-item bonus damage / damage type straight from the
+  // equipped weapon. Mirrors the Python game's `bonus_damage` +
+  // `damage_type` read inside `_apply_weapon_damage`. Sun Sword shows
+  // up here as `{ weaponBonusDamage: "1d6", weaponDamageType: "fire" }`.
+  const equippedWeapon = member.equipped.rightHand
+    ? items.get(member.equipped.rightHand) ?? null
+    : null;
   return {
     id: `pm:${member.name}`,
     name: member.name,
@@ -181,6 +188,8 @@ export function combatantFromMember(
     charClass: member.class,
     level: member.level,
     weaponName: stats.weaponName,
+    weaponBonusDamage: equippedWeapon?.bonusDamage,
+    weaponDamageType: equippedWeapon?.damageType,
   };
 }
 
@@ -230,6 +239,11 @@ export function refreshCombatantGear(
   // after a mid-combat swap (Thief draws a dagger for a stab, then
   // swaps back to a sword — each attack honours the current pick).
   c.weaponName = weapon ? weapon.name : null;
+  // Refresh magic-item bonus damage + type — equipping Sun Sword
+  // mid-fight should immediately add its 1d6 fire to subsequent
+  // swings (and dropping back to a Sword should stop it).
+  c.weaponBonusDamage = weapon?.bonusDamage;
+  c.weaponDamageType = weapon?.damageType;
 }
 
 /**

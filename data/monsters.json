@@ -457,6 +457,35 @@
       "battle_scale": 1,
       "difficulty": "normal"
     },
+    "Super Zombie": {
+      "description": "A bloated, half-decayed brute. Twice the size of a regular zombie and far harder to put down.",
+      "undead": true,
+      "humanoid": false,
+      "hp": 40,
+      "ac": 11,
+      "attack_bonus": 4,
+      "damage_dice": 1,
+      "damage_sides": 8,
+      "damage_bonus": 2,
+      "xp_reward": 70,
+      "gold_min": 6,
+      "gold_max": 22,
+      "color": [
+        60,
+        90,
+        50
+      ],
+      "spawn_weight": 8,
+      "tile": "game/monsters/super_zombie.png",
+      "move_range": 2,
+      "post_attack_move": 0,
+      "terrain": "land",
+      "spells": null,
+      "on_hit_effects": null,
+      "passives": null,
+      "battle_scale": 1,
+      "difficulty": "hard"
+    },
     "Banshee": {
       "description": "A wailing spirit that drains the life of those who hear her cry.",
       "hp": 35,

@@ -3713,6 +3713,13 @@ export class CombatScene extends Phaser.Scene {
       // drop without breaking the exit flow. Stackable items (arrows,
       // potions, herbs, …) merge into an existing stash entry rather
       // than spawning a new row.
+      //
+      // The catch used to be silent; that hid a class of bugs where a
+      // 404 on items.json/counters.json or a parser throw produced
+      // "gold but never any loot" indistinguishable from a string of
+      // unlucky 25% rolls. Log the failure (and an empty-pool warning
+      // from rollLootDrop's pre-check) so a deployed build can be
+      // diagnosed from the browser console.
       try {
         const [items, counters] = await Promise.all([
           loadItems(),
@@ -3721,9 +3728,16 @@ export class CombatScene extends Phaser.Scene {
         lootDrop = rollLootDrop(items, counters);
         if (lootDrop) {
           addToStash(party, lootDrop, items);
+        } else if (items.size === 0 || counters.size === 0) {
+          console.warn(
+            "CombatScene: loot pool unavailable — items.size=",
+            items.size,
+            "counters.size=",
+            counters.size,
+          );
         }
-      } catch {
-        /* counters/items unavailable — skip drop */
+      } catch (err) {
+        console.warn("CombatScene: loot roll skipped due to error —", err);
       }
     }
     this.showRewardSummary(totalXp, totalGold, lootDrop);

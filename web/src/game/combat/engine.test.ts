@@ -14,6 +14,7 @@ import {
   rollInitiative,
   rollAttack,
   rollDamage,
+  rollBonusDamage,
   formatModifier,
 } from "./engine";
 import { mulberry32 } from "../rng";
@@ -194,5 +195,62 @@ describe("damage rolling", () => {
     const noBonus = rollDamage(1, 6, 0, false, mulberry32(seed));
     const withBonus = rollDamage(1, 6, 5, false, mulberry32(seed));
     expect(withBonus).toBe(noBonus + 5);
+  });
+});
+
+// ── Bonus-damage rolling (magic-item bonus_damage spec) ──────────────
+
+describe("rollBonusDamage", () => {
+  it("returns 0 for unparseable specs rather than throwing", () => {
+    expect(rollBonusDamage("garbage")).toBe(0);
+    expect(rollBonusDamage("dX")).toBe(0);
+    expect(rollBonusDamage("")).toBe(0);
+  });
+
+  it("flat number doubles on crit", () => {
+    expect(rollBonusDamage(3, false)).toBe(3);
+    expect(rollBonusDamage(3, true)).toBe(6);
+  });
+
+  it("flat string ('5') doubles on crit", () => {
+    expect(rollBonusDamage("5", false)).toBe(5);
+    expect(rollBonusDamage("5", true)).toBe(10);
+  });
+
+  it("NdM string rolls N d-M-sided dice within range", () => {
+    const rng = mulberry32(7);
+    for (let i = 0; i < 30; i++) {
+      const r = rollBonusDamage("1d6", false, rng);
+      expect(r).toBeGreaterThanOrEqual(1);
+      expect(r).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it("'d4' parses as '1d4' (defaults the leading count to 1)", () => {
+    const rng = mulberry32(11);
+    for (let i = 0; i < 20; i++) {
+      const r = rollBonusDamage("d4", false, rng);
+      expect(r).toBeGreaterThanOrEqual(1);
+      expect(r).toBeLessThanOrEqual(4);
+    }
+  });
+
+  it("crit doubles dice count, not per-die max", () => {
+    // 1d6 normal → max 6.  1d6 crit → up to 12 across 2d6.
+    const rng = mulberry32(101);
+    let normalMax = 0;
+    let critMax = 0;
+    for (let i = 0; i < 200; i++) {
+      normalMax = Math.max(normalMax, rollBonusDamage("1d6", false, rng));
+      critMax = Math.max(critMax, rollBonusDamage("1d6", true, rng));
+    }
+    expect(normalMax).toBeLessThanOrEqual(6);
+    expect(critMax).toBeGreaterThan(6);
+    expect(critMax).toBeLessThanOrEqual(12);
+  });
+
+  it("zero / negative dice specs return 0", () => {
+    expect(rollBonusDamage("0d6")).toBe(0);
+    expect(rollBonusDamage("1d0")).toBe(0);
   });
 });

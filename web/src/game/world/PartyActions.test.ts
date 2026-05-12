@@ -1323,12 +1323,42 @@ describe("consumeTorch", () => {
     expect(p.torchSteps).toBe(175);
   });
 
-  it("honours an entry's partial `charges` count when present", () => {
+  // Regression: the seed party.json carries `{ item: "Torch", charges: N }`
+  // where N is the stack count (matching how Rocks / Lockpicks / Arrows
+  // are encoded). consumeTorch used to read N as the per-torch step
+  // duration, so a stack of 1 torch burned out after 1 step. It must
+  // instead decrement the stack by one and add a fixed
+  // TORCH_DEFAULT_STEPS regardless of how many torches remain.
+  it("treats charges as stack count — adds 150 steps and decrements the stack", () => {
     const p = makeParty();
-    p.inventory = [{ item: "Torch", charges: 40 }];
+    p.inventory = [{ item: "Torch", charges: 20 }];
+    p.torchSteps = 0;
+    const r = consumeTorch(p);
+    expect(r.ok).toBe(true);
+    expect(p.torchSteps).toBe(150);
+    expect(p.inventory).toEqual([{ item: "Torch", charges: 19 }]);
+  });
+
+  it("removes the entry when the last torch in the stack is lit", () => {
+    const p = makeParty();
+    p.inventory = [{ item: "Torch", charges: 1 }];
     p.torchSteps = 0;
     consumeTorch(p);
-    expect(p.torchSteps).toBe(40);
+    expect(p.torchSteps).toBe(150);
+    expect(p.inventory.find((it) => it.item === "Torch")).toBeUndefined();
+  });
+
+  it("burns through a 3-torch stack across three light-ups", () => {
+    const p = makeParty();
+    p.inventory = [{ item: "Torch", charges: 3 }];
+    p.torchSteps = 0;
+    consumeTorch(p);
+    consumeTorch(p);
+    consumeTorch(p);
+    expect(p.torchSteps).toBe(450);
+    expect(p.inventory.find((it) => it.item === "Torch")).toBeUndefined();
+    // Fourth call fails — out of torches.
+    expect(consumeTorch(p).ok).toBe(false);
   });
 });
 
