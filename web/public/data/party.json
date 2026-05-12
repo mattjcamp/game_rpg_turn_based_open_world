@@ -50,7 +50,7 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/game/characters/thief.png"
+      "sprite": "src/assets/game/npcs/villager_child.png"
     },
     {
       "name": "Selina",
@@ -96,7 +96,7 @@
         "head": null
       },
       "inventory": [],
-      "sprite": "src/assets/game/characters/wizard.png"
+      "sprite": "src/assets/game/characters/illusionist.png"
     }
   ],
   "active_party": [
