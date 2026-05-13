@@ -3,18 +3,23 @@ npm run dev
 python3 main.py
 
 ## Bugs
-- The last Dragon quest had no other encounters. Double check before trying to fix.
-- Monsters in the heirloom quest buiding respawned after I defeated them
 
-## Polish
+- Monsters in the heirloom quest buiding respawned after I defeated them
+- When a character dies, any effects like Detect Traps should go away until he is revived and the effect is reset
+- The Man Eater effect acts weird. After the character breaks free, his graphic never appears. You can only see a box highted around him.
+- Cleric's regeneration spell did not regenerate magic points for the wizard
 
 # V2
 
+## Bugs
+
 ## Polish
+- The Sun Sword should have an animation effect when the fire damage happens
 - Make the Fire Breath look more like fire
 - When the party completes the last quest, the game should end
-- Audit the quest system and test how encounters are applied. Add a feature to quest steps that allows us to specify what floor of the dungeon the step occurs. Item retrieval quest may have that I think this issue is mainly for procedural dungeons.
-- Consider making Infravision behave like the original in that it acts like normal vision but shows all tiles in shades of red. Get screenshot from original game to show Claude. Don't mess with the other lighting system, Infravision will no longer be a typical lighting system.
+- Audit the quest system and test how encounters are applied. Add a feature to quest steps that allows us to specify what floor of the dungeon the step occurs. Item retrieval quest may have that I think this issue is mainly for procedural dungeons. Note that the last dungeon Dragon quest was very anti-climatic since the Dragon was just near the entrance
+- Consider making Infravision behave like the original in that it acts like normal vision but shows all tiles in shades of red. Get screenshot from original game to show Claude. Don't mess with the other lighting system, Infravision will no longer be a typical lighting system. Or instead of that maybe remove Galadrial's Light since it ends up being redundant
+- Audit the timing of procedural dungeon generation. Do we want these to be fresh for each playthrough?
 
 ## Web V2 Refactor Items
 - Curate the data model and remove attributes that are unused
@@ -26,8 +31,6 @@ python3 main.py
 - create outline for random lore generation. Make a user control that lists out things like cultures, races, lost civilizations, events, epics, names, gods, current people. A user control could generate this content (outline first) and lore will be saved to data files so the user can make minor changes. The lore will be used in the content creation in some way.
 - Add books feature to add a way to communicate content
 - Make sure that the manual is in sync with the game, character creation screens, etc
-
-
 
 # V2 Editor 
 
