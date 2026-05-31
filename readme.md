@@ -1,3 +1,17 @@
+# NOTE development on Realm of Shadow has Stopped
+
+I made the decision to start this project over in order to make it a browser first game, including the game editor tool itself. Since this project grew too complicated, I decided to start over uisng all the lessons learned and ported the web based version of the game written in TypeScript and Phaser into a new project:
+
+[https://github.com/mattjcamp/wilderstep_infinite_abyss](https://github.com/mattjcamp/wilderstep_infinite_abyss)
+
+
+
+
+
+
+------
+
+
 # Realm of Shadow
 
 An Ultima III  and D&D inspired top-down, turn-based RPG built with TypeScript and Phaser. Lead a party of four adventurers through a procedurally generated world of overworld exploration, town visits, dungeon delving, and tactical grid combat.
