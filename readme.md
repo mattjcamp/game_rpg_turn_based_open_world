@@ -8,7 +8,7 @@ The data models have been refactored and the map/link system has been simplified
 
 You can try the game (I have one short module ready named "The Dragon's Lair"). You can play with the editor, but there is no way to publish modules from your browser yet.
 
-**[Try Wilderstep](https://mattjcamp.github.io/wilderstep_infinite_abyss/)**
+**[Try Wilderstep:Infinite Abyss](https://mattjcamp.github.io/wilderstep_infinite_abyss/)**
 
 ------
 
