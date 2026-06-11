@@ -51,7 +51,9 @@
       }
     ],
     "giver_col": 8,
-    "giver_row": 12
+    "giver_row": 12,
+    "is_final_quest": false,
+    "victory_text": ""
   },
   {
     "name": "Whatever Killed Maric",

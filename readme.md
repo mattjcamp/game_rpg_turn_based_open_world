@@ -1,17 +1,10 @@
-# NOTE Development on Realm of Shadow has Stopped
+<div align="center">
 
-I made the decision to start this project over in order to make it a browser first game, including the game editor tool itself. Since this project grew too complicated, I decided to start over uisng all the lessons learned and ported the web based version of the game written in TypeScript and Phaser into a new project:
+[![DEPRECATED — We are developing a new game here](https://img.shields.io/badge/⚠️_DEPRECATED-We_are_developing_a_new_game_here_→-red?style=for-the-badge)](https://github.com/mattjcamp/wilderstep_infinite_abyss)
 
-[https://github.com/mattjcamp/wilderstep_infinite_abyss](https://github.com/mattjcamp/wilderstep_infinite_abyss)
+</div>
 
-The data models have been refactored and the map/link system has been simplified to make things less error prone. And the game editor uses a React UI which is far better that the Python frontend which was primarily meant for games and not rich applications. The game and editor now work, but in order to provide a "dungeon master" experience for players I will need to set up a server infrastructure that can manage an API. We have a plan in place, but it's big feature so .... well, you know how that goes.
-
-You can try the game (I have one short module ready named "The Dragon's Lair"). You can play with the editor, but there is no way to publish modules from your browser yet.
-
-**[Try Wilderstep:Infinite Abyss](https://mattjcamp.github.io/wilderstep_infinite_abyss/)**
-
-------
-
+---
 
 # Realm of Shadow
 
