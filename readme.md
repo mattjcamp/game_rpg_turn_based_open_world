@@ -1,6 +1,6 @@
 <div align="center">
 
-[![DEPRECATED — We are building the game here now](https://img.shields.io/badge/⚠️_DEPRECATED-We_are_building_the_game_here_now_→-red?style=for-the-badge)](https://github.com/mattjcamp/wilderstep_infinite_abyss)
+<a href="https://github.com/mattjcamp/wilderstep_infinite_abyss"><img src="https://img.shields.io/badge/⚠️_DEPRECATED-We_are_building_the_game_here_now_→-red?style=for-the-badge" alt="DEPRECATED — We are building the game here now" width="700"></a>
 
 </div>
 
